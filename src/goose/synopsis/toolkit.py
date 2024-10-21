@@ -182,3 +182,15 @@ class SynopsisDeveloper(Toolkit):
             self.notifier.log(f"Failed fetching with HTTP error: {exc.response.status_code}")
         except Exception as exc:
             self.notifier.log(f"Failed fetching with error: {str(exc)}")
+
+    @tool
+    def get_hints(self, query: str, tags: list[str], limit: int) -> list[str]:
+        """Get developer hints that might help with completing the coding task. Fetch relevant hints at the beginning
+           of any plan execution.
+
+        Args:
+            query (str): A query for relevant developer hints, e.g., "update proto files" or "generate unit tests"
+            tags (list[str]): A list of metadata tags relevant to the search eg., ["java", "proto update", "unit tests"]
+            limit (int): Number of relevant documents to return.
+        """
+        return get_developer_hints(self.db, query, tags, limit)
