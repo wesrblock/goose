@@ -1,29 +1,166 @@
 import os
 import json
 import re
-
-import httpx
+import asyncio
 import base64
-
+import httpx
+import websocket
+from typing import Optional, Any, Dict, List, Tuple
 from exchange.content import Text, ToolResult, ToolUse
 from exchange.message import Message
 from exchange.providers.base import Provider, Usage
 from exchange.tool import Tool
 from tenacity import retry, wait_fixed, stop_after_attempt
-from exchange.providers.utils import retry_if_status
+from exchange.providers.utils import retry_if_status, openai_single_message_context_length_exceeded
 from exchange.langfuse_wrapper import observe_wrapper
-
-
-import websocket
-import time
-import os
-import json
-from typing import Optional
 
 class RealtimeWebSocket:
     def __init__(self):
         self.ws: Optional[websocket.WebSocket] = None
+        self._tool_call_count: int = 0
+        self._max_tool_calls: int = 10
+        self._current_tool_result: Optional[str] = None
+        self._current_tool_id: Optional[str] = None
+        self._current_tool_call: Optional[dict] = None
+        self.is_first_connection: bool = True
+    
+    @property
+    def tool_call_count(self) -> int:
+        """Get the current tool call count."""
+        return self._tool_call_count
         
+    @tool_call_count.setter 
+    def tool_call_count(self, value: int):
+        """Set the tool call count."""
+        self._tool_call_count = value
+
+    @property
+    def max_tool_calls(self) -> int:
+        """Get the maximum allowed tool calls."""
+        return self._max_tool_calls
+        
+    @property
+    def current_tool_call(self) -> Optional[dict]:
+        """Get the current tool call details."""
+        return self._current_tool_call
+        
+    @current_tool_call.setter
+    def current_tool_call(self, value: Optional[dict]):
+        """Set the current tool call details."""
+        self._current_tool_call = value
+        
+    @property
+    def current_tool_result(self) -> Optional[str]:
+        """Get the current tool execution result."""
+        return self._current_tool_result
+        
+    @current_tool_result.setter
+    def current_tool_result(self, value: Optional[str]):
+        """Set the current tool execution result."""
+        self._current_tool_result = value
+        
+    def _handle_event(self, event: Dict[str, Any], content_text: str, tool_calls: List[Dict[str, Any]]) -> Tuple[bool, str]:
+        """Handle a single event in the response stream.
+        
+        Returns:
+            Tuple[bool, str] indicating if processing should end and current content text.
+        """
+        event_type = event["type"]
+        
+        if event_type == "error":
+            # Clean up websocket state
+            try:
+                if self.ws and self.ws.connected:
+                    self.ws.close()
+            except:
+                pass
+            self.ws = None
+            
+            # Reset tool call state
+            self.current_tool_result = None
+            self.current_tool_call = None
+            self.tool_call_count = 0
+            
+            raise RuntimeError(f"API Error: {event['error']}")
+            
+        elif event_type == "response.text.delta":
+            content_text += event["delta"]
+            
+        elif event_type == "response.function_call_arguments.delta":
+            self._handle_tool_call_delta(event, tool_calls)
+            
+        elif event_type == "response.function_call_arguments.done":
+            self._handle_tool_call_done(event, tool_calls)
+            
+        return False, content_text  # Continue processing by default
+            
+    def _handle_tool_call_delta(self, event: Dict[str, Any], tool_calls: List[Dict[str, Any]]) -> None:
+        """Handle an incremental tool call argument update."""
+        # If we already have a tool result, stop processing new tool calls 
+        if self.current_tool_result is not None:
+            return
+
+        # Initialize or update current tool call
+        if not self.current_tool_call:
+            tool_id = event.get("tool_call_id", f"call_{len(tool_calls)}")
+            self.tool_call_count += 1
+            self.current_tool_call = {
+                "id": tool_id,
+                "type": "function",
+                "function": {
+                    "name": event.get("function_name", "shell"),
+                    "arguments": event["delta"]
+                }
+            }
+        else:
+            # Only append if it's for the same tool call
+            if event.get("tool_call_id") == self.current_tool_call["id"]:
+                self.current_tool_call["function"]["arguments"] += event["delta"]
+            
+    def _handle_tool_call_done(self, event: Dict[str, Any], tool_calls: List[Dict[str, Any]]) -> None:
+        """Handle tool call completion."""
+        if self.current_tool_call:
+            try:
+                args_str = self.current_tool_call["function"]["arguments"]
+                args = json.loads(args_str)  # Validate JSON
+                
+                # Store tool call ID for reference
+                self._current_tool_id = self.current_tool_call["id"]
+                self.current_tool_call["function"]["arguments"] = json.dumps(args)  # Clean JSON
+                
+                # Add to completed tool calls
+                tool_calls.append(self.current_tool_call)
+                
+                # Execute tool if needed
+                if self.current_tool_call["function"]["name"] == "shell":
+                    try:
+                        from subprocess import run, PIPE
+                        proc = run(
+                            args.get("command", ""),
+                            shell=True,
+                            stdout=PIPE,
+                            stderr=PIPE,
+                            timeout=10,
+                            text=True
+                        )
+                        self.current_tool_result = (
+                            proc.stdout if proc.returncode == 0
+                            else f"Error: {proc.stderr}"
+                        )
+                    except TimeoutExpired as e:
+                        self.current_tool_result = "Error: Command timed out"
+                    except Exception as e:
+                        self.current_tool_result = f"Error executing command: {str(e)}"
+            
+            except json.JSONDecodeError:
+                # Handle invalid JSON in tool arguments
+                self.current_tool_call["error"] = f"Invalid JSON arguments: {args_str}"
+                tool_calls.append(self.current_tool_call)
+            
+            finally:
+                # Always clear current tool call
+                self.current_tool_call = None
+
     def connect(self) -> bool:
         """Connect to the OpenAI realtime API."""
         url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
@@ -38,196 +175,240 @@ class RealtimeWebSocket:
         except Exception as e:
             print(f"Failed to connect: {e}")
             return False
-            
-    def send_openai(self, message: str) -> dict:
-        """Send a message to OpenAI and receive the response."""
-        if not self.ws:
-            raise RuntimeError("Not connected to websocket")
-            
-        event = {
-            "type": "conversation.item.create",
-            "item": {
-                "type": "message",
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": message}
-                ]
-            }
-        }
 
-        self.ws.send(json.dumps(event))
-        response = self.ws.recv()
-        return json.loads(response)
-    
-    def openai_socket_message(self, message: str) -> str:
-        """Send a message to OpenAI and receive the response."""
-        if not self.ws:
-            raise RuntimeError("Not connected to websocket")
-
-        self.ws.send(message)
-        response = self.ws.recv()
-        return response
+    def send_message(
+        self, 
+        message: str, 
+        history: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        timeout: int = 60  # Add timeout parameter
+    ) -> Dict[str, Any]:
+        """Send a message and collect the response.
         
+        Args:
+            message: The current message to send
+            history: Optional list of previous messages to include (for first connection)
+            tools: Optional list of tools to enable
+            timeout: Maximum seconds to wait for response (default 60)
+        """
+        try:
+            # Set socket timeout
+            if self.ws:
+                self.ws.settimeout(timeout)
+
+            if not self.ws or not self.ws.connected:
+                if not self.connect():
+                    raise RuntimeError("Failed to connect to websocket")
+                else:
+                    for hist_msg in history:
+                        hist_event = {
+                            "type": "conversation.item.create",
+                            "item": hist_msg
+                        }
+                        self.ws.send(json.dumps(hist_event))
+
+            # Create a new response
+            response_create = {
+                "type": "response.create",
+                "response": {
+                    "modalities": ["text"],
+                    "instructions": "You are a helpful AI assistant that can view files and edit code. After every tool call, wait for the result before proceeding."
+                }
+            }
+            if tools:
+                response_create["response"]["tools"] = tools
+
+            # Send the current user message
+            # Record any previous tool results before sending new message
+            if self.current_tool_result is not None:
+                print(f"DEBUG: Sending tool result: {self.current_tool_result}")
+                result_event = {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{
+                            "type": "input_text",
+                            "text": f"Tool result:\n{self.current_tool_result}"
+                        }]
+                    }
+                }
+                self.ws.send(json.dumps(result_event))
+                self.current_tool_result = None
+                self.current_tool_id = None
+
+            # Send the current user message
+            message_event = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": message}
+                    ]
+                }
+            }
+
+            self.ws.send(json.dumps(message_event))
+            self.ws.send(json.dumps(response_create))
+
+            # Collect response until done
+            content_text = ""
+            tool_calls = []
+            current_tool_call = None
+
+            start_time = asyncio.get_event_loop().time()
+
+            while True:
+                # Check timeout
+                if asyncio.get_event_loop().time() - start_time > timeout:
+                    raise TimeoutError("Response timeout exceeded")
+
+                try:
+                    raw_event = self.ws.recv()
+                    event = json.loads(raw_event)
+                    print(f"DEBUG: Received event type {event['type']}")
+                except (websocket.WebSocketTimeoutException, json.JSONDecodeError) as e:
+                    raise RuntimeError(f"WebSocket error: {str(e)}")
+
+                if self.tool_call_count >= self.max_tool_calls:
+                    print("DEBUG: Maximum tool calls reached, stopping interaction")
+                    raise RuntimeError(f"Exceeded maximum tool calls ({self.max_tool_calls})")
+
+                if event["type"] == "error":
+                    raise RuntimeError(f"API Error: {event['error']}")
+
+                elif event["type"] == "response.text.delta":
+                    content_text += event["delta"]
+
+                elif event["type"] == "response.function_call_arguments.delta":
+                    if not current_tool_call:
+                        # Start new tool call
+                        tool_id = event.get("tool_call_id", f"call_{len(tool_calls)}")
+                        self.tool_call_count += 1
+                        print(f"DEBUG: Starting tool call #{self.tool_call_count}, id={tool_id}")
+                        current_tool_call = {
+                            "id": tool_id,
+                            "type": "function",
+                            "function": {
+                                "name": event.get("function_name", "shell"),
+                                "arguments": event["delta"]
+                            }
+                        }
+                    else:
+                        current_tool_call["function"]["arguments"] += event["delta"]
+
+                elif event["type"] == "response.function_call_arguments.done":
+                    if current_tool_call:
+                        # Complete the current tool call
+                        try:
+                            args_str = current_tool_call["function"]["arguments"]
+                            args = json.loads(args_str)  # Validate JSON
+                            
+                            # Store tool call ID for reference
+                            self.current_tool_id = current_tool_call["id"]
+                            current_tool_call["function"]["arguments"] = json.dumps(args)  # Ensure clean JSON
+                            
+                            # Add to completed tool calls
+                            tool_calls.append(current_tool_call)
+                            
+                            # Execute tool if needed
+                            if current_tool_call["function"]["name"] == "shell":
+                                try:
+                                    from subprocess import run, PIPE, TimeoutExpired
+                                    proc = run(
+                                        args.get("command", ""), 
+                                        shell=True,
+                                        stdout=PIPE,
+                                        stderr=PIPE,
+                                        timeout=10,
+                                        text=True
+                                    )
+                                    self.current_tool_result = (
+                                        proc.stdout if proc.returncode == 0 
+                                        else f"Error: {proc.stderr}"
+                                    )
+                                except TimeoutExpired:
+                                    self.current_tool_result = "Error: Command timed out"
+                                except Exception as e:
+                                    self.current_tool_result = f"Error executing command: {str(e)}"
+
+                                # Send back tool result more efficiently - just the first few lines if it's too long    
+                                if self.current_tool_result and len(self.current_tool_result) > 500:
+                                    lines = self.current_tool_result.splitlines()[:10]
+                                    self.current_tool_result = "\n".join(lines) + "\n...(truncated for length)"
+                                
+                        except json.JSONDecodeError:
+                            current_tool_call["error"] = f"Invalid JSON arguments: {args_str}"
+                            tool_calls.append(current_tool_call)
+                        
+                        current_tool_call = None
+
+                elif event["type"] == "response.done":
+                    # Check if we are in the middle of a tool call that needs completion
+                    if current_tool_call:
+                        print("DEBUG: Warning - response.done received with incomplete tool call")
+                        # Add the incomplete tool call with an error
+                        current_tool_call["error"] = "Tool call was interrupted before completion"
+                        tool_calls.append(current_tool_call)
+                    
+                    # Check tool call state 
+                    if tool_calls and not self.current_tool_result:
+                        print("DEBUG: Tool calls present but no result yet - continuing to wait")
+                        continue
+                      
+                    # Close and reset the connection to avoid "active response" errors
+                    try:
+                        self.ws.close()
+                    except:
+                        pass
+                    self.ws = None
+                    
+                    # Format final response
+                    response = {
+                        "id": "rt_" + os.urandom(8).hex(),
+                        "choices": [{
+                            "message": {
+                                "role": "assistant",
+                                "content": content_text if content_text else None,
+                            },
+                            "finish_reason": "stop"
+                        }],
+                        "usage": {
+                            "prompt_tokens": None,
+                            "completion_tokens": None,
+                            "total_tokens": None
+                        }
+                    }
+
+                    if tool_calls:
+                        print(f"DEBUG: Finalizing response with {len(tool_calls)} tool calls")
+                        response["choices"][0]["message"]["tool_calls"] = tool_calls
+                        # Clear tool state for next interaction
+                        self.current_tool_result = None
+                        self.current_tool_id = None
+                        self.tool_call_count = 0
+
+                    print("DEBUG: Returning final response")
+                    return response
+
+        except Exception as e:
+            # Clean up on error
+            if self.ws and self.ws.connected:
+                try:
+                    self.ws.close()
+                except:
+                    pass
+                self.ws = None
+            raise e
+
+        return {}
+
     def close(self):
         """Close the websocket connection."""
         if self.ws:
             self.ws.close()
             self.ws = None
-
-
-
-# Copied local functions for openai_response_to_message modification.
-
-
-
-def openai_response_to_message(response: dict) -> Message:
-    original = response["choices"][0]["message"]
-    content = []
-    text = original.get("content")
-    if text:
-        content.append(Text(text=text))
-
-    tool_calls = original.get("tool_calls")
-    if tool_calls:
-        for tool_call in tool_calls:
-            try:
-                function_name = tool_call["function"]["name"]
-                if not re.match(r"^[a-zA-Z0-9_-]+$", function_name):
-                    content.append(
-                        ToolUse(
-                            id=tool_call["id"],
-                            name=function_name,
-                            parameters=tool_call["function"]["arguments"],
-                            is_error=True,
-                            error_message=f"The provided function name '{function_name}' had invalid characters, it must match this regex [a-zA-Z0-9_-]+",
-                        )
-                    )
-                else:
-                    content.append(
-                        ToolUse(
-                            id=tool_call["id"],
-                            name=function_name,
-                            parameters=json.loads(tool_call["function"]["arguments"]),
-                        )
-                    )
-            except json.JSONDecodeError:
-                content.append(
-                    ToolUse(
-                        id=tool_call["id"],
-                        name=tool_call["function"]["name"],
-                        parameters=tool_call["function"]["arguments"],
-                        is_error=True,
-                        error_message=f"Could not interpret tool use parameters for id {tool_call['id']}: {tool_call['function']['arguments']}",
-                    )
-                )
-
-    return Message(role="assistant", content=content)
-
-
-from exchange.providers.utils import ( openai_single_message_context_length_exceeded, raise_for_status )
-
-# Copied local functions for modification
-
-
-def encode_image(image_path: str) -> str:
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
-
-def messages_to_openai_spec(messages: list[Message]) -> list[dict[str, any]]:
-    messages_spec = []
-    for message in messages:
-        converted = {"role": message.role}
-        output = []
-        for content in message.content:
-            if isinstance(content, Text):
-                converted["content"] = content.text
-            elif isinstance(content, ToolUse):
-                sanitized_name = re.sub(r"[^a-zA-Z0-9_-]", "_", content.name)
-                converted.setdefault("tool_calls", []).append(
-                    {
-                        "id": content.id,
-                        "type": "function",
-                        "function": {
-                            "name": sanitized_name,
-                            "arguments": json.dumps(content.parameters),
-                        },
-                    }
-                )
-            elif isinstance(content, ToolResult):
-                if content.output.startswith('"image:'):
-                    image_path = content.output.replace('"image:', "").replace('"', "")
-                    output.append(
-                        {
-                            "role": "tool",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": "This tool result included an image that is uploaded in the next message.",
-                                },
-                            ],
-                            "tool_call_id": content.tool_use_id,
-                        }
-                    )
-                    output.append(
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": f"data:image/jpeg;base64,{encode_image(image_path)}"},
-                                }
-                            ],
-                        }
-                    )
-
-                else:
-                    output.append(
-                        {
-                            "role": "tool",
-                            "content": content.output,
-                            "tool_call_id": content.tool_use_id,
-                        }
-                    )
-
-        if "content" in converted or "tool_calls" in converted:
-            output = [converted] + output
-        messages_spec.extend(output)
-    return messages_spec
-
-
-def tools_to_openai_spec(tools: tuple[Tool, ...]) -> dict[str, any]:
-    tools_names = set()
-    result = []
-    for tool in tools:
-        if tool.name in tools_names:
-            # we should never allow duplicate tools
-            raise ValueError(f"Duplicate tool name: {tool.name}")
-        result.append(
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.parameters,
-                },
-            }
-        )
-        tools_names.add(tool.name)
-    return result
-
-
-
-
-
-OPENAI_HOST = "https://api.openai.com/"
-
-retry_procedure = retry(
-    wait=wait_fixed(2),
-    stop=stop_after_attempt(2),
-    retry=retry_if_status(codes=[429], above=500),
-    reraise=True,
-)
-
 
 class OpenAiRealtimeProvider(Provider):
     """Provides chat completions for models hosted directly by OpenAI."""
@@ -243,7 +424,7 @@ class OpenAiRealtimeProvider(Provider):
     @classmethod
     def from_env(cls: type["OpenAiRealtimeProvider"]) -> "OpenAiRealtimeProvider":
         cls.check_env_vars(cls.instructions_url)
-        url = os.environ.get("OPENAI_HOST", OPENAI_HOST)
+        url = os.environ.get("OPENAI_HOST", "https://api.openai.com/")
         key = os.environ.get("OPENAI_API_KEY")
 
         client = httpx.Client(
@@ -255,19 +436,33 @@ class OpenAiRealtimeProvider(Provider):
 
     @staticmethod
     def get_usage(data: dict) -> Usage:
-        usage = data.pop("usage")
-        input_tokens = usage.get("prompt_tokens")
-        output_tokens = usage.get("completion_tokens")
-        total_tokens = usage.get("total_tokens")
-
-        if total_tokens is None and input_tokens is not None and output_tokens is not None:
-            total_tokens = input_tokens + output_tokens
-
+        # Realtime API doesn't provide token counts, so estimate based on text length
+        if data.get("choices") and data["choices"][0].get("message", {}).get("content"):
+            content_len = len(data["choices"][0]["message"]["content"])
+            # Rough estimate: 4 characters per token
+            estimated_tokens = max(1, content_len // 4)
+            return Usage(
+                input_tokens=estimated_tokens,
+                output_tokens=estimated_tokens,
+                total_tokens=estimated_tokens * 2
+            )
         return Usage(
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            total_tokens=total_tokens,
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2
         )
+
+    def tools_to_realtime_format(self, tools: tuple[Tool, ...]) -> list[dict]:
+        """Convert tools to the realtime API format."""
+        tools_list = []
+        for tool in tools:
+            tools_list.append({
+                "type": "function",  # Current API only supports functions
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters
+            })
+        return tools_list
 
     @observe_wrapper(as_type="generation")
     def complete(
@@ -278,27 +473,95 @@ class OpenAiRealtimeProvider(Provider):
         tools: tuple[Tool, ...],
         **kwargs: dict[str, any],
     ) -> tuple[Message, Usage]:
+        # Convert tools to realtime format if any
+        tools_spec = self.tools_to_realtime_format(tools) if tools else None
 
-        if not self.rtws.ws or not self.rtws.ws.connected:
-            print("connecting ws", self.rtws.connect())
-            system_message = [] if model.startswith("o1") else [{"role": "system", "content": system}]
-            payload = dict(
-                messages=system_message + messages_to_openai_spec(messages),
-                model=model,
-                tools=tools_to_openai_spec(tools) if tools else [],
-                **kwargs,
-            )
-            payload = {k: v for k, v in payload.items() if v}
-            response = self.rtws.openai_socket_message(json.dumps(payload))
-            print(response)
-            response = json.loads(response)
+        # Find text content in any user message
+        text = None
+        for message in reversed(messages):
+            if message.role != "user":
+                continue
+            for content in message.content:
+                if isinstance(content, Text):
+                    text = content.text
+                    break
+            if text:
+                break
+        
+        if not text:
+            raise ValueError("No text content in last message")
 
-        # Check for context_length_exceeded error for single, long input message
-        if "error" in response and len(messages) == 1:
+        # Convert history into format for realtime API
+        history = []
+        if len(messages) > 1:  # More than just the current message
+            history = [
+                {
+                    "type": "message",
+                    "role": msg.role,
+                    "content": [
+                        # Only include text content for now
+                        {"type": "input_text", "text": msg.text} if msg.text else None
+                    ] 
+                }
+                for msg in messages[:-1]  # All but the last message
+                if msg.text  # Only include if has text
+            ]
+
+        # Send message and get response
+        response = self.rtws.send_message(text, history=history, tools=tools_spec)
+
+        # Check for context length exceeded error
+        if isinstance(response, dict) and "error" in response and len(messages) == 1:
             openai_single_message_context_length_exceeded(response["error"])
 
-        message = openai_response_to_message(response)
+        # Convert response to Message
+        message = self._response_to_message(response)
         usage = self.get_usage(response)
+        
         return message, usage
 
+    def _response_to_message(self, response: dict) -> Message:
+        """Convert realtime API response to Message format."""
+        original = response["choices"][0]["message"]
+        content = []
+        
+        # Handle text content
+        text = original.get("content")
+        if text:
+            content.append(Text(text=text))
 
+        # Handle tool calls
+        tool_calls = original.get("tool_calls", [])
+        for tool_call in tool_calls:
+            try:
+                function_name = tool_call["function"]["name"]
+                if not re.match(r"^[a-zA-Z0-9_-]+$", function_name):
+                    content.append(
+                        ToolUse(
+                            id=tool_call["id"],
+                            name=function_name,
+                            parameters=tool_call["function"]["arguments"],
+                            is_error=True,
+                            error_message=f"Invalid function name '{function_name}', must match [a-zA-Z0-9_-]+"
+                        )
+                    )
+                else:
+                    content.append(
+                        ToolUse(
+                            id=tool_call["id"],
+                            name=function_name,
+                            parameters=json.loads(tool_call["function"]["arguments"])
+                        )
+                    )
+            except json.JSONDecodeError:
+                content.append(
+                    ToolUse(
+                        id=tool_call["id"],
+                        name=tool_call["function"]["name"],
+                        parameters=tool_call["function"]["arguments"],
+                        is_error=True,
+                        error_message=f"Invalid tool parameters for id {tool_call['id']}: {tool_call['function']['arguments']}"
+                    )
+                )
+
+        return Message(role="assistant", content=content)

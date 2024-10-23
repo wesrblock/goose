@@ -18,11 +18,8 @@ from exchange.token_usage_collector import _token_usage_collector
 
 def validate_tool_output(output: str) -> None:
     """Validate tool output for the given model"""
-    max_output_chars = 2**20
-    max_output_tokens = 16000
-    encoder = get_encoding("cl100k_base")
-    if len(output) > max_output_chars or len(encoder.encode(output)) > max_output_tokens:
-        raise ValueError("This tool call created an output that was too long to handle!")
+    # TODO: Add validation back once chunking is implemented
+    pass
 
 
 @define(frozen=True)

@@ -1,1 +1,1 @@
-list files in this dir
+Run ls -l in the current directory.
