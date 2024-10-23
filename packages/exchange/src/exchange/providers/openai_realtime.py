@@ -54,10 +54,19 @@ class RealtimeWebSocket:
                 ]
             }
         }
-        
+
         self.ws.send(json.dumps(event))
         response = self.ws.recv()
         return json.loads(response)
+    
+    def openai_socket_message(self, message: str) -> str:
+        """Send a message to OpenAI and receive the response."""
+        if not self.ws:
+            raise RuntimeError("Not connected to websocket")
+
+        self.ws.send(message)
+        response = self.ws.recv()
+        return response
         
     def close(self):
         """Close the websocket connection."""
@@ -65,22 +74,6 @@ class RealtimeWebSocket:
             self.ws.close()
             self.ws = None
 
-def test_realtime_api() -> None:
-    """Test the realtime API with synchronous code."""
-    ws = RealtimeWebSocket()
-    
-    if ws.connect():
-        print('Connected to the Realtime API server.')
-        try:
-            response = ws.send_openai("how are you")
-            print('Received response:', response)
-            
-            response = ws.send_openai("how are you doing")
-            print('Received response:', response)
-        finally:
-            ws.close()
-    else:
-        print("Failed to connect to the Realtime API server")
 
 
 # Copied local functions for openai_response_to_message modification.
@@ -243,8 +236,9 @@ class OpenAiRealtimeProvider(Provider):
     REQUIRED_ENV_VARS = ["OPENAI_API_KEY"]
     instructions_url = "https://platform.openai.com/docs/api-reference/api-keys"
 
-    def __init__(self, client: httpx.Client) -> None:
-        self.client = client
+    def __init__(self, client: httpx.Client, rtws: RealtimeWebSocket) -> None:
+        self.client = client        
+        self.rtws = rtws
 
     @classmethod
     def from_env(cls: type["OpenAiRealtimeProvider"]) -> "OpenAiRealtimeProvider":
@@ -257,7 +251,7 @@ class OpenAiRealtimeProvider(Provider):
             auth=("Bearer", key),
             timeout=httpx.Timeout(60 * 10),
         )
-        return cls(client)
+        return cls(client, RealtimeWebSocket())
 
     @staticmethod
     def get_usage(data: dict) -> Usage:
@@ -284,16 +278,20 @@ class OpenAiRealtimeProvider(Provider):
         tools: tuple[Tool, ...],
         **kwargs: dict[str, any],
     ) -> tuple[Message, Usage]:
-        test_realtime_api()
-        system_message = [] if model.startswith("o1") else [{"role": "system", "content": system}]
-        payload = dict(
-            messages=system_message + messages_to_openai_spec(messages),
-            model=model,
-            tools=tools_to_openai_spec(tools) if tools else [],
-            **kwargs,
-        )
-        payload = {k: v for k, v in payload.items() if v}
-        response = self._post(payload)
+
+        if not self.rtws.ws or not self.rtws.ws.connected:
+            print("connecting ws", self.rtws.connect())
+            system_message = [] if model.startswith("o1") else [{"role": "system", "content": system}]
+            payload = dict(
+                messages=system_message + messages_to_openai_spec(messages),
+                model=model,
+                tools=tools_to_openai_spec(tools) if tools else [],
+                **kwargs,
+            )
+            payload = {k: v for k, v in payload.items() if v}
+            response = self.rtws.openai_socket_message(json.dumps(payload))
+            print(response)
+            response = json.loads(response)
 
         # Check for context_length_exceeded error for single, long input message
         if "error" in response and len(messages) == 1:
@@ -303,12 +301,4 @@ class OpenAiRealtimeProvider(Provider):
         usage = self.get_usage(response)
         return message, usage
 
-    @retry_procedure
-    def _post(self, payload: dict) -> dict:
-        # Note: While OpenAI and Ollama mount the API under "v1", this is
-        # conventional and not a strict requirement. For example, Azure OpenAI
-        # mounts the API under the deployment name, and "v1" is not in the URL.
-        # See https://github.com/openai/openai-openapi/blob/master/openapi.yaml
-        response = self.client.post("chat/completions", json=payload)
-        return raise_for_status(response).json()
 
