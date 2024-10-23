@@ -1,28 +1,26 @@
 import os
 import json
 import re
-
-import httpx
+import asyncio
 import base64
-
+import httpx
+import websocket
+from typing import Optional, Any, Dict, List, Tuple
 from exchange.content import Text, ToolResult, ToolUse
 from exchange.message import Message
 from exchange.providers.base import Provider, Usage
 from exchange.tool import Tool
 from tenacity import retry, wait_fixed, stop_after_attempt
-from exchange.providers.utils import retry_if_status
+from exchange.providers.utils import retry_if_status, openai_single_message_context_length_exceeded
 from exchange.langfuse_wrapper import observe_wrapper
-
-
-import websocket
-import time
-import os
-import json
-from typing import Optional
 
 class RealtimeWebSocket:
     def __init__(self):
         self.ws: Optional[websocket.WebSocket] = None
+        self.pending_responses: Dict[str, List[Dict[str, Any]]] = {}
+        self.current_response_id: Optional[str] = None
+        self.is_first_connection: bool = True  # Track if this is the first connection
+        self.session_state: Dict[str, Any] = {}  # Store session state
         
     def connect(self) -> bool:
         """Connect to the OpenAI realtime API."""
@@ -38,13 +36,47 @@ class RealtimeWebSocket:
         except Exception as e:
             print(f"Failed to connect: {e}")
             return False
+
+    def send_message(
+        self, 
+        message: str, 
+        history: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
+        """Send a message and collect the response.
+        
+        Args:
+            message: The current message to send
+            history: Optional list of previous messages to include (for first connection)
+            tools: Optional list of tools to enable
+        """
+        if not self.ws or not self.ws.connected:
+            if not self.connect():
+                raise RuntimeError("Failed to connect to websocket")
+
+        # Create a new response
+        response_create = {
+            "type": "response.create",
+            "response": {
+                "modalities": ["text"],
+                "instructions": "You are a helpful AI assistant that can view files and edit code."
+            }
+        }
+        if tools:
+            response_create["response"]["tools"] = tools
             
-    def send_openai(self, message: str) -> dict:
-        """Send a message to OpenAI and receive the response."""
-        if not self.ws:
-            raise RuntimeError("Not connected to websocket")
-            
-        event = {
+        # If this is the first connection, send all history first
+        if self.is_first_connection and history:
+            for hist_msg in history:
+                hist_event = {
+                    "type": "conversation.item.create",
+                    "item": hist_msg
+                }
+                self.ws.send(json.dumps(hist_event))
+            self.is_first_connection = False
+
+        # Send the current user message
+        message_event = {
             "type": "conversation.item.create",
             "item": {
                 "type": "message",
@@ -55,179 +87,72 @@ class RealtimeWebSocket:
             }
         }
 
-        self.ws.send(json.dumps(event))
-        response = self.ws.recv()
-        return json.loads(response)
-    
-    def openai_socket_message(self, message: str) -> str:
-        """Send a message to OpenAI and receive the response."""
-        if not self.ws:
-            raise RuntimeError("Not connected to websocket")
+        self.ws.send(json.dumps(message_event))
+        self.ws.send(json.dumps(response_create))
 
-        self.ws.send(message)
-        response = self.ws.recv()
-        return response
-        
+        # Collect response until done
+        response_content = []
+        tool_calls = []
+        content_text = ""
+
+        while True:
+            raw_event = self.ws.recv()
+            event = json.loads(raw_event)
+
+            if event["type"] == "error":
+                raise RuntimeError(f"API Error: {event['error']}")
+
+            elif event["type"] == "response.text.delta":
+                content_text += event["delta"]
+
+            elif event["type"] == "response.function_call_arguments.delta":
+                if not tool_calls or tool_calls[-1].get("completed"):
+                    tool_calls.append({
+                        "id": event.get("tool_call_id", f"call_{len(tool_calls)}"),
+                        "type": "function",
+                        "function": {
+                            "name": "shell",  # Use valid tool name
+                            "arguments": event["delta"]
+                        },
+                        "completed": False
+                    })
+                else:
+                    tool_calls[-1]["function"]["arguments"] += event["delta"]
+
+            elif event["type"] == "response.function_call_arguments.done":
+                if tool_calls:
+                    tool_calls[-1]["completed"] = True
+
+            elif event["type"] == "response.done":
+                # Format final response
+                response = {
+                    "id": "rt_" + os.urandom(8).hex(),
+                    "choices": [{
+                        "message": {
+                            "role": "assistant",
+                            "content": content_text if content_text else None,
+                        },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": {
+                        "prompt_tokens": None,  # Realtime API doesn't provide token counts
+                        "completion_tokens": None,
+                        "total_tokens": None
+                    }
+                }
+
+                if tool_calls:
+                    response["choices"][0]["message"]["tool_calls"] = tool_calls
+
+                return response
+
+        return {}
+
     def close(self):
         """Close the websocket connection."""
         if self.ws:
             self.ws.close()
             self.ws = None
-
-
-
-# Copied local functions for openai_response_to_message modification.
-
-
-
-def openai_response_to_message(response: dict) -> Message:
-    original = response["choices"][0]["message"]
-    content = []
-    text = original.get("content")
-    if text:
-        content.append(Text(text=text))
-
-    tool_calls = original.get("tool_calls")
-    if tool_calls:
-        for tool_call in tool_calls:
-            try:
-                function_name = tool_call["function"]["name"]
-                if not re.match(r"^[a-zA-Z0-9_-]+$", function_name):
-                    content.append(
-                        ToolUse(
-                            id=tool_call["id"],
-                            name=function_name,
-                            parameters=tool_call["function"]["arguments"],
-                            is_error=True,
-                            error_message=f"The provided function name '{function_name}' had invalid characters, it must match this regex [a-zA-Z0-9_-]+",
-                        )
-                    )
-                else:
-                    content.append(
-                        ToolUse(
-                            id=tool_call["id"],
-                            name=function_name,
-                            parameters=json.loads(tool_call["function"]["arguments"]),
-                        )
-                    )
-            except json.JSONDecodeError:
-                content.append(
-                    ToolUse(
-                        id=tool_call["id"],
-                        name=tool_call["function"]["name"],
-                        parameters=tool_call["function"]["arguments"],
-                        is_error=True,
-                        error_message=f"Could not interpret tool use parameters for id {tool_call['id']}: {tool_call['function']['arguments']}",
-                    )
-                )
-
-    return Message(role="assistant", content=content)
-
-
-from exchange.providers.utils import ( openai_single_message_context_length_exceeded, raise_for_status )
-
-# Copied local functions for modification
-
-
-def encode_image(image_path: str) -> str:
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
-
-def messages_to_openai_spec(messages: list[Message]) -> list[dict[str, any]]:
-    messages_spec = []
-    for message in messages:
-        converted = {"role": message.role}
-        output = []
-        for content in message.content:
-            if isinstance(content, Text):
-                converted["content"] = content.text
-            elif isinstance(content, ToolUse):
-                sanitized_name = re.sub(r"[^a-zA-Z0-9_-]", "_", content.name)
-                converted.setdefault("tool_calls", []).append(
-                    {
-                        "id": content.id,
-                        "type": "function",
-                        "function": {
-                            "name": sanitized_name,
-                            "arguments": json.dumps(content.parameters),
-                        },
-                    }
-                )
-            elif isinstance(content, ToolResult):
-                if content.output.startswith('"image:'):
-                    image_path = content.output.replace('"image:', "").replace('"', "")
-                    output.append(
-                        {
-                            "role": "tool",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": "This tool result included an image that is uploaded in the next message.",
-                                },
-                            ],
-                            "tool_call_id": content.tool_use_id,
-                        }
-                    )
-                    output.append(
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": f"data:image/jpeg;base64,{encode_image(image_path)}"},
-                                }
-                            ],
-                        }
-                    )
-
-                else:
-                    output.append(
-                        {
-                            "role": "tool",
-                            "content": content.output,
-                            "tool_call_id": content.tool_use_id,
-                        }
-                    )
-
-        if "content" in converted or "tool_calls" in converted:
-            output = [converted] + output
-        messages_spec.extend(output)
-    return messages_spec
-
-
-def tools_to_openai_spec(tools: tuple[Tool, ...]) -> dict[str, any]:
-    tools_names = set()
-    result = []
-    for tool in tools:
-        if tool.name in tools_names:
-            # we should never allow duplicate tools
-            raise ValueError(f"Duplicate tool name: {tool.name}")
-        result.append(
-            {
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.parameters,
-                },
-            }
-        )
-        tools_names.add(tool.name)
-    return result
-
-
-
-
-
-OPENAI_HOST = "https://api.openai.com/"
-
-retry_procedure = retry(
-    wait=wait_fixed(2),
-    stop=stop_after_attempt(2),
-    retry=retry_if_status(codes=[429], above=500),
-    reraise=True,
-)
-
 
 class OpenAiRealtimeProvider(Provider):
     """Provides chat completions for models hosted directly by OpenAI."""
@@ -243,7 +168,7 @@ class OpenAiRealtimeProvider(Provider):
     @classmethod
     def from_env(cls: type["OpenAiRealtimeProvider"]) -> "OpenAiRealtimeProvider":
         cls.check_env_vars(cls.instructions_url)
-        url = os.environ.get("OPENAI_HOST", OPENAI_HOST)
+        url = os.environ.get("OPENAI_HOST", "https://api.openai.com/")
         key = os.environ.get("OPENAI_API_KEY")
 
         client = httpx.Client(
@@ -255,19 +180,33 @@ class OpenAiRealtimeProvider(Provider):
 
     @staticmethod
     def get_usage(data: dict) -> Usage:
-        usage = data.pop("usage")
-        input_tokens = usage.get("prompt_tokens")
-        output_tokens = usage.get("completion_tokens")
-        total_tokens = usage.get("total_tokens")
-
-        if total_tokens is None and input_tokens is not None and output_tokens is not None:
-            total_tokens = input_tokens + output_tokens
-
+        # Realtime API doesn't provide token counts, so estimate based on text length
+        if data.get("choices") and data["choices"][0].get("message", {}).get("content"):
+            content_len = len(data["choices"][0]["message"]["content"])
+            # Rough estimate: 4 characters per token
+            estimated_tokens = max(1, content_len // 4)
+            return Usage(
+                input_tokens=estimated_tokens,
+                output_tokens=estimated_tokens,
+                total_tokens=estimated_tokens * 2
+            )
         return Usage(
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            total_tokens=total_tokens,
+            input_tokens=1,
+            output_tokens=1,
+            total_tokens=2
         )
+
+    def tools_to_realtime_format(self, tools: tuple[Tool, ...]) -> list[dict]:
+        """Convert tools to the realtime API format."""
+        tools_list = []
+        for tool in tools:
+            tools_list.append({
+                "type": "function",  # Current API only supports functions
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters
+            })
+        return tools_list
 
     @observe_wrapper(as_type="generation")
     def complete(
@@ -278,27 +217,95 @@ class OpenAiRealtimeProvider(Provider):
         tools: tuple[Tool, ...],
         **kwargs: dict[str, any],
     ) -> tuple[Message, Usage]:
+        # Convert tools to realtime format if any
+        tools_spec = self.tools_to_realtime_format(tools) if tools else None
 
-        if not self.rtws.ws or not self.rtws.ws.connected:
-            print("connecting ws", self.rtws.connect())
-            system_message = [] if model.startswith("o1") else [{"role": "system", "content": system}]
-            payload = dict(
-                messages=system_message + messages_to_openai_spec(messages),
-                model=model,
-                tools=tools_to_openai_spec(tools) if tools else [],
-                **kwargs,
-            )
-            payload = {k: v for k, v in payload.items() if v}
-            response = self.rtws.openai_socket_message(json.dumps(payload))
-            print(response)
-            response = json.loads(response)
+        # Find text content in any user message
+        text = None
+        for message in reversed(messages):
+            if message.role != "user":
+                continue
+            for content in message.content:
+                if isinstance(content, Text):
+                    text = content.text
+                    break
+            if text:
+                break
+        
+        if not text:
+            raise ValueError("No text content in last message")
 
-        # Check for context_length_exceeded error for single, long input message
-        if "error" in response and len(messages) == 1:
+        # Convert history into format for realtime API
+        history = []
+        if len(messages) > 1:  # More than just the current message
+            history = [
+                {
+                    "type": "message",
+                    "role": msg.role,
+                    "content": [
+                        # Only include text content for now
+                        {"type": "input_text", "text": msg.text} if msg.text else None
+                    ] 
+                }
+                for msg in messages[:-1]  # All but the last message
+                if msg.text  # Only include if has text
+            ]
+
+        # Send message and get response
+        response = self.rtws.send_message(text, history=history, tools=tools_spec)
+
+        # Check for context length exceeded error
+        if isinstance(response, dict) and "error" in response and len(messages) == 1:
             openai_single_message_context_length_exceeded(response["error"])
 
-        message = openai_response_to_message(response)
+        # Convert response to Message
+        message = self._response_to_message(response)
         usage = self.get_usage(response)
+        
         return message, usage
 
+    def _response_to_message(self, response: dict) -> Message:
+        """Convert realtime API response to Message format."""
+        original = response["choices"][0]["message"]
+        content = []
+        
+        # Handle text content
+        text = original.get("content")
+        if text:
+            content.append(Text(text=text))
 
+        # Handle tool calls
+        tool_calls = original.get("tool_calls", [])
+        for tool_call in tool_calls:
+            try:
+                function_name = tool_call["function"]["name"]
+                if not re.match(r"^[a-zA-Z0-9_-]+$", function_name):
+                    content.append(
+                        ToolUse(
+                            id=tool_call["id"],
+                            name=function_name,
+                            parameters=tool_call["function"]["arguments"],
+                            is_error=True,
+                            error_message=f"Invalid function name '{function_name}', must match [a-zA-Z0-9_-]+"
+                        )
+                    )
+                else:
+                    content.append(
+                        ToolUse(
+                            id=tool_call["id"],
+                            name=function_name,
+                            parameters=json.loads(tool_call["function"]["arguments"])
+                        )
+                    )
+            except json.JSONDecodeError:
+                content.append(
+                    ToolUse(
+                        id=tool_call["id"],
+                        name=tool_call["function"]["name"],
+                        parameters=tool_call["function"]["arguments"],
+                        is_error=True,
+                        error_message=f"Invalid tool parameters for id {tool_call['id']}: {tool_call['function']['arguments']}"
+                    )
+                )
+
+        return Message(role="assistant", content=content)
