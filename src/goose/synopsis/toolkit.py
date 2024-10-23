@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Dict, Literal, Optional
-import shutil
 
 from exchange import Message
 import httpx
@@ -159,7 +158,7 @@ class SynopsisDeveloper(Toolkit):
         # Remember the file in system
         system.remember_file(path)
 
-        language = get_language(path)
+        get_language(path)
         md_content = f"Undo edit for {path}."
 
         self.notifier.log("")
@@ -191,13 +190,23 @@ class SynopsisDeveloper(Toolkit):
         - `undo_edit`: Undo the last edit made to a file.
 
         Args:
-            command (str): The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`, `undo_edit`.
-            path (str): Absolute path (or relative path against cwd) to file or directory, e.g. `/repo/file.py` or `/repo` or `curr_dir_file.py`.
-            file_text (str, optional): Required parameter of `create` command, with the content of the file to be created.
-            insert_line (int, optional): Required parameter of `insert` command. The `new_str` will be inserted AFTER the line `insert_line` of `path`.
-            new_str (str, optional): Optional parameter of `str_replace` command containing the new string (if not given, no string will be added). Required parameter of `insert` command containing the string to insert.
-            old_str (str, optional): Required parameter of `str_replace` command containing the string in `path` to replace.
-            view_range (list, optional): Optional parameter of `view` command when `path` points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file.
+            command (str): The commands to run.
+                Allowed options are: `view`, `create`, `str_replace`, `insert`, `undo_edit`.
+            path (str): Absolute path (or relative path against cwd) to file or directory,
+                e.g. `/repo/file.py` or `/repo` or `curr_dir_file.py`.
+            file_text (str, optional): Required parameter of `create` command, with the content
+                of the file to be created.
+            insert_line (int, optional): Required parameter of `insert` command.
+                The `new_str` will be inserted AFTER the line `insert_line` of `path`.
+            new_str (str, optional): Optional parameter of `str_replace` command
+                containing the new string (if not given, no string will be added).
+                Required parameter of `insert` command containing the string to insert.
+            old_str (str, optional): Required parameter of `str_replace` command containing the
+                string in `path` to replace.
+            view_range (list, optional): Optional parameter of `view` command when `path` points to a file.
+                If none is given, the full file is shown. If provided, the file will be shown in the indicated line
+                number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start.
+                Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file.
         """
         # Ensure 'command' is provided
         if not command:
