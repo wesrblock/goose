@@ -138,7 +138,7 @@ class SynopsisDeveloper(Toolkit):
 
     def _save_file_history(self, patho: Path) -> None:
         """Save the current content of the file to history for undo functionality."""
-        content = patho.read_text()
+        content = patho.read_text() if patho.exists() else ""
         self._file_history[str(patho)] = content
 
     def _undo_edit(self, path: str) -> str:

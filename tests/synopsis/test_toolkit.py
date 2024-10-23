@@ -34,24 +34,24 @@ def test_shell(toolkit, tmpdir):
     assert "Hello, World!" in result
 
 
-def test_read_write_file(toolkit, tmpdir):
+def test_text_editor_read_write_file(toolkit, tmpdir):
     test_file = tmpdir.join("test_file.txt")
     content = "Test content"
 
-    toolkit.write_file(str(test_file), content)
+    toolkit.text_editor(command="create", path=str(test_file), file_text=content)
     assert test_file.read() == content
 
-    result = toolkit.read_file(str(test_file))
-    assert "The file content at" in result
+    result = toolkit.text_editor(command="view", path=str(test_file))
+    assert "Displayed content of" in result
     assert system.is_active(str(test_file))
 
 
-def test_patch_file(toolkit, tmpdir):
+def test_text_editor_patch_file(toolkit, tmpdir):
     test_file = tmpdir.join("test_file.txt")
     test_file.write("Hello, World!")
 
-    toolkit.read_file(str(test_file))  # Remember the file
-    result = toolkit.patch_file(str(test_file), "World", "Universe")
+    toolkit.text_editor(command="view", path=str(test_file))  # Remember the file
+    result = toolkit.text_editor(command="str_replace", path=str(test_file), old_str="World", new_str="Universe")
     assert "Succesfully replaced before with after" in result
     assert test_file.read() == "Hello, Universe!"
 
