@@ -14,63 +14,73 @@ from exchange.providers.utils import retry_if_status
 from exchange.langfuse_wrapper import observe_wrapper
 
 
-import asyncio
-import websockets
+import websocket
 import time
 import os
 import json
+from typing import Optional
 
-def send_openai(websocket, message):
-    event = {
-        "type": "conversation.item.create",
-        "item": {
-            "type": "message",
-            "role": "user",
-            "content": [
-                { "type": "input_text", "text": message }
-            ]
+class RealtimeWebSocket:
+    def __init__(self):
+        self.ws: Optional[websocket.WebSocket] = None
+        
+    def connect(self) -> bool:
+        """Connect to the OpenAI realtime API."""
+        url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
+        headers = {
+            "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
+            "OpenAI-Beta": "realtime=v1",
         }
-    }
-    websocket.send(json.dumps(event))
-    print(f'Sent message: {message}')
-    response = websocket.recv()
-    print('Received response:', json.loads(response))
+        
+        try:
+            self.ws = websocket.create_connection(url, header=headers)
+            return True
+        except Exception as e:
+            print(f"Failed to connect: {e}")
+            return False
+            
+    def send_openai(self, message: str) -> dict:
+        """Send a message to OpenAI and receive the response."""
+        if not self.ws:
+            raise RuntimeError("Not connected to websocket")
+            
+        event = {
+            "type": "conversation.item.create",
+            "item": {
+                "type": "message",
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": message}
+                ]
+            }
+        }
+        
+        self.ws.send(json.dumps(event))
+        response = self.ws.recv()
+        return json.loads(response)
+        
+    def close(self):
+        """Close the websocket connection."""
+        if self.ws:
+            self.ws.close()
+            self.ws = None
 
 def test_realtime_api() -> None:
-    url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
-    headers = {
-        "Authorization": "Bearer " + os.getenv("OPENAI_API_KEY"),
-        "OpenAI-Beta": "realtime=v1",
-    }
-
-    import asyncio
-
-async def connect_to_websocket(url, headers):
-    async with websockets.connect(url, extra_headers=headers) as websocket:
-        return websocket
-
-
-def test_realtime_api() -> None:
-    url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01"
-    headers = {
-        "Authorization": "Bearer " + os.getenv("OPENAI_API_KEY"),
-        "OpenAI-Beta": "realtime=v1",
-    }
-
-    # Ensure we have an event loop
-    loop = asyncio.get_event_loop()
-    websocket = loop.run_until_complete(connect_to_websocket(url, headers))
-
-    if websocket is not None:
+    """Test the realtime API with synchronous code."""
+    ws = RealtimeWebSocket()
+    
+    if ws.connect():
         print('Connected to the Realtime API server.')
-        send_openai(websocket, "how are you")
-
-        print('Connected to the Realtime API server.')
-
-
-        send_openai(websocket, "how are yuou")
-
-# test_realtime_api()
+        try:
+            response = ws.send_openai("how are you")
+            print('Received response:', response)
+            
+            response = ws.send_openai("how are you doing")
+            print('Received response:', response)
+        finally:
+            ws.close()
+    else:
+        print("Failed to connect to the Realtime API server")
 
 
 # Copied local functions for openai_response_to_message modification.
