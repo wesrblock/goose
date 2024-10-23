@@ -65,6 +65,28 @@ def test_parse_docstring_no_description() -> None:
     assert "Attempted to load from a function" in str(e.value)
 
 
+def test_parse_docstring_with_optional_params() -> None:
+    from typing import Optional
+
+    def dummy_func(a: int, b: Optional[str] = None, c: int = 1) -> None:
+        """This function does something.
+
+        Args:
+            a (int): The first required parameter.
+            b (Optional[str], optional): Optional second parameter. Defaults to None.
+            c (int, optional): The third parameter with default value. Defaults to 1.
+        """
+        pass
+
+    description, parameters = utils.parse_docstring(dummy_func)
+    assert description == "This function does something."
+    assert parameters == [
+        {"name": "a", "annotation": "int", "description": "The first required parameter."},
+        {"name": "b", "annotation": "Optional[str]", "description": "Optional second parameter. Defaults to None."},
+        {"name": "c", "annotation": "int", "description": "The third parameter with default value. Defaults to 1."},
+    ]
+
+
 def test_json_schema() -> None:
     def dummy_func(a: int, b: str, c: list) -> None:
         pass
@@ -79,6 +101,31 @@ def test_json_schema() -> None:
             "c": {"type": "string"},
         },
         "required": ["a", "b", "c"],
+    }
+
+
+def test_json_schema_with_optional_params() -> None:
+    from typing import Optional, List
+
+    def dummy_func(
+        a: int,
+        b: str = "hello",
+        c: Optional[List[int]] = None,
+        d: Optional[str] = None,
+    ) -> None:
+        pass
+
+    schema = utils.json_schema(dummy_func)
+
+    assert schema == {
+        "type": "object",
+        "properties": {
+            "a": {"type": "integer"},
+            "b": {"type": "string", "default": "hello"},
+            "c": {"type": "array", "items": {"type": "integer"}, "default": None},
+            "d": {"type": "string", "default": None},
+        },
+        "required": ["a"],
     }
 
 
