@@ -53,6 +53,14 @@ class RealtimeWebSocket:
         if not self.ws or not self.ws.connected:
             if not self.connect():
                 raise RuntimeError("Failed to connect to websocket")
+            else:
+                for hist_msg in history:
+                    hist_event = {
+                        "type": "conversation.item.create",
+                        "item": hist_msg
+                    }
+                    self.ws.send(json.dumps(hist_event))
+
 
         # Create a new response
         response_create = {
@@ -64,16 +72,7 @@ class RealtimeWebSocket:
         }
         if tools:
             response_create["response"]["tools"] = tools
-            
-        # If this is the first connection, send all history first
-        if self.is_first_connection and history:
-            for hist_msg in history:
-                hist_event = {
-                    "type": "conversation.item.create",
-                    "item": hist_msg
-                }
-                self.ws.send(json.dumps(hist_event))
-            self.is_first_connection = False
+
 
         # Send the current user message
         message_event = {
