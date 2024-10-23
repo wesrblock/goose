@@ -21,6 +21,10 @@ class RealtimeWebSocket:
         self.current_response_id: Optional[str] = None
         self.is_first_connection: bool = True  # Track if this is the first connection
         self.session_state: Dict[str, Any] = {}  # Store session state
+        self.tool_call_count: int = 0  # Track number of tool calls
+        self.max_tool_calls: int = 10  # Maximum allowed tool calls per session
+        self.current_tool_result: Optional[str] = None  # Store last tool result
+        self.current_tool_id: Optional[str] = None  # Store last tool call ID
         
     def connect(self) -> bool:
         """Connect to the OpenAI realtime API."""
@@ -41,7 +45,8 @@ class RealtimeWebSocket:
         self, 
         message: str, 
         history: Optional[List[Dict[str, Any]]] = None,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
+        timeout: int = 60  # Add timeout parameter
     ) -> Dict[str, Any]:
         """Send a message and collect the response.
         
@@ -49,101 +54,173 @@ class RealtimeWebSocket:
             message: The current message to send
             history: Optional list of previous messages to include (for first connection)
             tools: Optional list of tools to enable
+            timeout: Maximum seconds to wait for response (default 60)
         """
-        if not self.ws or not self.ws.connected:
-            if not self.connect():
-                raise RuntimeError("Failed to connect to websocket")
-            else:
-                for hist_msg in history:
-                    hist_event = {
-                        "type": "conversation.item.create",
-                        "item": hist_msg
-                    }
-                    self.ws.send(json.dumps(hist_event))
+        try:
+            # Set socket timeout
+            if self.ws:
+                self.ws.settimeout(timeout)
 
-
-        # Create a new response
-        response_create = {
-            "type": "response.create",
-            "response": {
-                "modalities": ["text"],
-                "instructions": "You are a helpful AI assistant that can view files and edit code."
-            }
-        }
-        if tools:
-            response_create["response"]["tools"] = tools
-
-
-        # Send the current user message
-        message_event = {
-            "type": "conversation.item.create",
-            "item": {
-                "type": "message",
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": message}
-                ]
-            }
-        }
-
-        self.ws.send(json.dumps(message_event))
-        self.ws.send(json.dumps(response_create))
-
-        # Collect response until done
-        response_content = []
-        tool_calls = []
-        content_text = ""
-
-        while True:
-            raw_event = self.ws.recv()
-            event = json.loads(raw_event)
-
-            if event["type"] == "error":
-                raise RuntimeError(f"API Error: {event['error']}")
-
-            elif event["type"] == "response.text.delta":
-                content_text += event["delta"]
-
-            elif event["type"] == "response.function_call_arguments.delta":
-                if not tool_calls or tool_calls[-1].get("completed"):
-                    tool_calls.append({
-                        "id": event.get("tool_call_id", f"call_{len(tool_calls)}"),
-                        "type": "function",
-                        "function": {
-                            "name": "shell",  # Use valid tool name
-                            "arguments": event["delta"]
-                        },
-                        "completed": False
-                    })
+            if not self.ws or not self.ws.connected:
+                if not self.connect():
+                    raise RuntimeError("Failed to connect to websocket")
                 else:
-                    tool_calls[-1]["function"]["arguments"] += event["delta"]
+                    for hist_msg in history:
+                        hist_event = {
+                            "type": "conversation.item.create",
+                            "item": hist_msg
+                        }
+                        self.ws.send(json.dumps(hist_event))
 
-            elif event["type"] == "response.function_call_arguments.done":
-                if tool_calls:
-                    tool_calls[-1]["completed"] = True
+            # Create a new response
+            response_create = {
+                "type": "response.create",
+                "response": {
+                    "modalities": ["text"],
+                    "instructions": "You are a helpful AI assistant that can view files and edit code."
+                }
+            }
+            if tools:
+                response_create["response"]["tools"] = tools
 
-            elif event["type"] == "response.done":
-                # Format final response
-                response = {
-                    "id": "rt_" + os.urandom(8).hex(),
-                    "choices": [{
-                        "message": {
-                            "role": "assistant",
-                            "content": content_text if content_text else None,
-                        },
-                        "finish_reason": "stop"
-                    }],
-                    "usage": {
-                        "prompt_tokens": None,  # Realtime API doesn't provide token counts
-                        "completion_tokens": None,
-                        "total_tokens": None
+            # Send the current user message
+            # Record any previous tool results before sending new message
+            if self.current_tool_result is not None:
+                print(f"DEBUG: Sending tool result: {self.current_tool_result}")
+                result_event = {
+                    "type": "conversation.item.create",
+                    "item": {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{
+                            "type": "input_text",
+                            "text": f"Tool result:\n{self.current_tool_result}"
+                        }]
                     }
                 }
+                self.ws.send(json.dumps(result_event))
+                self.current_tool_result = None
+                self.current_tool_id = None
 
-                if tool_calls:
-                    response["choices"][0]["message"]["tool_calls"] = tool_calls
+            # Send the current user message
+            message_event = {
+                "type": "conversation.item.create",
+                "item": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": message}
+                    ]
+                }
+            }
 
-                return response
+            self.ws.send(json.dumps(message_event))
+            self.ws.send(json.dumps(response_create))
+
+            # Collect response until done
+            content_text = ""
+            tool_calls = []
+            current_tool_call = None
+
+            start_time = asyncio.get_event_loop().time()
+
+            while True:
+                # Check timeout
+                if asyncio.get_event_loop().time() - start_time > timeout:
+                    raise TimeoutError("Response timeout exceeded")
+
+                try:
+                    raw_event = self.ws.recv()
+                    event = json.loads(raw_event)
+                    print(f"DEBUG: Received event type {event['type']}")
+                except (websocket.WebSocketTimeoutException, json.JSONDecodeError) as e:
+                    raise RuntimeError(f"WebSocket error: {str(e)}")
+
+                if self.tool_call_count >= self.max_tool_calls:
+                    print("DEBUG: Maximum tool calls reached, stopping interaction")
+                    raise RuntimeError(f"Exceeded maximum tool calls ({self.max_tool_calls})")
+
+                if event["type"] == "error":
+                    raise RuntimeError(f"API Error: {event['error']}")
+
+                elif event["type"] == "response.text.delta":
+                    content_text += event["delta"]
+
+                elif event["type"] == "response.function_call_arguments.delta":
+                    if not current_tool_call:
+                        # Start new tool call
+                        tool_id = event.get("tool_call_id", f"call_{len(tool_calls)}")
+                        self.tool_call_count += 1
+                        print(f"DEBUG: Starting tool call #{self.tool_call_count}, id={tool_id}")
+                        current_tool_call = {
+                            "id": tool_id,
+                            "type": "function",
+                            "function": {
+                                "name": event.get("function_name", "shell"),
+                                "arguments": event["delta"]
+                            }
+                        }
+                    else:
+                        current_tool_call["function"]["arguments"] += event["delta"]
+
+                elif event["type"] == "response.function_call_arguments.done":
+                    if current_tool_call:
+                        # Complete the current tool call
+                        try:
+                            args_str = current_tool_call["function"]["arguments"]
+                            print(f"DEBUG: Validating tool call arguments: {args_str}")
+                            json.loads(args_str)  # Validate JSON
+                            print(f"DEBUG: Tool call #{self.tool_call_count} validated successfully")
+                            # Store tool call ID and result for next response
+                            self.current_tool_id = current_tool_call["id"]
+                            args = json.loads(args_str)
+                            if "command" in args and args["command"] == "ls":
+                                # Capture shell output
+                                try:
+                                    import subprocess
+                                    result = subprocess.check_output(["ls"]).decode()
+                                    self.current_tool_result = result
+                                except Exception as e:
+                                    self.current_tool_result = str(e)
+                            tool_calls.append(current_tool_call)
+                        except json.JSONDecodeError:
+                            print(f"DEBUG: Invalid JSON for tool call #{self.tool_call_count}")
+                            current_tool_call["error"] = f"Invalid JSON arguments: {args_str}"
+                            tool_calls.append(current_tool_call)
+                        current_tool_call = None
+
+                elif event["type"] == "response.done":
+                    # Format final response
+                    response = {
+                        "id": "rt_" + os.urandom(8).hex(),
+                        "choices": [{
+                            "message": {
+                                "role": "assistant",
+                                "content": content_text if content_text else None,
+                            },
+                            "finish_reason": "stop"
+                        }],
+                        "usage": {
+                            "prompt_tokens": None,
+                            "completion_tokens": None,
+                            "total_tokens": None
+                        }
+                    }
+
+                    if tool_calls:
+                        response["choices"][0]["message"]["tool_calls"] = tool_calls
+
+                    return response
+
+        except Exception as e:
+            # Clean up on error
+            if self.ws and self.ws.connected:
+                try:
+                    self.ws.close()
+                except:
+                    pass
+                self.ws = None
+            raise e
 
         return {}
 
