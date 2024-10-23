@@ -1,7 +1,7 @@
 import inspect
 import uuid
 from importlib.metadata import entry_points
-from typing import get_args, get_origin, Any, List, Tuple, Dict, Union
+from typing import Literal, get_args, get_origin, Any, List, Tuple, Dict, Union
 
 from griffe import (
     Docstring,
@@ -120,6 +120,8 @@ def _map_type_to_schema(py_type: type) -> dict[str, Any]:
         else:
             # General Union
             return {"anyOf": [_map_type_to_schema(arg) for arg in non_none_args]}
+    elif origin is Literal:
+        return {"enum": list(args)}
     elif origin in (list, List, tuple, Tuple):
         return {"type": "array", "items": _map_type_to_schema(args[0] if args else Any)}
     elif origin in (dict, Dict):

@@ -1,3 +1,4 @@
+from typing import Literal
 import pytest
 from exchange import utils
 from unittest.mock import patch
@@ -68,13 +69,13 @@ def test_parse_docstring_no_description() -> None:
 def test_parse_docstring_with_optional_params() -> None:
     from typing import Optional
 
-    def dummy_func(a: int, b: Optional[str] = None, c: int = 1) -> None:
+    def dummy_func(a: int, b: Optional[str] = None, c: Literal["foo", "bar"] = "foo") -> None:
         """This function does something.
 
         Args:
             a (int): The first required parameter.
             b (Optional[str], optional): Optional second parameter. Defaults to None.
-            c (int, optional): The third parameter with default value. Defaults to 1.
+            c (Literal["foo", "bar"], optional): A parameter with a literal default value. Defaults to "foo".
         """
         pass
 
@@ -83,7 +84,11 @@ def test_parse_docstring_with_optional_params() -> None:
     assert parameters == [
         {"name": "a", "annotation": "int", "description": "The first required parameter."},
         {"name": "b", "annotation": "Optional[str]", "description": "Optional second parameter. Defaults to None."},
-        {"name": "c", "annotation": "int", "description": "The third parameter with default value. Defaults to 1."},
+        {
+            "name": "c",
+            "annotation": 'Literal["foo", "bar"]',
+            "description": 'A parameter with a literal default value. Defaults to "foo".',
+        },
     ]
 
 
@@ -109,7 +114,7 @@ def test_json_schema_with_optional_params() -> None:
 
     def dummy_func(
         a: int,
-        b: str = "hello",
+        b: Literal["foo", "bar"] = "foo",
         c: Optional[List[int]] = None,
         d: Optional[str] = None,
     ) -> None:
@@ -121,7 +126,7 @@ def test_json_schema_with_optional_params() -> None:
         "type": "object",
         "properties": {
             "a": {"type": "integer"},
-            "b": {"type": "string", "default": "hello"},
+            "b": {"enum": ["foo", "bar"], "default": "foo"},
             "c": {"type": "array", "items": {"type": "integer"}, "default": None},
             "d": {"type": "string", "default": None},
         },
