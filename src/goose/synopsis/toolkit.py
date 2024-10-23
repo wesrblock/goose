@@ -1,10 +1,12 @@
 # janky global state for now, think about it
+from collections import defaultdict
 import re
 import subprocess
 import os
 from pathlib import Path
 import tempfile
-from typing import Dict
+from typing import Dict, Literal, Optional
+import shutil
 
 from exchange import Message
 import httpx
@@ -15,12 +17,15 @@ from goose.utils.shell import is_dangerous_command, shell, keep_unsafe_command_p
 from rich.markdown import Markdown
 from rich.rule import Rule
 
+TextEditorCommand = Literal["view", "create", "str_replace", "insert", "undo_edit"]
+
 
 class SynopsisDeveloper(Toolkit):
     """Provides shell and file operation tools using OperatingSystem."""
 
     def __init__(self, *args: object, **kwargs: Dict[str, object]) -> None:
         super().__init__(*args, **kwargs)
+        self._file_history = defaultdict(list)
 
     def system(self) -> str:
         """Retrieve system configuration details for developer"""
@@ -67,32 +72,15 @@ class SynopsisDeveloper(Toolkit):
         self.logshell(command)
         return shell(command, self.notifier, self.exchange_view, cwd=system.cwd, env=system.env)
 
-    @tool
-    def read_file(self, path: str) -> str:
-        """Read the content of the file at path
-
-        Args:
-            path (str): The destination file path, in the format "path/to/file.txt"
-        """
-        system.remember_file(path)
-        self.logshell(f"cat {path}")
-        return f"The file content at {path} has been updated above."
-
-    @tool
-    def write_file(self, path: str, content: str) -> str:
-        """
-        Write a file at the specified path with the provided content. This will create any directories if they do not exist.
-        The content will fully overwrite the existing file.
-
-        Args:
-            path (str): The destination file path, in the format "path/to/file.txt"
-            content (str): The raw file content.
-        """  # noqa: E501
+    def _write_file(self, path: str, content: str) -> str:
+        """Write content to the file at path."""
         patho = system.to_patho(path)
 
         if patho.exists() and not system.is_active(path):
             print(f"We are warning the LLM to view before write in write_file, with path={path} and patho={str(patho)}")
             raise ValueError(f"You must view {path} using read_file before you overwrite it")
+
+        self._save_file_history(patho)  # Save current content to history
 
         patho.parent.mkdir(parents=True, exist_ok=True)
         patho.write_text(content)
@@ -108,18 +96,8 @@ class SynopsisDeveloper(Toolkit):
 
         return f"Successfully wrote to {path}"
 
-    @tool
-    def patch_file(self, path: str, before: str, after: str) -> str:
-        """Patch the file at the specified by replacing before with after
-
-        Before **must** be present exactly once in the file, so that it can safely
-        be replaced with after.
-
-        Args:
-            path (str): The path to the file, in the format "path/to/file.txt"
-            before (str): The content that will be replaced
-            after (str): The content it will be replaced with
-        """
+    def _patch_file(self, path: str, before: str, after: str) -> str:
+        """Patch the file at the specified path by replacing 'before' with 'after'."""
         self.notifier.status(f"editing {path}")
         patho = system.to_patho(path)
 
@@ -137,6 +115,8 @@ class SynopsisDeveloper(Toolkit):
             raise ValueError("The before content is present multiple times in the file, be more specific.")
         if content.count(before) < 1:
             raise ValueError("The before content was not found in file, be careful that you recreate it exactly.")
+
+        self._save_file_history(patho)  # Save current content to history
 
         content = content.replace(before, after)
         system.remember_file(path)
@@ -156,6 +136,197 @@ class SynopsisDeveloper(Toolkit):
         self.notifier.log(Markdown(output))
         self.notifier.log("")
         return "Succesfully replaced before with after."
+
+    def _save_file_history(self, patho: Path) -> None:
+        """Save the current content of the file to history for undo functionality."""
+        content = patho.read_text()
+        self._file_history[str(patho)] = content
+
+    def _undo_edit(self, path: str) -> str:
+        """Undo the last edit made to a file."""
+        patho = system.to_patho(path)
+
+        if not patho.exists():
+            raise ValueError(f"The file {path} does not exist.")
+
+        if str(patho) not in self._file_history:
+            raise ValueError(f"No edit history available to undo changes on {path}.")
+
+        # Restore the previous content from history
+        previous_content = self._file_history.pop(str(patho))
+        patho.write_text(previous_content)
+
+        # Remember the file in system
+        system.remember_file(path)
+
+        language = get_language(path)
+        md_content = f"Undo edit for {path}."
+
+        self.notifier.log("")
+        self.notifier.log(Rule(RULEPREFIX + path, style=RULESTYLE, align="left"))
+        self.notifier.log(Markdown(md_content))
+        self.notifier.log("")
+
+        return f"Successfully undid the last edit on {path}"
+
+    @tool
+    def text_editor(
+        self,
+        command: TextEditorCommand,
+        path: str,
+        file_text: Optional[str] = None,
+        insert_line: Optional[int] = None,
+        new_str: Optional[str] = None,
+        old_str: Optional[str] = None,
+        view_range: Optional[list[int]] = None,
+    ) -> str:
+        """
+        Perform text editing operations on files.
+
+        The `command` parameter specifies the operation to perform. Allowed options are:
+        - `view`: View the content of a file or directory.
+        - `create`: Create a new file with the given content.
+        - `str_replace`: Replace a string in a file with a new string.
+        - `insert`: Insert a string into a file after a specific line number.
+        - `undo_edit`: Undo the last edit made to a file.
+
+        Args:
+            command (str): The commands to run. Allowed options are: `view`, `create`, `str_replace`, `insert`, `undo_edit`.
+            path (str): Absolute path (or relative path against cwd) to file or directory, e.g. `/repo/file.py` or `/repo` or `curr_dir_file.py`.
+            file_text (str, optional): Required parameter of `create` command, with the content of the file to be created.
+            insert_line (int, optional): Required parameter of `insert` command. The `new_str` will be inserted AFTER the line `insert_line` of `path`.
+            new_str (str, optional): Optional parameter of `str_replace` command containing the new string (if not given, no string will be added). Required parameter of `insert` command containing the string to insert.
+            old_str (str, optional): Required parameter of `str_replace` command containing the string in `path` to replace.
+            view_range (list, optional): Optional parameter of `view` command when `path` points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting `[start_line, -1]` shows all lines from `start_line` to the end of the file.
+        """
+        # Ensure 'command' is provided
+        if not command:
+            raise ValueError("Parameter 'command' is required.")
+
+        # Ensure 'path' is provided
+        if not path:
+            raise ValueError("Parameter 'path' is required.")
+
+        patho = system.to_patho(path)
+
+        if command == "view":
+            # View the content of the file or directory
+            if patho.is_file():
+                # Read the file content
+                if not patho.exists():
+                    raise ValueError(f"The file {path} does not exist.")
+
+                with open(patho, "r") as f:
+                    content = f.readlines()
+
+                if view_range:
+                    # Ensure view_range is a list of two integers
+                    if len(view_range) != 2:
+                        raise ValueError("view_range must be a list of two integers.")
+                    start_line, end_line = view_range
+                    if start_line < 1:
+                        raise ValueError("Line numbers start from 1.")
+                    if end_line == -1:
+                        end_line = len(content)
+                    elif end_line < start_line:
+                        raise ValueError("end_line must be greater than or equal to start_line.")
+                    content = content[start_line - 1 : end_line]
+
+                # Remember the file in system
+                system.remember_file(path)
+
+                # Display the content
+                language = get_language(path)
+                md_content = f"```{language}\n{''.join(content)}\n```"
+
+                self.notifier.log("")
+                self.notifier.log(Rule(RULEPREFIX + path, style=RULESTYLE, align="left"))
+                self.notifier.log(Markdown(md_content))
+                self.notifier.log("")
+
+                return f"Displayed content of {path}"
+
+            elif patho.is_dir():
+                # List the directory contents
+                files = [str(p) for p in patho.iterdir()]
+                dir_content = "\n".join(files)
+
+                self.notifier.log("")
+                self.notifier.log(Rule(RULEPREFIX + path, style=RULESTYLE, align="left"))
+                self.notifier.log(Markdown(f"```\n{dir_content}\n```"))
+                self.notifier.log("")
+
+                return f"Displayed contents of directory {path}"
+            else:
+                raise ValueError(f"The path {path} does not exist.")
+
+        elif command == "create":
+            # Create a new file with the given content
+            if file_text is None:
+                raise ValueError("Parameter 'file_text' is required for 'create' command.")
+
+            # Use the existing _write_file method
+            return self._write_file(path, file_text)
+
+        elif command == "str_replace":
+            # Replace a string in a file with a new string
+            if old_str is None:
+                raise ValueError("Parameter 'old_str' is required for 'str_replace' command.")
+            if new_str is None:
+                new_str = ""  # If new_str not provided, remove old_str
+
+            # Use the existing _patch_file method
+            return self._patch_file(path, old_str, new_str)
+
+        elif command == "insert":
+            # Insert a string into the file after a specific line number
+            if insert_line is None:
+                raise ValueError("Parameter 'insert_line' is required for 'insert' command.")
+            if new_str is None:
+                raise ValueError("Parameter 'new_str' is required for 'insert' command.")
+
+            # Ensure the file exists
+            if not patho.exists():
+                raise ValueError(f"The file {path} does not exist.")
+
+            if not system.is_active(path):
+                raise ValueError(f"You must view {path} using the 'view' command before you edit it.")
+
+            self._save_file_history(patho)  # Save current content to history
+
+            # Read the file content
+            with open(patho, "r") as f:
+                lines = f.readlines()
+
+            if insert_line < 0 or insert_line > len(lines):
+                raise ValueError("insert_line is out of range.")
+
+            # Insert the new string after the specified line
+            lines.insert(insert_line, new_str + "\n")  # Line numbers start from 0 in list indices
+
+            # Write the updated content back to the file
+            with open(patho, "w") as f:
+                f.writelines(lines)
+
+            # Remember the file in system
+            system.remember_file(path)
+
+            language = get_language(path)
+            md_content = f"Inserted at line {insert_line + 1}:\n```{language}\n{new_str}\n```"
+
+            self.notifier.log("")
+            self.notifier.log(Rule(RULEPREFIX + path, style=RULESTYLE, align="left"))
+            self.notifier.log(Markdown(md_content))
+            self.notifier.log("")
+
+            return f"Successfully inserted new_str into {path} after line {insert_line}"
+
+        elif command == "undo_edit":
+            # Undo the last edit made to a file
+            return self._undo_edit(path)
+
+        else:
+            raise ValueError(f"Unknown command '{command}'.")
 
     @tool
     def start_process(self, command: str) -> int:
