@@ -66,7 +66,7 @@ class TextEditor:
         content = patho.read_text() if patho.exists() else ""
         self._file_history[str(patho)] = content
 
-    def _undo_edit(self, path: str) -> str:
+    def _undo_edit(self, path: str, **kwargs: dict) -> str:
         """Undo the last edit made to a file."""
         patho = system.to_patho(path)
 
@@ -80,7 +80,7 @@ class TextEditor:
         self._log_file_operation(path, "Undo edit", get_language(path))
         return f"Successfully undid the last edit on {path}"
 
-    def _view_file_or_directory(self, path: str, view_range: Optional[list[int]] = None) -> str:
+    def _view_file_or_directory(self, path: str, view_range: Optional[list[int]] = None, **kwargs: dict) -> str:
         """View the content of a file or directory."""
         patho = system.to_patho(path)
 
@@ -114,7 +114,7 @@ class TextEditor:
         self._log_file_operation(str(patho), dir_content, None)
         return f"Displayed contents of directory {str(patho)}"
 
-    def _insert_string(self, path: str, insert_line: int, new_str: str) -> str:
+    def _insert_string(self, path: str, insert_line: int, new_str: str, **kwargs: dict) -> str:
         """Insert a string into the file after a specific line number."""
         patho = system.to_patho(path)
         if not patho.exists() or not system.is_active(path):
@@ -135,11 +135,11 @@ class TextEditor:
         self._log_file_operation(path, new_str, get_language(path))
         return f"Successfully inserted new_str into {path} after line {insert_line}"
 
-    def _create_file(self, path: str, file_text: str) -> str:
+    def _create_file(self, path: str, file_text: str, **kwargs: dict) -> str:
         """Create a new file with the given content."""
         return self._write_file(path, file_text)
 
-    def _replace_string(self, path: str, old_str: str, new_str: str) -> str:
+    def _replace_string(self, path: str, old_str: str, new_str: str, **kwargs: dict) -> str:
         """Replace a string in a file."""
         return self._patch_file(path, old_str, new_str)
 
@@ -151,7 +151,7 @@ class TextEditor:
         self.notifier.log(Markdown(md_content))
         self.notifier.log("")
 
-    def text_editor(self, command: TextEditorCommand, path: str, **kwargs: dict) -> str:
+    def run_command(self, command: TextEditorCommand, path: str, **kwargs: dict) -> str:
         """Dispatch text editing operations to the appropriate handler."""
         if command not in self.command_dispatch:
             raise ValueError(f"Unknown command '{command}'.")
