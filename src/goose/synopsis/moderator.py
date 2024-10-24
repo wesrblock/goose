@@ -110,12 +110,12 @@ class Synopsis(Moderator):
                 self.notifier.status("Updating action plan...")
             self.current_plan = self.plan(exchange)
 
-        if self.notifier:
-            self.notifier.status("Creating synopsis message...")
         return Message.load("synopsis.md", synopsis=self, system=system)
 
     def summarize(self, exchange: Exchange) -> str:
         message = Message.load("summarize.md", synopsis=self, messages=self.originals, exchange=exchange, system=system)
+        if len(self.originals) < 5:
+            return "\n".join([message.summary for message in self.originals])
         model = os.environ.get("SUMMARIZER", exchange.model)
         new_exchange = exchange.replace(moderator=ContextTruncate(), tools=(), system="", messages=[], model=model)
         new_exchange.add(message)
