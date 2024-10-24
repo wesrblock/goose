@@ -74,7 +74,7 @@ def test_parse_docstring_with_optional_params() -> None:
 
         Args:
             a (int): The first required parameter.
-            b (List[int]): The second parameter. Defaults to None.
+            b (List[int]): The second parameter.
             c (Literal["foo", "bar"], optional): A parameter with a literal default value. Defaults to "foo".
             d (Optional[str], optional): Optional fourth parameter. Defaults to None.
         """
