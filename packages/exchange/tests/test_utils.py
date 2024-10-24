@@ -67,15 +67,16 @@ def test_parse_docstring_no_description() -> None:
 
 
 def test_parse_docstring_with_optional_params() -> None:
-    from typing import Optional
+    from typing import Optional, List
 
-    def dummy_func(a: int, b: Optional[str] = None, c: Literal["foo", "bar"] = "foo") -> None:
+    def dummy_func(a: int, b: List[int], c: Literal["foo", "bar"] = "foo", d: Optional[str] = None) -> None:
         """This function does something.
 
         Args:
             a (int): The first required parameter.
-            b (Optional[str], optional): Optional second parameter. Defaults to None.
+            b (List[int]): The second parameter. Defaults to None.
             c (Literal["foo", "bar"], optional): A parameter with a literal default value. Defaults to "foo".
+            d (Optional[str], optional): Optional fourth parameter. Defaults to None.
         """
         pass
 
@@ -83,12 +84,13 @@ def test_parse_docstring_with_optional_params() -> None:
     assert description == "This function does something."
     assert parameters == [
         {"name": "a", "annotation": "int", "description": "The first required parameter."},
-        {"name": "b", "annotation": "Optional[str]", "description": "Optional second parameter. Defaults to None."},
+        {"name": "b", "annotation": "List[int]", "description": "The second parameter. Defaults to None."},
         {
             "name": "c",
             "annotation": 'Literal["foo", "bar"]',
             "description": 'A parameter with a literal default value. Defaults to "foo".',
         },
+        {"name": "d", "annotation": "Optional[str]", "description": "Optional fourth parameter. Defaults to None."},
     ]
 
 
