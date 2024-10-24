@@ -84,7 +84,7 @@ def test_parse_docstring_with_optional_params() -> None:
     assert description == "This function does something."
     assert parameters == [
         {"name": "a", "annotation": "int", "description": "The first required parameter."},
-        {"name": "b", "annotation": "List[int]", "description": "The second parameter. Defaults to None."},
+        {"name": "b", "annotation": "List[int]", "description": "The second parameter."},
         {
             "name": "c",
             "annotation": 'Literal["foo", "bar"]',
