@@ -12,6 +12,7 @@ from goose.synopsis.process_manager import ProcessManager, ProcessManagerCommand
 from goose.toolkit.base import Toolkit, tool
 
 
+
 class SynopsisDeveloper(Toolkit):
     """Provides shell and file operation tools using OperatingSystem."""
 
@@ -197,4 +198,6 @@ class SynopsisDeveloper(Toolkit):
         """
         # TODO do some additional filtering / reranking on returned results based on the task
         hints = get_hints(self.db, query, tags, lazy_load=True, limit=limit)
-        return "## DEVELOPER HINTS:\n\n" + "\n\n".join([f"### {h['file_name']} Hint File:\n{h['content']}" for h in hints])
+        return "## DEVELOPER HINTS:\n\n" + "\n\n".join(
+            [f"### {h['file_name']} Hint File:\n{h['content']}" for h in hints]
+        )

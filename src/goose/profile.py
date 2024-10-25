@@ -42,7 +42,10 @@ class Profile:
 
     def profile_info(self) -> str:
         tookit_names = [toolkit.name for toolkit in self.toolkits]
-        return f"provider:{self.provider}, processor:{self.processor} toolkits: {', '.join(tookit_names)} context: {self.context}"
+        return (
+            f"provider:{self.provider}, processor:{self.processor} "
+            f"toolkits: {', '.join(tookit_names)} context: {self.context}"
+        )
 
 
 def default_profile(provider: str, processor: str, accelerator: str, **kwargs: dict[str, any]) -> Profile:
@@ -57,4 +60,7 @@ def default_profile(provider: str, processor: str, accelerator: str, **kwargs: d
         moderator="synopsis",
         toolkits=[ToolkitSpec("synopsis")],
         context=None
+        moderator="truncate",
+        toolkits=[ToolkitSpec("developer")],
+        context=None,
     )

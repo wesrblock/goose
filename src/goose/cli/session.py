@@ -108,8 +108,7 @@ class Session:
 
         self.prompt_session = GoosePromptSession()
 
-        if profile.context:
-            self.context_db = LanceDBInterface(profile.context)
+        self.context_db = LanceDBInterface(profile.context) if profile.context else None
 
     def _get_initial_messages(self) -> list[Message]:
         messages = self.load_session()
@@ -175,23 +174,22 @@ class Session:
     @staticmethod
     def get_short_git_remote_gitpython() -> str:
         try:
-            repo = Repo('.', search_parent_directories=True)
+            repo = Repo(".", search_parent_directories=True)
             remote = repo.remotes.origin.url
-            
-            if remote.endswith('.git'):
+
+            if remote.endswith(".git"):
                 remote = remote[:-4]
-                
-            if remote.startswith('git@') or '@' in remote:
+
+            if remote.startswith("git@") or "@" in remote:
                 # This will handle both:
                 # git@github.com:username/repo
                 # org-123456@github.com:username/repo
-                return remote.split(':')[1]
+                return remote.split(":")[1]
             else:
                 # For https://github.com/username/repo
-                return '/'.join(remote.split('/')[-2:])
+                return "/".join(remote.split("/")[-2:])
         except Exception:
             return None
-
 
     def run(self, new_session: bool = True) -> None:
         """
@@ -209,14 +207,16 @@ class Session:
         print(f"[dim]starting session | name: [cyan]{self.name}[/cyan]  profile: [cyan]{profile_name}[/cyan][/dim]")
         print()
         message = self.process_first_message()
-        
+
         if self.context_db:
             repo = Session.get_short_git_remote_gitpython()
 
-            # load global and repo hints 
+            # load global and repo hints
             init_tags = ["global", f"repos:{repo}"]
             hints = get_hints(self.context_db, query=None, tags=init_tags, lazy_load=False, limit=5)
-            self.exchange.moderator.hints += "## DEVELOPER HINTS:\n\n" + "\n\n".join([f"### {h['file_name']} Hint File:\n{h['content']}" for h in hints])
+            self.exchange.moderator.hints += "## DEVELOPER HINTS:\n\n" + "\n\n".join(
+                [f"### {h['file_name']} Hint File:\n{h['content']}" for h in hints]
+            )
 
             devhint_tags = get_all_tags(self.context_db)
             devhint_tags = [tag for tag in devhint_tags if tag not in init_tags]  # Updated line
