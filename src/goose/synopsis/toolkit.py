@@ -18,6 +18,8 @@ class SynopsisDeveloper(Toolkit):
     def __init__(self, *args: object, **kwargs: Dict[str, object]) -> None:
         super().__init__(*args, **kwargs)
         self._file_history = defaultdict(list)
+        if self.context:
+            self.db = LanceDBInterface(self.context)
 
     def system(self) -> str:
         """Retrieve system configuration details for developer"""
@@ -193,4 +195,6 @@ class SynopsisDeveloper(Toolkit):
             tags (list[str]): A list of metadata tags relevant to the search eg., ["java", "proto update", "unit tests"]
             limit (int): Number of relevant documents to return.
         """
-        return get_developer_hints(self.db, query, tags, limit)
+        # TODO do some additional filtering / reranking on returned results based on the task
+        hints = get_hints(self.db, query, tags, lazy_load=True, limit=limit)
+        return "## DEVELOPER HINTS:\n\n" + "\n\n".join([f"### {h['file_name']} Hint File:\n{h['content']}" for h in hints])
