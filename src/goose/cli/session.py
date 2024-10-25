@@ -218,6 +218,8 @@ class Session:
                 for tool_use in response.tool_use:
                     tool_result = self.exchange.call_function(tool_use)
                     content.append(tool_result)
+                    if tool_use.name == "focus":
+                        self.exchange.moderator.focus_files.extend(tool_result.output)
                 message = Message(role="user", content=content)
                 committed.append(message)
                 self.exchange.add(message)

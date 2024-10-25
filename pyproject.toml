@@ -13,6 +13,7 @@ dependencies = [
     "prompt-toolkit>=3.0.47",
     "keyring>=25.4.1",
     "langfuse>=2.38.2",
+    "goose-plugins-block",
 ]
 author = [{ name = "Block", email = "ai-oss-tools@block.xyz" }]
 packages = [{ include = "goose", from = "src" }]
@@ -75,6 +76,7 @@ dev-dependencies = [
 
 [tool.uv.sources]
 ai-exchange = { workspace = true }
+goose-plugins-block = { path = "/Users/ezherdeva/Development/goose-plugins-block", editable = true }
 
 [tool.uv.workspace]
 members = ["packages/*"]

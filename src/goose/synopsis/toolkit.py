@@ -4,7 +4,9 @@ import subprocess
 import os
 from pathlib import Path
 import tempfile
-from typing import Dict
+from typing import Dict, List
+
+from watchdog.observers.kqueue import absolute_path
 
 from exchange import Message
 import httpx
@@ -278,3 +280,21 @@ class SynopsisDeveloper(Toolkit):
             self.notifier.log(f"Failed fetching with HTTP error: {exc.response.status_code}")
         except Exception as exc:
             self.notifier.log(f"Failed fetching with error: {str(exc)}")
+
+
+    @tool
+    def focus(self, files_names_list: List[str]) -> List[str]:
+        """"
+        Returns a list of file names to focus on, with each name being an absolute path.
+        
+        Args:
+            files_names_list (List[str]): A list of file names specified in the query.
+            
+        Returns:
+            (List[str]): A list of file names to focus on, with each name being an absolute path.
+
+        """
+        absolute_path_file_names = []
+        for file_name in files_names_list:
+            absolute_path_file_names.append(os.path.abspath(file_name))
+        return absolute_path_file_names

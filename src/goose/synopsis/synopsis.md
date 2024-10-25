@@ -16,6 +16,16 @@
 
 {% endfor %}
 
+# Files to focus on
+
+{% for file in synopsis.focus_files %}
+{{file.path}}
+```{{file.language}}
+{{file.content}}
+```
+
+{% endfor %}
+
 # Summary
 
 {{synopsis.current_summary}}

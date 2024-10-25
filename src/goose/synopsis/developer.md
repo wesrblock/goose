@@ -25,6 +25,8 @@ The write file tool will do a full overwrite of the existing file, while the pat
 will edit it using a find and replace. Choose the tool which will make the edit as simple
 as possible to execute.
 
+If you specifically instructed to focus on particular files to accomplish the task you must use the focus tool. 
+For example, the request can look like: “Focus specifically on xxx.yaml and yyy.py for this task.”
 
 # Instructions
 
