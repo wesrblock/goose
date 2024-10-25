@@ -197,6 +197,7 @@ class SynopsisDeveloper(Toolkit):
             limit (int): Number of relevant documents to return.
         """
         # TODO do some additional filtering / reranking on returned results based on the task
+        # TODO make toolkit available only if context is passed in profiles config
         hints = get_hints(self.db, query, tags, lazy_load=True, limit=limit)
         return "## DEVELOPER HINTS:\n\n" + "\n\n".join(
             [f"### {h['file_name']} Hint File:\n{h['content']}" for h in hints]
