@@ -45,6 +45,7 @@ class Exchange:
     messages: list[Message] = field(factory=list)
     checkpoint_data: CheckpointData = field(factory=CheckpointData)
     generation_args: dict = field(default=Factory(dict))
+    ask_confirmation: bool = False
 
     @property
     def _toolmap(self) -> Mapping[str, Tool]:
