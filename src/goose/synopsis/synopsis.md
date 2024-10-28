@@ -8,7 +8,10 @@
 
 # Dynamic Contextual Hints
 
-{{synopsis.dynamic_hints}}
+{% for hint in synopsis.dynamic_hints %}
+{{ hint }}
+
+{% endfor %}
 
 # Relevant Files
 
