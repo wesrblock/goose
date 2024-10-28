@@ -187,7 +187,7 @@ class SynopsisDeveloper(Toolkit):
             self.notifier.log(f"Failed fetching with error: {str(exc)}")
 
     @tool
-    def get_hints(self, query: str, tags: list[str], limit: int) -> list[str]:
+    def get_hints(self, query: str, tags: list[str], limit: int) -> str:
         """Get developer hints that might help with completing the coding task. Fetch relevant hints at the beginning
            of any plan execution.
 

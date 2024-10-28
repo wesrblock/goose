@@ -6,6 +6,10 @@
 
 {{synopsis.hints}}
 
+# Dynamic Contextual Hints
+
+{{synopsis.dynamic_hints}}
+
 # Relevant Files
 
 {% for file in system.active_files %}

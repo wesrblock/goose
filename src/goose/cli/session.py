@@ -4,6 +4,7 @@ import traceback
 from pathlib import Path
 from typing import Optional
 from git import Repo
+import json
 
 from exchange import Message, Text, ToolResult, ToolUse
 from exchange.langfuse_wrapper import auth_check, observe_wrapper
@@ -221,7 +222,7 @@ class Session:
             devhint_tags = get_all_tags(self.context_db)
             devhint_tags = [tag for tag in devhint_tags if tag not in init_tags]  # Updated line
 
-            self.exchange.moderator.hints += f"Available tags to search developer hints by are: {devhint_tags}"
+            self.exchange.moderator.hints += f"Available tags to search developer hints by are: {devhint_tags}\n\n"
 
         while message:  # Loop until no input (empty string).
             self.notifier.start()
@@ -271,7 +272,7 @@ class Session:
                     tool_result = self.exchange.call_function(tool_use)
                     content.append(tool_result)
                     if tool_use.name == "get_hints":  # TODO find more elegant solution to inject hints into moderator
-                        self.exchange.moderator.hints += tool_result.output
+                        self.exchange.moderator.dynamic_hints += json.loads(tool_result.output)
                 message = Message(role="user", content=content)
                 committed.append(message)
                 self.exchange.add(message)
