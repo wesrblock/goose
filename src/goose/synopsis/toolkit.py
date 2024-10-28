@@ -284,8 +284,8 @@ class SynopsisDeveloper(Toolkit):
 
     @tool
     def focus(self, files_names_list: List[str]) -> List[str]:
-        """"
-        Returns a list of file names to focus on, with each name being an absolute path.
+        """
+        Focuses only on requested files to complete the task.
         
         Args:
             files_names_list (List[str]): A list of file names specified in the query.

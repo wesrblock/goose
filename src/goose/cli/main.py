@@ -267,5 +267,16 @@ for group in all_cli_groups.values():
     for command in group.commands.values():
         cli.add_command(command)
 
+
+@goose_cli.group()
+def focus() -> None:
+    """Set or change the focus"""
+    pass
+
+@focus.command(name="add-file")
+def add_file() -> None:
+    pass
+
+
 if __name__ == "__main__":
     cli()
