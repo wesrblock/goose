@@ -85,7 +85,6 @@ class Synopsis(Moderator):
 
         if plan:
             self.current_plan = self.plan(exchange)
-
         return Message.load("synopsis.md", synopsis=self, system=system, ask_confirmation=exchange.ask_confirmation)
 
     def summarize(self, exchange: Exchange) -> str:

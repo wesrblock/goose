@@ -143,7 +143,7 @@ def get_session_files() -> dict[str, Path]:
 @click.option("--confirm", is_flag=True, help="Prompt before executing potentially unsafe commands", default=False)
 def session_start(
     name: Optional[str], profile: str, log_level: str, plan: Optional[str] = None, tracing: bool = False, 
-    ask_confirmation: bool = False
+    confirm: bool = False
 ) -> None:
     """Start a new goose session"""
     if plan:
@@ -155,7 +155,7 @@ def session_start(
 
     try:
         session = Session(name=name, profile=profile, plan=_plan, log_level=log_level, tracing=tracing, 
-                          ask_confirmation=ask_confirmation)
+                          ask_confirmation=confirm)
         session.run()
     except RuntimeError as e:
         print(f"[red]Error: {e}")

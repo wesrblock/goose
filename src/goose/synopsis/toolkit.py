@@ -99,6 +99,7 @@ class SynopsisDeveloper(Toolkit):
             path (str): Absolute path (or relative path against cwd) to file or directory,
                 e.g. `/repo/file.py` or `/repo` or `curr_dir_file.py`.
             ask_confirmation (boolean): whether to ask for confirmation before creating or modifying any file.
+                any command except `view` will require confirmation.
             file_text (str, optional): Required parameter of `create` command, with the content
                 of the file to be created.
             insert_line (int, optional): Required parameter of `insert` command.
