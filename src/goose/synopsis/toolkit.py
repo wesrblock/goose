@@ -23,6 +23,7 @@ class SynopsisDeveloper(Toolkit):
         self._file_history = defaultdict(list)
         if self.context:
             self.db = LanceDBContext(self.context)
+        self._file_history = defaultdict(list)
 
     def system(self) -> str:
         """Retrieve system configuration details for developer"""
