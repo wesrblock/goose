@@ -53,8 +53,12 @@ class SynopsisDeveloper(Toolkit):
         assert any(
             [command, working_dir, source_path]
         ), "At least one of the parameters for bash shell must be provided."
-        bash_tool = Bash(notifier=self.notifier, exchange_view=self.exchange_view, explanation=explanation, 
-                         ask_confirmation=ask_confirmation)
+        bash_tool = Bash(
+            notifier=self.notifier,
+            exchange_view=self.exchange_view,
+            explanation=explanation,
+            ask_confirmation=ask_confirmation,
+        )
         outputs = []
 
         if working_dir:

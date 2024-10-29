@@ -12,7 +12,9 @@ from goose.utils.shell import shell
 
 
 class Bash:
-    def __init__(self, notifier: Notifier, exchange_view: ExchangeView, explanation: str, ask_confirmation: bool) -> None:
+    def __init__(
+        self, notifier: Notifier, exchange_view: ExchangeView, explanation: str, ask_confirmation: bool
+    ) -> None:
         self.notifier = notifier
         self.exchange_view = exchange_view
         self.explanation = explanation
@@ -70,5 +72,3 @@ class Bash:
         self.logshell(f"cd {path}")
         system.cwd = str(patho)
         return f"Changed directory to: {path}"
-
-

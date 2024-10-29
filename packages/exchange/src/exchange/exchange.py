@@ -165,8 +165,9 @@ class Exchange:
             output = str(tb) + "\n" + str(e)
             is_error = True
         cancelled_by_user = is_cancelled_by_user(output)
-        return ToolResult(tool_use_id=tool_use.id, output=output, is_error=is_error, 
-                          is_cancelled_by_user=cancelled_by_user)
+        return ToolResult(
+            tool_use_id=tool_use.id, output=output, is_error=is_error, is_cancelled_by_user=cancelled_by_user
+        )
 
     def add_tool_use(self, tool_use: ToolUse) -> None:
         """Manually add a tool use and corresponding result
