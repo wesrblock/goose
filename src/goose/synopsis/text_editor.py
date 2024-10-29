@@ -105,14 +105,12 @@ class TextEditor:
             content = content[start_line - 1 : (end_line if end_line != -1 else len(content))]
 
         system.remember_file(str(patho))
-        self._log_file_operation(str(patho), "".join(content), get_language(str(patho)))
         return f"Displayed content of {str(patho)}"
 
     def _view_directory(self, patho: Path) -> str:
         files = [str(p) for p in patho.iterdir()]
         dir_content = "\n".join(files)
-        self._log_file_operation(str(patho), dir_content, None)
-        return f"Displayed contents of directory {str(patho)}"
+        return f"The contents of directory {str(patho)}:\n{dir_content}"
 
     def _insert_string(self, path: str, insert_line: int, new_str: str, **kwargs: dict) -> str:
         """Insert a string into the file after a specific line number."""
