@@ -6,7 +6,6 @@ from pathlib import Path
 import tempfile
 from typing import Dict, List
 
-from watchdog.observers.kqueue import absolute_path
 
 from exchange import Message
 import httpx
