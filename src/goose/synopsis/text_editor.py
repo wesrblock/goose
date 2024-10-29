@@ -156,5 +156,4 @@ class TextEditor:
         if command not in self.command_dispatch:
             raise ValueError(f"Unknown command '{command}'.")
 
-        # Call the corresponding method from the command dispatch
         return self.command_dispatch[command](path, **kwargs)
