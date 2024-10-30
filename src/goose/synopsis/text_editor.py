@@ -1,12 +1,13 @@
-from typing import Optional, Literal
 from pathlib import Path
-from rich.markdown import Markdown
-from rich.rule import Rule
+from typing import Literal, Optional
+
 from goose.notifier import Notifier
 from goose.synopsis.system import system
 from goose.toolkit.utils import RULEPREFIX, RULESTYLE, get_language
 from goose.utils.confirm_execute import cancel_confirmation, confirm_execute
 from goose.utils.file_changes import show_diff
+from rich.markdown import Markdown
+from rich.rule import Rule
 
 TextEditorCommand = Literal["view", "create", "str_replace", "insert", "undo_edit"]
 
@@ -113,14 +114,12 @@ class TextEditor:
             content = content[start_line - 1 : (end_line if end_line != -1 else len(content))]
 
         system.remember_file(str(patho))
-        self._log_file_operation(str(patho), "".join(content), get_language(str(patho)))
         return f"Displayed content of {str(patho)}"
 
     def _view_directory(self, patho: Path) -> str:
         files = [str(p) for p in patho.iterdir()]
         dir_content = "\n".join(files)
-        self._log_file_operation(str(patho), dir_content, None)
-        return f"Displayed contents of directory {str(patho)}"
+        return f"The contents of directory {str(patho)}:\n{dir_content}"
 
     def _insert_string(self, path: str, insert_line: int, new_str: str, **kwargs: dict) -> str:
         """Insert a string into the file after a specific line number."""
@@ -166,5 +165,4 @@ class TextEditor:
         if command not in self.command_dispatch:
             raise ValueError(f"Unknown command '{command}'.")
 
-        # Call the corresponding method from the command dispatch
         return self.command_dispatch[command](path, **kwargs)

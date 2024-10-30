@@ -1,16 +1,11 @@
 # janky global state for now, think about it
 from collections import defaultdict
-from collections import defaultdict
 import re
 import tempfile
-from typing import Dict, Optional
 from typing import Dict, Optional
 
 from exchange import Message
 import httpx
-from goose.synopsis.bash import Bash
-from goose.synopsis.text_editor import TextEditor, TextEditorCommand
-from goose.synopsis.process_manager import ProcessManager, ProcessManagerCommand
 from goose.synopsis.bash import Bash
 from goose.synopsis.text_editor import TextEditor, TextEditorCommand
 from goose.synopsis.process_manager import ProcessManager, ProcessManagerCommand
@@ -22,7 +17,6 @@ class SynopsisDeveloper(Toolkit):
 
     def __init__(self, *args: object, **kwargs: Dict[str, object]) -> None:
         super().__init__(*args, **kwargs)
-        self._file_history = defaultdict(list)
         self._file_history = defaultdict(list)
 
     def system(self) -> str:
@@ -40,7 +34,7 @@ class SynopsisDeveloper(Toolkit):
         source_path: Optional[str] = None,
     ) -> str:
         """
-        Run commands in a bash shell
+        Run commands in a bash shell.
 
         Perform bash-related operations in a specific order:
         1. Change the working directory (if provided)
@@ -59,12 +53,9 @@ class SynopsisDeveloper(Toolkit):
         assert any(
             [command, working_dir, source_path]
         ), "At least one of the parameters for bash shell must be provided."
-        bash_tool = Bash(
-            notifier=self.notifier,
-            exchange_view=self.exchange_view,
-            explanation=explanation,
-            ask_confirmation=ask_confirmation,
-        )
+
+        bash_tool = Bash(notifier=self.notifier, exchange_view=self.exchange_view, explanation=explanation,
+            ask_confirmation=ask_confirmation)
         outputs = []
 
         if working_dir:
@@ -79,7 +70,6 @@ class SynopsisDeveloper(Toolkit):
             _out = bash_tool._shell(command)
             outputs.append(_out)
 
-        return "\n".join(outputs)
         return "\n".join(outputs)
 
     @tool
@@ -110,7 +100,7 @@ class SynopsisDeveloper(Toolkit):
             path (str): Absolute path (or relative path against cwd) to file or directory,
                 e.g. `/repo/file.py` or `/repo` or `curr_dir_file.py`.
             ask_confirmation (boolean): whether to ask for confirmation before creating or modifying any file.
-                any command except `view` will require confirmation.
+                Any command except `view` will require confirmation.
             file_text (str, optional): Required parameter of `create` command, with the content
                 of the file to be created.
             insert_line (int, optional): Required parameter of `insert` command.
@@ -151,36 +141,8 @@ class SynopsisDeveloper(Toolkit):
         - `list`: List all currently running background processes with their IDs and commands.
         - `view_output`: View the output of a running background process by providing its ID.
         - `cancel`: Cancel a running background process by providing its ID.
-    def process_manager(
-        self,
-        command: ProcessManagerCommand,
-        shell_command: Optional[str] = None,
-        process_id: Optional[int] = None,
-    ) -> str:
-        """
-        Manage background processes.
-
-        The `command` parameter specifies the operation to perform. Allowed options are:
-        - `start`: Start a background process by running a shell command.
-        - `list`: List all currently running background processes with their IDs and commands.
-        - `view_output`: View the output of a running background process by providing its ID.
-        - `cancel`: Cancel a running background process by providing its ID.
 
         Args:
-            command (str): The command to run.
-                Allowed options are: `start`, `list`, `view_output`, `cancel`.
-            shell_command (str, optional): Required parameter for the `start` command, representing
-                the shell command to be executed in the background.
-                Example: `"python -m http.server &"` to start a web server in the background.
-            process_id (int, optional): Required parameter for `view_output` and `cancel` commands,
-                representing the process ID of the background process to manage.
-        """
-        process_manager_instance = ProcessManager(notifier=self.notifier)
-        return process_manager_instance.run_command(
-            command=command,
-            shell_command=shell_command,
-            process_id=process_id,
-        )
             command (str): The command to run.
                 Allowed options are: `start`, `list`, `view_output`, `cancel`.
             shell_command (str, optional): Required parameter for the `start` command, representing

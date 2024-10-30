@@ -1,13 +1,13 @@
-import os
 import subprocess
-from typing import Dict, Literal
-
-from goose.notifier import Notifier
-from goose.synopsis.system import system
-from goose.toolkit.utils import RULEPREFIX, RULESTYLE
-from goose.utils.shell import is_dangerous_command, keep_unsafe_command_prompt
+import os
+from typing import Literal, Dict
 from rich.markdown import Markdown
 from rich.rule import Rule
+from goose.notifier import Notifier
+from goose.synopsis.system import system
+from goose.synopsis.util import log_command
+from goose.toolkit.utils import RULEPREFIX, RULESTYLE
+from goose.utils.shell import is_dangerous_command, keep_unsafe_command_prompt
 
 ProcessManagerCommand = Literal["start", "list", "view_output", "cancel"]
 
@@ -24,17 +24,12 @@ class ProcessManager:
             "cancel": self._cancel_process,
         }
 
-    def logshell(self, command: str, title: str = "shell") -> None:
-        self.notifier.log("")
-        self.notifier.log(
-            Rule(RULEPREFIX + f"{title} | [dim magenta]{os.path.abspath(system.cwd)}[/]", style=RULESTYLE, align="left")
-        )
-        self.notifier.log(Markdown(f"```bash\n{command}\n```"))
-        self.notifier.log("")
+    def _logshell(self, command: str, title: str = "background") -> None:
+        log_command(self.notifier, command, path=os.path.abspath(system.cwd), title=title)
 
     def _start_process(self, shell_command: str, **kwargs: dict) -> int:
         """Start a background process running the specified command."""
-        self.logshell(shell_command, title="background")
+        self._logshell(shell_command, title="background")
 
         if is_dangerous_command(shell_command):
             self.notifier.stop()
@@ -77,7 +72,7 @@ class ProcessManager:
     def _cancel_process(self, process_id: int, **kwargs: dict) -> str:
         """Cancel the background process with the specified ID."""
         result = system.cancel_process(process_id)
-        self.logshell(f"kill {process_id}")
+        self._logshell(f"kill {process_id}")
         if result:
             return f"Process {process_id} cancelled"
         else:
@@ -97,5 +92,4 @@ class ProcessManager:
         if command not in self.command_dispatch:
             raise ValueError(f"Unknown command '{command}'.")
 
-        # Call the corresponding method from the command dispatch
         return self.command_dispatch[command](**kwargs)
