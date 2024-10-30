@@ -1,7 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 from attrs import define, field
-from typing import Optional, Tuple
+from typing import Optional
 
 from exchange.message import Message
 from exchange.tool import Tool
@@ -51,7 +51,7 @@ class Provider(ABC):
         pass
 
     @staticmethod
-    def recommended_models() -> Tuple[str, str]:
+    def recommended_models() -> tuple[str, str]:
         """Return the recommended model and processor for this provider"""
         return "gpt-4o", "gpt-4o-mini"
 

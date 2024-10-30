@@ -1,4 +1,3 @@
-from typing import Tuple
 import httpx
 import os
 
@@ -92,7 +91,7 @@ class DatabricksProvider(Provider):
         return message, usage
 
     @staticmethod
-    def recommended_models() -> Tuple[str, str]:
+    def recommended_models() -> tuple[str, str]:
         """Return the recommended model and processor for this provider"""
         return "databricks-meta-llama-3-1-70b-instruct", "databricks-meta-llama-3-1-70b-instruct"
 

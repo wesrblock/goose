@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 import httpx
 
@@ -46,6 +45,6 @@ ollama:
         return cls(client)
 
     @staticmethod
-    def recommended_models() -> Tuple[str, str]:
+    def recommended_models() -> tuple[str, str]:
         """Return the recommended model and processor for this provider"""
         return OLLAMA_MODEL, OLLAMA_MODEL

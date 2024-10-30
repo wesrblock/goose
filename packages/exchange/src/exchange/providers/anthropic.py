@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 
 import httpx
 
@@ -159,7 +158,7 @@ class AnthropicProvider(Provider):
         return message, usage
 
     @staticmethod
-    def recommended_models() -> Tuple[str, str]:
+    def recommended_models() -> tuple[str, str]:
         """Return the recommended model and processor for this provider"""
         return "claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20241022"
 
