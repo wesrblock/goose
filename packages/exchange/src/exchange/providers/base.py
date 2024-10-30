@@ -1,7 +1,7 @@
 import os
 from abc import ABC, abstractmethod
 from attrs import define, field
-from typing import Optional
+from typing import Optional, Tuple
 
 from exchange.message import Message
 from exchange.tool import Tool
@@ -49,6 +49,11 @@ class Provider(ABC):
     ) -> tuple[Message, Usage]:
         """Generate the next message using the specified model"""
         pass
+
+    @staticmethod
+    def recommended_models() -> Tuple[str, str]:
+        """Return the recommended model and processor for this provider"""
+        return "gpt-4o", "gpt-4o-mini"
 
 
 class MissingProviderEnvVariableError(Exception):

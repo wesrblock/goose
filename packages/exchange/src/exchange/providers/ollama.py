@@ -1,4 +1,5 @@
 import os
+from typing import Tuple
 
 import httpx
 
@@ -43,3 +44,8 @@ ollama:
         # When served by Ollama, the OpenAI API is available at the path "v1/".
         client = httpx.Client(base_url=ollama_url + "v1/", timeout=timeout)
         return cls(client)
+
+    @staticmethod
+    def recommended_models() -> Tuple[str, str]:
+        """Return the recommended model and processor for this provider"""
+        return OLLAMA_MODEL, OLLAMA_MODEL
