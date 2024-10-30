@@ -59,5 +59,4 @@ def get_total_cost_message(
 
     time_duration = f"{formatted_time(start_time)} - {formatted_time(end_time)}"
     summary = f"{time_duration} | {session_name_prefix} | Total cost: ${total_cost:.2f}"
-    # Lifei: add comments
     return message + summary
