@@ -12,14 +12,25 @@ PRICES = {
     "gpt-4o-mini": (0.150, 0.600),
     "gpt-4o-mini-2024-07-18": (0.150, 0.600),
     "o1-preview": (15.00, 60.00),
+    "o1-preview-2024-09-12": (15.00, 60.00),
     "o1-mini": (3.00, 12.00),
-    "claude-3-5-sonnet-20240620": (3.00, 15.00),
+    "o1-mini-2024-09-12": (3.00, 12.00),
+    "claude-3-5-sonnet-latest": (3.00, 15.00),  # Claude 3.5 Sonnet model
     "claude-3-5-sonnet-20241022": (3.00, 15.00),
+    "anthropic.claude-3-5-sonnet-20241022-v2:0": (3.00, 15.00),
+    "claude-3-5-sonnet-v2@20241022": (3.00, 15.00),
+    "claude-3-5-sonnet-20240620": (3.00, 15.00),
     "anthropic.claude-3-5-sonnet-20240620-v1:0": (3.00, 15.00),
+    "claude-3-opus-latest": (15.00, 75.00),  # Claude Opus 3 model
     "claude-3-opus-20240229": (15.00, 75.00),
     "anthropic.claude-3-opus-20240229-v1:0": (15.00, 75.00),
-    "claude-3-haiku-20240307": (0.25, 1.25),
+    "claude-3-opus@20240229": (15.00, 75.00),
+    "claude-3-sonnet-20240229": (3.00, 15.00),  # Claude Sonnet 3 model
+    "anthropic.claude-3-sonnet-20240229-v1:0": (3.00, 15.00),
+    "claude-3-sonnet@20240229": (3.00, 15.00),
+    "claude-3-haiku-20240307": (0.25, 1.25),  # Claude Haiku 3 model
     "anthropic.claude-3-haiku-20240307-v1:0": (0.25, 1.25),
+    "claude-3-haiku@20240307": (0.25, 1.25),
 }
 
 
