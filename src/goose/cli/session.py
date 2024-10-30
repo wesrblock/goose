@@ -153,7 +153,6 @@ class Session:
         profile = self.profile_name or "default"
         print(f"[dim]starting session | name:[cyan]{self.name}[/]  profile:[cyan]{profile}[/]")
         print(f"[dim]saving to {self.session_file_path}")
-        print()
 
         # Process initial message
         message = Message.user(initial_message)
@@ -205,12 +204,16 @@ class Session:
     @observe_wrapper()
     def reply(self) -> None:
         """Reply to the last user message, calling tools as needed"""
+        # group all traces under the same session
+        langfuse_context.update_current_trace(session_id=self.name)
+
         # These are the *raw* messages, before the moderator rewrites things
         committed = [self.exchange.messages[-1]]
 
         try:
-            self.status_indicator.update("responding")
+            self.status_indicator.update("processing request")
             response = self.exchange.generate()
+            self.status_indicator.update("got response, processing")
             committed.append(response)
 
             if response.text:
@@ -224,7 +227,7 @@ class Session:
                 message = Message(role="user", content=content)
                 committed.append(message)
                 self.exchange.add(message)
-                self.status_indicator.update("responding")
+                self.status_indicator.update("processing tool results")
                 response = self.exchange.generate()
                 committed.append(response)
 

@@ -1,12 +1,13 @@
-import subprocess
 import os
-from typing import Literal, Dict
-from rich.markdown import Markdown
-from rich.rule import Rule
+import subprocess
+from typing import Dict, Literal
+
 from goose.notifier import Notifier
 from goose.synopsis.system import system
 from goose.toolkit.utils import RULEPREFIX, RULESTYLE
 from goose.utils.shell import is_dangerous_command, keep_unsafe_command_prompt
+from rich.markdown import Markdown
+from rich.rule import Rule
 
 ProcessManagerCommand = Literal["start", "list", "view_output", "cancel"]
 

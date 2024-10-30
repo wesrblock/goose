@@ -1,11 +1,16 @@
 # janky global state for now, think about it
 from collections import defaultdict
+from collections import defaultdict
 import re
 import tempfile
+from typing import Dict, Optional
 from typing import Dict, Optional
 
 from exchange import Message
 import httpx
+from goose.synopsis.bash import Bash
+from goose.synopsis.text_editor import TextEditor, TextEditorCommand
+from goose.synopsis.process_manager import ProcessManager, ProcessManagerCommand
 from goose.synopsis.bash import Bash
 from goose.synopsis.text_editor import TextEditor, TextEditorCommand
 from goose.synopsis.process_manager import ProcessManager, ProcessManagerCommand
@@ -17,6 +22,7 @@ class SynopsisDeveloper(Toolkit):
 
     def __init__(self, *args: object, **kwargs: Dict[str, object]) -> None:
         super().__init__(*args, **kwargs)
+        self._file_history = defaultdict(list)
         self._file_history = defaultdict(list)
 
     def system(self) -> str:
@@ -73,6 +79,7 @@ class SynopsisDeveloper(Toolkit):
             _out = bash_tool._shell(command)
             outputs.append(_out)
 
+        return "\n".join(outputs)
         return "\n".join(outputs)
 
     @tool
@@ -144,8 +151,36 @@ class SynopsisDeveloper(Toolkit):
         - `list`: List all currently running background processes with their IDs and commands.
         - `view_output`: View the output of a running background process by providing its ID.
         - `cancel`: Cancel a running background process by providing its ID.
+    def process_manager(
+        self,
+        command: ProcessManagerCommand,
+        shell_command: Optional[str] = None,
+        process_id: Optional[int] = None,
+    ) -> str:
+        """
+        Manage background processes.
+
+        The `command` parameter specifies the operation to perform. Allowed options are:
+        - `start`: Start a background process by running a shell command.
+        - `list`: List all currently running background processes with their IDs and commands.
+        - `view_output`: View the output of a running background process by providing its ID.
+        - `cancel`: Cancel a running background process by providing its ID.
 
         Args:
+            command (str): The command to run.
+                Allowed options are: `start`, `list`, `view_output`, `cancel`.
+            shell_command (str, optional): Required parameter for the `start` command, representing
+                the shell command to be executed in the background.
+                Example: `"python -m http.server &"` to start a web server in the background.
+            process_id (int, optional): Required parameter for `view_output` and `cancel` commands,
+                representing the process ID of the background process to manage.
+        """
+        process_manager_instance = ProcessManager(notifier=self.notifier)
+        return process_manager_instance.run_command(
+            command=command,
+            shell_command=shell_command,
+            process_id=process_id,
+        )
             command (str): The command to run.
                 Allowed options are: `start`, `list`, `view_output`, `cancel`.
             shell_command (str, optional): Required parameter for the `start` command, representing
