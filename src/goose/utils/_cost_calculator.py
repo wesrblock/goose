@@ -16,6 +16,7 @@ PRICES = {
     "o1-mini": (3.00, 12.00),
     "o1-mini-2024-09-12": (3.00, 12.00),
     "claude-3-5-sonnet-latest": (3.00, 15.00),  # Claude 3.5 Sonnet model
+    "claude-3-5-sonnet-2": (3.00, 15.00),
     "claude-3-5-sonnet-20241022": (3.00, 15.00),
     "anthropic.claude-3-5-sonnet-20241022-v2:0": (3.00, 15.00),
     "claude-3-5-sonnet-v2@20241022": (3.00, 15.00),
