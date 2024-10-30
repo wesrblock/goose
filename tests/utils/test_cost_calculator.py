@@ -37,7 +37,7 @@ def test_get_total_cost_message(mock_prices):
         " total_tokens=10600): $0.06\n"
         "Session name: test_session | Cost for model gpt-4o-mini Usage(input_tokens=3000000, output_tokens=4000000, "
         "total_tokens=7000000): $2.85\n"
-        "Session name: test_session | 2024-10-20 01:02:03 - 2024-10-21 02:03:04 | Total cost: $2.91"
+        "2024-10-20 01:02:03 - 2024-10-21 02:03:04 | Session name: test_session | Total cost: $2.91"
     )
     assert message == expected_message
 
@@ -57,6 +57,6 @@ def test_get_total_cost_message_with_non_available_pricing(mock_prices):
         " total_tokens=10600): Not available\n"
         + "Session name: test_session | Cost for model gpt-4o-mini Usage(input_tokens=3000000, output_tokens=4000000,"
         " total_tokens=7000000): $2.85\n"
-        + "Session name: test_session | 2024-10-20 01:02:03 - 2024-10-21 02:03:04 | Total cost: $2.85"
+        + "2024-10-20 01:02:03 - 2024-10-21 02:03:04 | Session name: test_session | Total cost: $2.85"
     )
     assert message == expected_message
