@@ -1,5 +1,9 @@
+from datetime import datetime
 from typing import Optional
+
 from exchange.providers.base import Usage
+
+from goose.utils.time_utils import formatted_time
 
 PRICES = {
     "gpt-4o": (2.50, 10.00),
@@ -27,15 +31,20 @@ def _calculate_cost(model: str, token_usage: Usage) -> Optional[float]:
     return None
 
 
-def get_total_cost_message(token_usages: dict[str, Usage]) -> str:
+def get_total_cost_message(
+    token_usages: dict[str, Usage], session_name: str, start_time: datetime, end_time: datetime
+) -> str:
     total_cost = 0
     message = ""
+    session_name_prefix = f"Session name: {session_name}"
     for model, token_usage in token_usages.items():
         cost = _calculate_cost(model, token_usage)
         if cost is not None:
-            message += f"Cost for model {model} {str(token_usage)}: ${cost:.2f}\n"
+            message += f"{session_name_prefix} | Cost for model {model} {str(token_usage)}: ${cost:.2f}\n"
             total_cost += cost
         else:
-            message += f"Cost for model {model} {str(token_usage)}: Not available\n"
-    message += f"Total cost: ${total_cost:.2f}"
-    return message
+            message += f"{session_name_prefix} | Cost for model {model} {str(token_usage)}: Not available\n"
+
+    time_duration = f"{formatted_time(start_time)} - {formatted_time(end_time)}"
+    summary = f"{session_name_prefix} | {time_duration} | Total cost: ${total_cost:.2f}"
+    return message + summary
