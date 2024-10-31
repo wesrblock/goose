@@ -57,6 +57,6 @@ def get_total_cost_message(
         else:
             message += f"{session_name_prefix} | Cost for model {model} {str(token_usage)}: Not available\n"
 
-    time_duration = f"{formatted_time(start_time)} - {formatted_time(end_time)}"
-    summary = f"{time_duration} | {session_name_prefix} | Total cost: ${total_cost:.2f}"
+    datetime_range = f"{formatted_time(start_time)} - {formatted_time(end_time)}"
+    summary = f"{datetime_range} | {session_name_prefix} | Total cost: ${total_cost:.2f}"
     return message + summary
