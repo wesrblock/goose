@@ -277,7 +277,13 @@ def session_clear(keep: int) -> None:
 )
 @click.option("-V", "--version", is_flag=True, help="List the version of goose and any plugins")
 @click.pass_context
-def cli(ctx: click.Context, version: bool, **kwargs: dict) -> None:
+def cli(ctx: click.Context, version: bool, trace: bool = False, **kwargs: dict) -> None:
+    trace = True
+    if trace:
+        from goose.utils.tracing import enable_tracing
+
+        enable_tracing()
+
     if version:
         ctx.invoke(get_version)
         ctx.exit()
