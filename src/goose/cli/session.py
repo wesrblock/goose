@@ -67,6 +67,7 @@ class Session:
         plan: Optional[dict] = None,
         log_level: Optional[str] = "INFO",
         tracing: bool = False,
+        ask_confirmation: bool = False,
         **kwargs: dict[str, any],
     ) -> None:
         if name is None:
@@ -90,7 +91,9 @@ class Session:
                 )
         langfuse_context.configure(enabled=tracing)
 
-        self.exchange = create_exchange(profile=load_profile(profile), notifier=self.notifier)
+        self.exchange = create_exchange(
+            profile=load_profile(profile), notifier=self.notifier, ask_confirmation=ask_confirmation
+        )
         setup_logging(log_file_directory=LOG_PATH, log_level=log_level)
 
         self.exchange.messages.extend(self._get_initial_messages())
