@@ -16,6 +16,7 @@ dependencies = [
     "selenium>=4.0.0",
     "beautifulsoup4>=4.9.3",
     "pyshadow<=0.0.5"
+    "goose-plugins-block",
     "goose-context-management",
 ]
 author = [{ name = "Block", email = "ai-oss-tools@block.xyz" }]
@@ -80,6 +81,7 @@ dev-dependencies = [
 
 [tool.uv.sources]
 ai-exchange = { workspace = true }
+goose-plugins-block = { path = "../goose-plugins-block", editable = true }
 goose-context-management = { path = "../goose-context-store", editable = true }
 
 [tool.uv.workspace]

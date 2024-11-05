@@ -27,7 +27,7 @@ from goose.utils._create_exchange import create_exchange
 from goose.utils.session_file import is_empty_session, is_existing_session, log_messages, read_or_create_file
 
 from context_manager.developer_hints import get_all_tags, get_hints
-from context_manager.lancedb_interface import LanceDBInterface
+from context_manager.context_db import LanceDBContext
 
 RESUME_MESSAGE = "I see we were interrupted. How can I help you?"
 
@@ -109,7 +109,7 @@ class Session:
 
         self.prompt_session = GoosePromptSession()
 
-        self.context_db = LanceDBInterface(profile.context) if profile.context else None
+        self.context_db = LanceDBContext(profile.context) if profile.context else None
 
     def _get_initial_messages(self) -> list[Message]:
         messages = self.load_session()

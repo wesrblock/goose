@@ -11,6 +11,8 @@ from goose.synopsis.text_editor import TextEditor, TextEditorCommand
 from goose.synopsis.process_manager import ProcessManager, ProcessManagerCommand
 from goose.toolkit.base import Toolkit, tool
 
+from context_manager.developer_hints import get_hints
+from context_manager.context_db import LanceDBContext
 
 
 class SynopsisDeveloper(Toolkit):
@@ -20,7 +22,7 @@ class SynopsisDeveloper(Toolkit):
         super().__init__(*args, **kwargs)
         self._file_history = defaultdict(list)
         if self.context:
-            self.db = LanceDBInterface(self.context)
+            self.db = LanceDBContext(self.context)
 
     def system(self) -> str:
         """Retrieve system configuration details for developer"""
@@ -198,7 +200,10 @@ class SynopsisDeveloper(Toolkit):
         """
         # TODO do some additional filtering / reranking on returned results based on the task
         # TODO make toolkit available only if context is passed in profiles config
-        hints = get_hints(self.db, query, tags, lazy_load=True, limit=limit)
-        return "## DEVELOPER HINTS:\n\n" + "\n\n".join(
-            [f"### {h['file_name']} Hint File:\n{h['content']}" for h in hints]
-        )
+        hints = get_hints(db=self.db, query=query, tags=tags, lazy_load=True, limit=limit)
+        if len(hints) == 0:
+            return ""
+        else:
+            return "## DEVELOPER HINTS:\n\n" + "\n\n".join(
+                [f"### {h['file_name']} Hint File:\n{h['content']}" for h in hints]
+            )
