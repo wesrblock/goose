@@ -247,6 +247,11 @@ class Session:
             # The interrupt reply modifies the message history,
             # and we sync those changes to committed
             self.interrupt_reply(committed)
+        except CostExceeded:
+            print(
+                f"[red]The session cost has exceeded the maximum allowed cost of ${self.max_cost/100:.2f}.\n"
+                + "To continue, exit and resume the session with a different maximum allowed cost.[/]"
+            )
 
         # we log the committed messages only once the reply completes
         # this prevents messages related to uncaught errors from being recorded
