@@ -1,0 +1,22 @@
+[package]
+name = "goose"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+# Error handling
+anyhow = "1.0"
+
+# Requests
+reqwest = { version = "0.11", features = ["json"] }
+
+# Async
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# CLI, input, formatting
+clap = { version = "4.4", features = ["derive"] }
+cliclack = "0.3.5"
+console = "0.15.8"
+bat = "0.24.0"
