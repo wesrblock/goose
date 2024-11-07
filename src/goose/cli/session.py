@@ -150,6 +150,7 @@ class Session:
         Args:
             initial_message (str): The initial user message to process.
         """
+        time_start = datetime.now()
         profile = self.profile_name or "default"
         print(f"[dim]starting session | name: [cyan]{self.name}[/]  profile: [cyan]{profile}[/]")
         print(f"[dim]saving to {self.session_file_path}")
@@ -159,6 +160,9 @@ class Session:
 
         self.exchange.add(message)
         self.reply()  # Process the user message
+
+        time_end = datetime.now()
+        self._log_cost(start_time=time_start, end_time=time_end)
 
         print(f"[dim]ended run | name: [cyan]{self.name}[/]  profile: [cyan]{profile}[/]")
         print(f"[dim]to resume: [magenta]goose session resume {self.name} --profile {profile}[/][/]")
