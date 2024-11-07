@@ -217,8 +217,8 @@ class Session:
 
         try:
             self._check_cost_not_exceeded()
-            self.status_indicator.update("processing request")
 
+            self.status_indicator.update("processing request")
             response = self.exchange.generate()
             self.status_indicator.update("got response, processing")
             committed.append(response)
@@ -247,7 +247,7 @@ class Session:
             # The interrupt reply modifies the message history,
             # and we sync those changes to committed
             self.interrupt_reply(committed)
-        except CostExceeded:
+        except CostExceededError:
             print(
                 f"[red]The session cost has exceeded the maximum allowed cost of ${self.max_cost/100:.2f}.\n"
                 + "To continue, exit and resume the session with a different maximum allowed cost.[/]"
@@ -307,12 +307,14 @@ class Session:
                 if cost is not None:
                     total_cost += cost
                 else:
-                    raise RuntimeError(f"Pricing for model {model} not available. Incompatible with --max-cost parameter.")
+                    raise RuntimeError(f"Pricing for model {model} not available. "
+                                       + "Incompatible with --max-cost parameter.")
 
             # Convert to integer cents for comparison
             cost_cents = int(round(total_cost * 100, 0))
             if cost_cents >= self.max_cost:
-                raise CostExceeded(f"Session cost ${total_cost:.2f} exceeds maximum allowed cost ${self.max_cost/100:.2f}")
+                error = f"Session cost ${total_cost:.2f} exceeds maximum allowed cost ${self.max_cost/100:.2f}"
+                raise CostExceededError(error)
 
     def _log_cost(self, start_time: datetime, end_time: datetime) -> None:
         get_logger().info(get_total_cost_message(self.exchange.get_token_usage(), self.name, start_time, end_time))
@@ -365,7 +367,7 @@ class Session:
             logger.error(f"error deleting empty session file: {e}")
         return False
 
-class CostExceeded(Exception):
+class CostExceededError(Exception):
     """Raised when the cost of a session exceeds the maximum allowed cost."""
     pass
 

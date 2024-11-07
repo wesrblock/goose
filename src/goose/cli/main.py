@@ -162,7 +162,8 @@ def get_session_files() -> dict[str, Path]:
 @click.option("--tracing", is_flag=True, required=False)
 @click.option("--max-cost", type=int, help="Maximum cost in cents (e.g., 100 = $1.00)", default=None)
 def session_start(
-    name: Optional[str], profile: str, log_level: str, plan: Optional[str] = None, tracing: bool = False, max_cost: Optional[int] = None
+    name: Optional[str], profile: str, log_level: str, plan: Optional[str] = None, tracing: bool = False,
+    max_cost: Optional[int] = None
 ) -> None:
     """Start a new goose session"""
     if plan:
@@ -173,7 +174,8 @@ def session_start(
         _plan = None
 
     try:
-        session = Session(name=name, profile=profile, plan=_plan, log_level=log_level, tracing=tracing, max_cost=max_cost)
+        session = Session(name=name, profile=profile, plan=_plan, log_level=log_level, tracing=tracing,
+                          max_cost=max_cost)
         session.run()
     except RuntimeError as e:
         print(f"[red]Error: {e}")
