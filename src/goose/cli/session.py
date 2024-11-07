@@ -307,8 +307,9 @@ class Session:
                 if cost is not None:
                     total_cost += cost
                 else:
-                    raise RuntimeError(f"Pricing for model {model} not available. "
-                                       + "Incompatible with --max-cost parameter.")
+                    raise RuntimeError(
+                        f"Pricing for model {model} not available. Incompatible with --max-cost parameter."
+                    )
 
             # Convert to integer cents for comparison
             cost_cents = int(round(total_cost * 100, 0))
@@ -367,9 +368,12 @@ class Session:
             logger.error(f"error deleting empty session file: {e}")
         return False
 
+
 class CostExceededError(Exception):
     """Raised when the cost of a session exceeds the maximum allowed cost."""
+
     pass
+
 
 if __name__ == "__main__":
     session = Session()

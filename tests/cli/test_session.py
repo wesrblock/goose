@@ -167,7 +167,7 @@ def test_reply_does_not_call_exchange_generate_when_cost_exceeded(create_session
     usage = Usage(input_tokens=1000000, output_tokens=0, total_tokens=1000000)
     mock_exchange.get_token_usage.return_value = {"gpt-4o": usage}
 
-    with patch("goose.cli.session.log_messages"): # Mock log_messages to avoid serialization issues with MagicMock
+    with patch("goose.cli.session.log_messages"):  # Mock log_messages to avoid serialization issues with MagicMock
         session.reply()
         mock_exchange.generate.assert_not_called()
 
