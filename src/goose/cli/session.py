@@ -306,6 +306,8 @@ class Session:
                 cost = calculate_cost(model, token_usage)
                 if cost is not None:
                     total_cost += cost
+                else:
+                    raise RuntimeError(f"Pricing for model {model} not available. Incompatible with --max-cost parameter.")
 
             # Convert to integer cents for comparison
             cost_cents = int(round(total_cost * 100, 0))
