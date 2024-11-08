@@ -199,7 +199,6 @@ mod tests {
     use crate::providers::types::content::ToolResult;
     use crate::providers::types::message::Role;
     use serde_json::json;
-    use std::collections::HashMap;
 
     const OPENAI_TOOL_USE_RESPONSE: &str = r#"{
         "choices": [{
@@ -234,12 +233,13 @@ mod tests {
 
     #[test]
     fn test_tools_to_openai_spec() -> Result<()> {
-        let mut params = HashMap::new();
-        params.insert("type".to_string(), json!("object"));
+        let parameters = json!({
+            "type": "object"
+        });
         let tool = Tool::new(
             "test_tool".to_string(),
             "A test tool".to_string(),
-            params,
+            parameters,
             |_| Ok(json!({})),
         );
 
@@ -309,20 +309,21 @@ mod tests {
 
     #[test]
     fn test_tools_to_openai_spec_duplicate() -> Result<()> {
-        let mut params = HashMap::new();
-        params.insert("type".to_string(), json!("object"));
+        let parameters = json!({
+            "type": "object"
+        });
 
         let tool1 = Tool::new(
             "test_tool".to_string(),
             "Test tool".to_string(),
-            params.clone(),
+            parameters.clone(),
             |_| Ok(json!({})),
         );
 
         let tool2 = Tool::new(
             "test_tool".to_string(),
             "Test tool".to_string(),
-            params.clone(),
+            parameters.clone(),
             |_| Ok(json!({})),
         );
 

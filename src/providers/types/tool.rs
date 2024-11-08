@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Debug;
 
 /// A tool that can be used by a model.
@@ -8,7 +7,7 @@ pub struct Tool {
     /// A description of what the tool does
     pub description: String,
     /// A json schema of the function signature
-    pub parameters: HashMap<String, serde_json::Value>,
+    pub parameters: serde_json::Value,
     /// The function that powers the tool
     /// Note: We use Box<dyn Fn> to store callable functions
     pub function:
@@ -19,7 +18,7 @@ impl Tool {
     pub fn new(
         name: String,
         description: String,
-        parameters: HashMap<String, serde_json::Value>,
+        parameters: serde_json::Value,
         function: impl Fn(&serde_json::Value) -> anyhow::Result<serde_json::Value>
             + Send
             + Sync
@@ -58,13 +57,16 @@ mod tests {
 
     #[test]
     fn test_basic_tool_creation() {
-        let parameters = HashMap::from([(
-            "location".to_string(),
-            json!({
-                "type": "string",
-                "description": "The city and state, e.g. San Francisco, CA"
-            }),
-        )]);
+        let parameters = json!({
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. San Francisco, CA"
+                }
+            },
+            "required": ["location"]
+        });
 
         let tool = Tool::new(
             "get_current_weather".to_string(),
@@ -88,22 +90,20 @@ mod tests {
 
     #[test]
     fn test_tool_with_multiple_params() {
-        let parameters = HashMap::from([
-            (
-                "param1".to_string(),
-                json!({
+        let parameters = json!({
+            "type": "object",
+            "properties": {
+                "param1": {
                     "type": "integer",
                     "description": "Description for param1"
-                }),
-            ),
-            (
-                "param2".to_string(),
-                json!({
+                },
+                "param2": {
                     "type": "string",
                     "description": "Description for param2"
-                }),
-            ),
-        ]);
+                }
+            },
+            "required": ["param1", "param2"]
+        });
 
         let tool = Tool::new(
             "multi_param_function".to_string(),
@@ -128,7 +128,7 @@ mod tests {
         let tool = Tool::new(
             "test_tool".to_string(),
             "Test description".to_string(),
-            HashMap::new(),
+            json!({}),
             |_| Ok(json!({})),
         );
 

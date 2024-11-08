@@ -153,6 +153,8 @@ impl Provider for OpenAiProvider {
                 .insert("top_p".to_string(), json!(p));
         }
 
+        // dbg!(&payload);
+
         // Make request
         let response = self.post(payload)?;
 

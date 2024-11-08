@@ -88,17 +88,17 @@ impl Message {
             .collect()
     }
 
-    fn has_text(&self) -> bool {
+    pub fn has_text(&self) -> bool {
         self.content.iter().any(|c| matches!(c, Content::Text(_)))
     }
 
-    fn has_tool_use(&self) -> bool {
+    pub fn has_tool_use(&self) -> bool {
         self.content
             .iter()
             .any(|c| matches!(c, Content::ToolUse(_)))
     }
 
-    fn has_tool_result(&self) -> bool {
+    pub fn has_tool_result(&self) -> bool {
         self.content
             .iter()
             .any(|c| matches!(c, Content::ToolResult(_)))

@@ -3,12 +3,15 @@ use bat::PrettyPrinter;
 use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
+use goose::providers::types::content::{ContentType};
 use std::env;
+use serde_json::json;
 
 use goose::providers::configs::openai::OpenAiProviderConfig;
 use goose::providers::base::Provider;
 use goose::providers::openai::OpenAiProvider;
 use goose::providers::types::message::Message;
+use goose::providers::types::tool::Tool;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -37,6 +40,32 @@ fn main() -> Result<()> {
         host: "https://api.openai.com".to_string(),
     })?;
 
+    // Add word counting tool
+    let parameters = json!({
+        "type": "object",
+        "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to count words in"
+                }
+        },
+        "required": ["text"]
+    });
+
+    let word_count_tool = Tool::new(
+        "count_words".to_string(),
+        "Count the number of words in text".to_string(),
+        parameters,
+        |args| {
+            let text = args.get("text")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            Ok(json!({ "count": text.split_whitespace().count() }))
+        }
+    );
+
+    let tools = vec![word_count_tool];
+
     println!(
         "Example goose CLI {}",
         style("- type \"exit\" to end the session").dim()
@@ -59,16 +88,21 @@ fn main() -> Result<()> {
             &cli.model,
             "You are a helpful assistant.",
             &[user_message],
-            &[],  // no tools
-            None, // default temperature
-            None, // default max_tokens
-            None, // no stop sequences
-            None, // default top_p
+            &tools,  // Changed from &[] to &tools
+            None,    // default temperature
+            None,    // default max_tokens
+            None,    // no stop sequences
+            None,    // default top_p
         )?;
 
         spin.stop("");
 
-        render(&response_message.text());
+        if response_message.has_tool_use() {
+            render(&response_message.tool_use().first().unwrap().summary());
+        } else {
+            render(&response_message.text());
+        }
+
         println!("\n");
     }
     Ok(())
