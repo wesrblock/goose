@@ -3,9 +3,12 @@ use bat::PrettyPrinter;
 use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
-use reqwest::Client;
-use serde_json::{json, Value};
 use std::env;
+
+use goose::providers::configs::openai::OpenAiProviderConfig;
+use goose::providers::base::Provider;
+use goose::providers::openai::OpenAiProvider;
+use goose::providers::types::message::Message;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -19,8 +22,7 @@ struct Cli {
     model: String,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Get API key from command line or environment variable
@@ -29,7 +31,12 @@ async fn main() -> Result<()> {
         .or_else(|| env::var("OPENAI_API_KEY").ok())
         .context("API key must be provided via --api-key or OPENAI_API_KEY environment variable")?;
 
-    let client = Client::new();
+    // Initialize OpenAI provider
+    let provider = OpenAiProvider::new(OpenAiProviderConfig {
+        api_key,
+        host: "https://api.openai.com".to_string(),
+    })?;
+
     println!(
         "Example goose CLI {}",
         style("- type \"exit\" to end the session").dim()
@@ -37,60 +44,40 @@ async fn main() -> Result<()> {
     println!("\n");
 
     loop {
-        let message: String = input("Message:").placeholder("").multiline().interact()?;
+        let message_text: String = input("Message:").placeholder("").multiline().interact()?;
 
-        if message.trim().eq_ignore_ascii_case("exit") {
+        if message_text.trim().eq_ignore_ascii_case("exit") {
             break;
         }
 
-        let future = send_chat_request(&client, &api_key, &cli.model, &message);
         let spin = spinner();
         spin.start("awaiting reply");
 
-        let response = future.await?;
+        // Create user message and get completion
+        let user_message = Message::user(&message_text)?;
+        let (response_message, _usage) = provider.complete(
+            &cli.model,
+            "You are a helpful assistant.",
+            &[user_message],
+            &[],  // no tools
+            None, // default temperature
+            None, // default max_tokens
+            None, // no stop sequences
+            None, // default top_p
+        )?;
+
         spin.stop("");
 
-        // Extract the content from the response
-        let content = response["choices"][0]["message"]["content"]
-            .as_str()
-            .context("Failed to get response content")?;
-
-        render(content).await;
+        render(&response_message.text());
         println!("\n");
     }
     Ok(())
 }
 
-async fn render(content: &str) {
+fn render(content: &str) {
     PrettyPrinter::new()
         .input_from_bytes(content.as_bytes())
         .language("markdown")
         .print()
         .unwrap();
-}
-
-async fn send_chat_request(
-    client: &Client,
-    api_key: &str,
-    model: &str,
-    message: &str,
-) -> Result<Value> {
-    let response = client
-        .post("https://api.openai.com/v1/chat/completions")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&json!({
-            "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": message
-                }
-            ]
-        }))
-        .send()
-        .await?
-        .json::<Value>()
-        .await?;
-
-    Ok(response)
 }

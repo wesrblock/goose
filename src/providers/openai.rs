@@ -62,18 +62,12 @@ impl OpenAiProvider {
             self.config.host.trim_end_matches('/')
         );
 
-        println!("=== Request Debug ===");
-        println!("URL: {}", url);
-        println!("Payload: {}", serde_json::to_string_pretty(&payload)?);
-
         let response = self
             .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&payload)
             .send()?;
-
-        println!("Response Status: {}", response.status());
 
         match response.status() {
             StatusCode::OK => Ok(response.json()?),
