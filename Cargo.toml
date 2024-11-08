@@ -6,9 +6,10 @@ edition = "2021"
 [dependencies]
 # Error handling
 anyhow = "1.0"
+thiserror = "1.0"
 
 # Requests
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", features = ["json", "blocking"] }
 
 # Async
 tokio = { version = "1.0", features = ["full"] }
