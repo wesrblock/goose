@@ -17,8 +17,12 @@ impl ProviderConfig for OpenAiProviderConfig {
         let api_key = Self::get_env("OPENAI_API_KEY", true, None)?
             .ok_or_else(|| anyhow::anyhow!("OpenAI API key should be present"))?;
 
-        let host = Self::get_env("OPENAI_API_HOST", false, Some("https://api.openai.com/".to_string()))?
-            .unwrap_or_else(|| "https://api.openai.com/".to_string());
+        let host = Self::get_env(
+            "OPENAI_API_HOST",
+            false,
+            Some("https://api.openai.com/".to_string()),
+        )?
+        .unwrap_or_else(|| "https://api.openai.com/".to_string());
 
         Ok(Self::new(api_key, host))
     }

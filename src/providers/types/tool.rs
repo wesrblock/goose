@@ -11,7 +11,8 @@ pub struct Tool {
     pub parameters: HashMap<String, serde_json::Value>,
     /// The function that powers the tool
     /// Note: We use Box<dyn Fn> to store callable functions
-    pub function: Box<dyn Fn(&serde_json::Value) -> anyhow::Result<serde_json::Value> + Send + Sync>,
+    pub function:
+        Box<dyn Fn(&serde_json::Value) -> anyhow::Result<serde_json::Value> + Send + Sync>,
 }
 
 impl Tool {
@@ -19,7 +20,10 @@ impl Tool {
         name: String,
         description: String,
         parameters: HashMap<String, serde_json::Value>,
-        function: impl Fn(&serde_json::Value) -> anyhow::Result<serde_json::Value> + Send + Sync + 'static,
+        function: impl Fn(&serde_json::Value) -> anyhow::Result<serde_json::Value>
+            + Send
+            + Sync
+            + 'static,
     ) -> Self {
         Tool {
             name,
@@ -41,7 +45,6 @@ impl Debug for Tool {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,12 +58,13 @@ mod tests {
 
     #[test]
     fn test_basic_tool_creation() {
-        let parameters = HashMap::from([
-            ("location".to_string(), json!({
+        let parameters = HashMap::from([(
+            "location".to_string(),
+            json!({
                 "type": "string",
                 "description": "The city and state, e.g. San Francisco, CA"
-            }))
-        ]);
+            }),
+        )]);
 
         let tool = Tool::new(
             "get_current_weather".to_string(),
@@ -70,7 +74,10 @@ mod tests {
         );
 
         assert_eq!(tool.name, "get_current_weather");
-        assert_eq!(tool.description, "Get the current weather in a given location");
+        assert_eq!(
+            tool.description,
+            "Get the current weather in a given location"
+        );
         assert_eq!(tool.parameters, parameters);
 
         // Test function execution
@@ -82,14 +89,20 @@ mod tests {
     #[test]
     fn test_tool_with_multiple_params() {
         let parameters = HashMap::from([
-            ("param1".to_string(), json!({
-                "type": "integer",
-                "description": "Description for param1"
-            })),
-            ("param2".to_string(), json!({
-                "type": "string",
-                "description": "Description for param2"
-            })),
+            (
+                "param1".to_string(),
+                json!({
+                    "type": "integer",
+                    "description": "Description for param1"
+                }),
+            ),
+            (
+                "param2".to_string(),
+                json!({
+                    "type": "string",
+                    "description": "Description for param2"
+                }),
+            ),
         ]);
 
         let tool = Tool::new(

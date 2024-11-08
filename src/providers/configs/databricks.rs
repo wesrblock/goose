@@ -10,8 +10,6 @@ impl DatabricksProviderConfig {
     pub fn new(host: String, token: String) -> Self {
         Self { host, token }
     }
-
-
 }
 
 impl ProviderConfig for DatabricksProviderConfig {

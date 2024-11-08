@@ -198,8 +198,8 @@ mod tests {
     use super::*;
     use crate::providers::types::content::ToolResult;
     use crate::providers::types::message::Role;
-    use std::collections::HashMap;
     use serde_json::json;
+    use std::collections::HashMap;
 
     const OPENAI_TOOL_USE_RESPONSE: &str = r#"{
         "choices": [{
@@ -240,7 +240,7 @@ mod tests {
             "test_tool".to_string(),
             "A test tool".to_string(),
             params,
-            |_| Ok(json!({}))
+            |_| Ok(json!({})),
         );
 
         let spec = tools_to_openai_spec(&[tool])?;
@@ -316,19 +316,22 @@ mod tests {
             "test_tool".to_string(),
             "Test tool".to_string(),
             params.clone(),
-            |_| Ok(json!({}))
+            |_| Ok(json!({})),
         );
 
         let tool2 = Tool::new(
             "test_tool".to_string(),
             "Test tool".to_string(),
             params.clone(),
-            |_| Ok(json!({}))
+            |_| Ok(json!({})),
         );
 
         let result = tools_to_openai_spec(&[tool1, tool2]);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Duplicate tool name"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Duplicate tool name"));
 
         Ok(())
     }
@@ -381,14 +384,16 @@ mod tests {
     #[test]
     fn test_openai_response_to_message_invalid_func_name() -> Result<()> {
         let mut response: Value = serde_json::from_str(OPENAI_TOOL_USE_RESPONSE)?;
-        response["choices"][0]["message"]["tool_calls"][0]["function"]["name"] = json!("invalid fn");
+        response["choices"][0]["message"]["tool_calls"][0]["function"]["name"] =
+            json!("invalid fn");
 
         let message = openai_response_to_message(response)?;
         let tool_uses = message.tool_use();
 
         assert_eq!(tool_uses[0].name, "invalid fn");
         assert!(tool_uses[0].is_error);
-        assert!(tool_uses[0].error_message
+        assert!(tool_uses[0]
+            .error_message
             .as_ref()
             .unwrap()
             .starts_with("The provided function name"));
@@ -399,14 +404,16 @@ mod tests {
     #[test]
     fn test_openai_response_to_message_json_decode_error() -> Result<()> {
         let mut response: Value = serde_json::from_str(OPENAI_TOOL_USE_RESPONSE)?;
-        response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = json!("invalid json {");
+        response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] =
+            json!("invalid json {");
 
         let message = openai_response_to_message(response)?;
         let tool_uses = message.tool_use();
 
         assert_eq!(tool_uses[0].name, "example_fn");
         assert!(tool_uses[0].is_error);
-        assert!(tool_uses[0].error_message
+        assert!(tool_uses[0]
+            .error_message
             .as_ref()
             .unwrap()
             .starts_with("Could not interpret tool use parameters"));

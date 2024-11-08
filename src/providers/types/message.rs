@@ -1,8 +1,8 @@
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use anyhow::{Result, anyhow};
 
-use super::content::{Content, Text, ToolUse, ToolResult};
+use super::content::{Content, Text, ToolResult, ToolUse};
 use super::objectid::create_object_id;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,19 +93,33 @@ impl Message {
     }
 
     fn has_tool_use(&self) -> bool {
-        self.content.iter().any(|c| matches!(c, Content::ToolUse(_)))
+        self.content
+            .iter()
+            .any(|c| matches!(c, Content::ToolUse(_)))
     }
 
     fn has_tool_result(&self) -> bool {
-        self.content.iter().any(|c| matches!(c, Content::ToolResult(_)))
+        self.content
+            .iter()
+            .any(|c| matches!(c, Content::ToolResult(_)))
     }
 
     pub fn user(text: &str) -> Result<Self> {
-        Self::new(Role::User, vec![Content::Text(Text { text: text.to_string() })])
+        Self::new(
+            Role::User,
+            vec![Content::Text(Text {
+                text: text.to_string(),
+            })],
+        )
     }
 
     pub fn assistant(text: &str) -> Result<Self> {
-        Self::new(Role::Assistant, vec![Content::Text(Text { text: text.to_string() })])
+        Self::new(
+            Role::Assistant,
+            vec![Content::Text(Text {
+                text: text.to_string(),
+            })],
+        )
     }
 
     pub fn summary(&self) -> String {
@@ -113,7 +127,6 @@ impl Message {
         format!("message:{:?}\n{}", self.role, content_summaries.join("\n"))
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -202,7 +215,9 @@ mod tests {
         let result = Message::new(
             Role::User,
             vec![
-                Content::Text(Text { text: "".to_string() }),
+                Content::Text(Text {
+                    text: "".to_string(),
+                }),
                 Content::ToolUse(ToolUse {
                     id: "1".to_string(),
                     name: "tool".to_string(),
@@ -218,7 +233,9 @@ mod tests {
         let result = Message::new(
             Role::Assistant,
             vec![
-                Content::Text(Text { text: "".to_string() }),
+                Content::Text(Text {
+                    text: "".to_string(),
+                }),
                 Content::ToolResult(ToolResult {
                     tool_use_id: "1".to_string(),
                     output: "result".to_string(),
@@ -251,7 +268,9 @@ mod tests {
         let message = Message::new(
             Role::Assistant,
             vec![
-                Content::Text(Text { text: "Using tool".to_string() }),
+                Content::Text(Text {
+                    text: "Using tool".to_string(),
+                }),
                 Content::ToolUse(tool_use),
             ],
         )?;

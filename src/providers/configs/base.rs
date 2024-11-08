@@ -1,5 +1,5 @@
-use std::env;
 use anyhow::Result;
+use std::env;
 
 pub trait ProviderConfig {
     /// Load configuration from environment variables
@@ -12,7 +12,10 @@ pub trait ProviderConfig {
         match env::var(key) {
             Ok(value) => Ok(Some(value)),
             Err(env::VarError::NotPresent) if !required => Ok(default),
-            Err(env::VarError::NotPresent) => Err(anyhow::anyhow!("Environment variable '{}' is required but not set.", key)),
+            Err(env::VarError::NotPresent) => Err(anyhow::anyhow!(
+                "Environment variable '{}' is required but not set.",
+                key
+            )),
             Err(e) => Err(e.into()),
         }
     }

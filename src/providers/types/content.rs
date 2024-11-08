@@ -94,8 +94,7 @@ impl ContentType for ToolResult {
     fn summary(&self) -> String {
         format!(
             "content:tool_result:error={}\noutput:{}",
-            self.is_error,
-            self.output
+            self.is_error, self.output
         )
     }
 }

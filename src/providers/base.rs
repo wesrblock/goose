@@ -1,10 +1,7 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
-use super::types::{
-    message::Message,
-    tool::Tool,
-};
+use super::types::{message::Message, tool::Tool};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Usage {
@@ -14,7 +11,11 @@ pub struct Usage {
 }
 
 impl Usage {
-    pub fn new(input_tokens: Option<i32>, output_tokens: Option<i32>, total_tokens: Option<i32>) -> Self {
+    pub fn new(
+        input_tokens: Option<i32>,
+        output_tokens: Option<i32>,
+        total_tokens: Option<i32>,
+    ) -> Self {
         Self {
             input_tokens,
             output_tokens,
@@ -26,7 +27,9 @@ impl Usage {
 /// Base trait for AI providers (OpenAI, Anthropic, etc)
 pub trait Provider: Send + Sync {
     /// Create a provider instance from environment variables
-    fn from_env() -> Result<Self> where Self: Sized;
+    fn from_env() -> Result<Self>
+    where
+        Self: Sized;
 
     /// Generate the next message using the specified model and other parameters
     fn complete(

@@ -13,8 +13,12 @@ mod tests {
         let id = create_object_id("test");
         assert!(id.starts_with("test_"), "ID should start with 'test_'");
         let expected_length = "test_".len() + 32;
-        assert_eq!(id.len(), expected_length,
-            "ID length should be {} (prefix + '_' + 32 char UUID)", expected_length);
+        assert_eq!(
+            id.len(),
+            expected_length,
+            "ID length should be {} (prefix + '_' + 32 char UUID)",
+            expected_length
+        );
     }
 
     #[test]

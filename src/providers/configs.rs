@@ -1,3 +1,3 @@
 pub mod base;
-pub mod openai;
 pub mod databricks;
+pub mod openai;
