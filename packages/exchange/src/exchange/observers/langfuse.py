@@ -67,12 +67,12 @@ class LangfuseObserver(Observer):
         langfuse_context.configure(enabled=False)
         self.tracing = False
 
-    def observe_wrapper(self, *args, **kwargs) -> Callable:
+    def observe_wrapper(self, *args, **kwargs) -> Callable:  # noqa: ANN002, ANN003
         def _wrapper(fn: Callable) -> Callable:
             if self.tracing and auth_check():
 
                 @wraps(fn)
-                def wrapped_fn(*fargs, **fkwargs) -> Callable:
+                def wrapped_fn(*fargs, **fkwargs) -> Callable:  # noqa: ANN002, ANN003
                     # group all traces under the same session
                     if fn.__name__ == "reply":
                         langfuse_context.update_current_trace(session_id=fargs[0].name)

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Callable
+from typing import Callable, Type
+
 
 class Observer(ABC):
     @abstractmethod
@@ -7,19 +8,20 @@ class Observer(ABC):
         pass
 
     @abstractmethod
-    def observe_wrapper(*args, **kwargs) -> Callable:
+    def observe_wrapper(*args, **kwargs) -> Callable:  # noqa: ANN002, ANN003
         pass
 
     @abstractmethod
     def finalize(self) -> None:
         pass
 
+
 class ObserverManager:
     _instance = None
     _observers: list[Observer] = []
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls: Type["ObserverManager"]) -> "ObserverManager":
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
