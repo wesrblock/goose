@@ -3,7 +3,6 @@ use bat::PrettyPrinter;
 use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
-use goose::providers::types::content::{ContentType};
 use std::env;
 use serde_json::json;
 
@@ -12,6 +11,7 @@ use goose::providers::base::Provider;
 use goose::providers::openai::OpenAiProvider;
 use goose::providers::types::message::Message;
 use goose::providers::types::tool::Tool;
+use goose::providers::types::content::Content;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -25,7 +25,8 @@ struct Cli {
     model: String,
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Get API key from command line or environment variable
@@ -93,14 +94,14 @@ fn main() -> Result<()> {
             None,    // default max_tokens
             None,    // no stop sequences
             None,    // default top_p
-        )?;
+        ).await?;  // Added .await since complete returns a Future
 
         spin.stop("");
 
         if response_message.has_tool_use() {
-            render(&response_message.tool_use().first().unwrap().summary());
+            render(&Content::ToolUse(response_message.tool_use().first().unwrap().clone()).summary()).await;
         } else {
-            render(&response_message.text());
+            render(&response_message.text()).await;
         }
 
         println!("\n");
@@ -108,7 +109,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn render(content: &str) {
+async fn render(content: &str) {
     PrettyPrinter::new()
         .input_from_bytes(content.as_bytes())
         .language("markdown")

@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use reqwest::blocking::Client; // we are using blocking API here to make sync calls
+use reqwest::Client; // we are using blocking API here to make sync calls
 use reqwest::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -56,7 +56,7 @@ impl OpenAiProvider {
         Ok(Usage::new(input_tokens, output_tokens, total_tokens))
     }
 
-    fn post(&self, payload: Value) -> Result<Value> {
+    async fn post(&self, payload: Value) -> Result<Value> {
         let url = format!(
             "{}/v1/chat/completions",
             self.config.host.trim_end_matches('/')
@@ -67,10 +67,11 @@ impl OpenAiProvider {
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .json(&payload)
-            .send()?;
+            .send()
+            .await?;
 
         match response.status() {
-            StatusCode::OK => Ok(response.json()?),
+            StatusCode::OK => Ok(response.json().await?),
             status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
                 // Implement retry logic here if needed
                 Err(anyhow!("Server error: {}", status))
@@ -86,7 +87,7 @@ impl Provider for OpenAiProvider {
         Self::new(config)
     }
 
-    fn complete(
+    async fn complete(
         &self,
         model: &str,
         system: &str,
@@ -156,7 +157,7 @@ impl Provider for OpenAiProvider {
         // dbg!(&payload);
 
         // Make request
-        let response = self.post(payload)?;
+        let response = self.post(payload).await?;
 
         // Check for context length error if single message
         if let Some(error) = response.get("error") {
