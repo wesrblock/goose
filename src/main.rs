@@ -3,9 +3,15 @@ use bat::PrettyPrinter;
 use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
-use reqwest::Client;
-use serde_json::{json, Value};
 use std::env;
+use serde_json::json;
+
+use goose::providers::configs::openai::OpenAiProviderConfig;
+use goose::providers::base::Provider;
+use goose::providers::openai::OpenAiProvider;
+use goose::providers::types::message::Message;
+use goose::providers::types::tool::Tool;
+use goose::providers::types::content::Content;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -29,7 +35,38 @@ async fn main() -> Result<()> {
         .or_else(|| env::var("OPENAI_API_KEY").ok())
         .context("API key must be provided via --api-key or OPENAI_API_KEY environment variable")?;
 
-    let client = Client::new();
+    // Initialize OpenAI provider
+    let provider = OpenAiProvider::new(OpenAiProviderConfig {
+        api_key,
+        host: "https://api.openai.com".to_string(),
+    })?;
+
+    // Add word counting tool
+    let parameters = json!({
+        "type": "object",
+        "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to count words in"
+                }
+        },
+        "required": ["text"]
+    });
+
+    let word_count_tool = Tool::new(
+        "count_words".to_string(),
+        "Count the number of words in text".to_string(),
+        parameters,
+        |args| {
+            let text = args.get("text")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            Ok(json!({ "count": text.split_whitespace().count() }))
+        }
+    );
+
+    let tools = vec![word_count_tool];
+
     println!(
         "Example goose CLI {}",
         style("- type \"exit\" to end the session").dim()
@@ -37,25 +74,36 @@ async fn main() -> Result<()> {
     println!("\n");
 
     loop {
-        let message: String = input("Message:").placeholder("").multiline().interact()?;
+        let message_text: String = input("Message:").placeholder("").multiline().interact()?;
 
-        if message.trim().eq_ignore_ascii_case("exit") {
+        if message_text.trim().eq_ignore_ascii_case("exit") {
             break;
         }
 
-        let future = send_chat_request(&client, &api_key, &cli.model, &message);
         let spin = spinner();
         spin.start("awaiting reply");
 
-        let response = future.await?;
+        // Create user message and get completion
+        let user_message = Message::user(&message_text)?;
+        let (response_message, _usage) = provider.complete(
+            &cli.model,
+            "You are a helpful assistant.",
+            &[user_message],
+            &tools,  // Changed from &[] to &tools
+            None,    // default temperature
+            None,    // default max_tokens
+            None,    // no stop sequences
+            None,    // default top_p
+        ).await?;  // Added .await since complete returns a Future
+
         spin.stop("");
 
-        // Extract the content from the response
-        let content = response["choices"][0]["message"]["content"]
-            .as_str()
-            .context("Failed to get response content")?;
+        if response_message.has_tool_use() {
+            render(&Content::ToolUse(response_message.tool_use().first().unwrap().clone()).summary()).await;
+        } else {
+            render(&response_message.text()).await;
+        }
 
-        render(content).await;
         println!("\n");
     }
     Ok(())
@@ -67,30 +115,4 @@ async fn render(content: &str) {
         .language("markdown")
         .print()
         .unwrap();
-}
-
-async fn send_chat_request(
-    client: &Client,
-    api_key: &str,
-    model: &str,
-    message: &str,
-) -> Result<Value> {
-    let response = client
-        .post("https://api.openai.com/v1/chat/completions")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&json!({
-            "model": model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": message
-                }
-            ]
-        }))
-        .send()
-        .await?
-        .json::<Value>()
-        .await?;
-
-    Ok(response)
 }

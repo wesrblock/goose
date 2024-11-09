@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 # Error handling
 anyhow = "1.0"
+thiserror = "1.0"
 
 # Requests
 reqwest = { version = "0.11", features = ["json"] }
@@ -20,3 +21,8 @@ clap = { version = "4.4", features = ["derive"] }
 cliclack = "0.3.5"
 console = "0.15.8"
 bat = "0.24.0"
+uuid = { version = "1.0", features = ["v4"] }
+regex = "1.11.1"
+
+[dev-dependencies]
+mockito = "1.2"
