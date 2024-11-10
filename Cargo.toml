@@ -1,28 +1,11 @@
-[package]
-name = "goose"
-version = "1.0.0"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
 edition = "2021"
-
-[dependencies]
-# Error handling
-anyhow = "1.0"
-thiserror = "1.0"
-
-# Requests
-reqwest = { version = "0.11", features = ["json"] }
-
-# Async
-tokio = { version = "1.0", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-# CLI, input, formatting
-clap = { version = "4.4", features = ["derive"] }
-cliclack = "0.3.5"
-console = "0.15.8"
-bat = "0.24.0"
-uuid = { version = "1.0", features = ["v4"] }
-regex = "1.11.1"
-
-[dev-dependencies]
-mockito = "1.2"
+version = "1.0.0"
+authors = ["Block <ai-oss-tools@block.xyz>"]
+license = "Apache-2.0"
+repository = "https://github.com/block/goose"
+description = "An AI agent"

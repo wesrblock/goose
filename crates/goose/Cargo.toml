@@ -1,0 +1,21 @@
+[package]
+name = "goose"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+regex = "1.11.1"
+
+[dev-dependencies]
+mockito = "1.2"
