@@ -163,13 +163,12 @@ impl Provider for OpenAiProvider {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
-    use serde_json::json;
 
     async fn _setup_mock_server(response_body: Value) -> (MockServer, OpenAiProvider) {
         let mock_server = MockServer::start().await;
@@ -238,83 +237,85 @@ mod tests {
     }
 
     #[tokio::test]
-async fn test_complete_tool_use() -> Result<()> {
-    // Mock response for tool calling
-    let response_body = json!({
-        "id": "chatcmpl-tool",
-        "object": "chat.completion",
-        "choices": [{
-            "index": 0,
-            "message": {
-                "role": "assistant",
-                "content": null,
-                "tool_calls": [{
-                    "id": "call_123",
-                    "type": "function",
-                    "function": {
-                        "name": "get_weather",
-                        "arguments": "{\"location\":\"San Francisco, CA\"}"
+    async fn test_complete_tool_use() -> Result<()> {
+        // Mock response for tool calling
+        let response_body = json!({
+            "id": "chatcmpl-tool",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": null,
+                    "tool_calls": [{
+                        "id": "call_123",
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "arguments": "{\"location\":\"San Francisco, CA\"}"
+                        }
+                    }]
+                },
+                "finish_reason": "tool_calls"
+            }],
+            "usage": {
+                "prompt_tokens": 20,
+                "completion_tokens": 15,
+                "total_tokens": 35
+            }
+        });
+
+        let (_, provider) = _setup_mock_server(response_body).await;
+
+        // Input messages
+        let messages = vec![Message::user("What's the weather in San Francisco?")?];
+
+        // Define the tool
+        let tool = Tool::new(
+            "get_weather".to_string(),
+            "Gets the current weather for a location".to_string(),
+            json!({
+                "type": "object",
+                "properties": {
+                    "location": {
+                        "type": "string",
+                        "description": "The city and state, e.g. New York, NY"
                     }
-                }]
-            },
-            "finish_reason": "tool_calls"
-        }],
-        "usage": {
-            "prompt_tokens": 20,
-            "completion_tokens": 15,
-            "total_tokens": 35
-        }
-    });
+                },
+                "required": ["location"]
+            }),
+            Box::new(move |_: &_| {
+                // Changed to use move and more generic parameter pattern
+                Ok(json!({ "weather": "sunny" }))
+            }),
+        );
 
-    let (_, provider) = _setup_mock_server(response_body).await;
+        // Call the complete method
+        let (message, usage) = provider
+            .complete(
+                "gpt-3.5-turbo",
+                "You are a helpful assistant.",
+                &messages,
+                &[tool],
+                Some(0.3),
+                None,
+            )
+            .await?;
 
-    // Input messages
-    let messages = vec![Message::user("What's the weather in San Francisco?")?];
+        // Assert the response
+        let tool_uses = message.tool_use();
+        assert_eq!(tool_uses.len(), 1);
+        let tool_use = &tool_uses[0];
+        assert_eq!(tool_use.name, "get_weather");
+        assert_eq!(
+            tool_use.parameters,
+            json!({"location": "San Francisco, CA"})
+        );
 
-    // Define the tool
-    let tool = Tool::new(
-        "get_weather".to_string(),
-        "Gets the current weather for a location".to_string(),
-        json!({
-            "type": "object",
-            "properties": {
-                "location": {
-                    "type": "string",
-                    "description": "The city and state, e.g. New York, NY"
-                }
-            },
-            "required": ["location"]
-        }),
-        Box::new(move |_: &_| {  // Changed to use move and more generic parameter pattern
-            Ok(json!({ "weather": "sunny" }))
-        })
-    );
+        assert_eq!(usage.input_tokens, Some(20));
+        assert_eq!(usage.output_tokens, Some(15));
+        assert_eq!(usage.total_tokens, Some(35));
 
-    // Call the complete method
-    let (message, usage) = provider
-        .complete(
-            "gpt-3.5-turbo",
-            "You are a helpful assistant.",
-            &messages,
-            &[tool],
-            Some(0.3),
-            None,
-        )
-        .await?;
-
-    // Assert the response
-    let tool_uses = message.tool_use();
-    assert_eq!(tool_uses.len(), 1);
-    let tool_use = &tool_uses[0];
-    assert_eq!(tool_use.name, "get_weather");
-    assert_eq!(tool_use.parameters, json!({"location": "San Francisco, CA"}));
-
-    assert_eq!(usage.input_tokens, Some(20));
-    assert_eq!(usage.output_tokens, Some(15));
-    assert_eq!(usage.total_tokens, Some(35));
-
-    Ok(())
-}
-
-
+        Ok(())
+    }
 }

@@ -1,13 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
 // Text content
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Text {
     pub text: String,
 }
-
 
 // Tool use content
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,8 +19,6 @@ pub struct ToolUse {
     pub error_message: Option<String>,
 }
 
-
-
 // Tool result content
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolResult {
@@ -31,7 +27,6 @@ pub struct ToolResult {
     #[serde(default)]
     pub is_error: bool,
 }
-
 
 // Enum to handle all content types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,7 +38,6 @@ pub enum Content {
 }
 
 impl Content {
-
     pub fn summary(&self) -> String {
         match self {
             Content::Text(t) => format!("content:text\n{}", t.text),
