@@ -270,10 +270,10 @@ mod tests {
         // Input messages
         let messages = vec![Message::user("What's the weather in San Francisco?")?];
 
-        // Define the tool
+        // Define the tool using builder pattern
         let tool = Tool::new(
-            "get_weather".to_string(),
-            "Gets the current weather for a location".to_string(),
+            "get_weather",
+            "Gets the current weather for a location",
             json!({
                 "type": "object",
                 "properties": {
@@ -283,10 +283,6 @@ mod tests {
                     }
                 },
                 "required": ["location"]
-            }),
-            Box::new(move |_: &_| {
-                // Changed to use move and more generic parameter pattern
-                Ok(json!({ "weather": "sunny" }))
             }),
         );
 

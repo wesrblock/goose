@@ -195,9 +195,7 @@ mod tests {
 
         // Set up the mock to intercept the request and respond with the mocked response
         Mock::given(method("POST"))
-            .and(path(
-                "/serving-endpoints/my-databricks-model/invocations",
-            ))
+            .and(path("/serving-endpoints/my-databricks-model/invocations"))
             .and(header("Authorization", "Bearer test_token"))
             .and(body_json(expected_request_body.clone()))
             .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))

@@ -3,13 +3,13 @@ use bat::PrettyPrinter;
 use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
-use goose::providers::configs::databricks::DatabricksProviderConfig;
-use goose::providers::databricks::DatabricksProvider;
 use serde_json::json;
 use std::env;
 
 use goose::providers::base::{Provider, Usage};
+use goose::providers::configs::databricks::DatabricksProviderConfig;
 use goose::providers::configs::openai::OpenAiProviderConfig;
+use goose::providers::databricks::DatabricksProvider;
 use goose::providers::openai::OpenAiProvider;
 use goose::providers::types::content::Content;
 use goose::providers::types::message::Message;
@@ -63,18 +63,10 @@ async fn main() -> Result<()> {
         },
         "required": ["text"]
     });
-
     let word_count_tool = Tool::new(
-        "count_words".to_string(),
-        "Count the number of words in text".to_string(),
+        "count_words",
+        "Count the number of words in text",
         parameters,
-        |args| {
-            let text = args
-                .get("text")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default();
-            Ok(json!({ "count": text.split_whitespace().count() }))
-        },
     );
 
     let tools = vec![word_count_tool];
@@ -151,10 +143,12 @@ fn create_openai_provider(cli: &Cli) -> Result<ProviderType> {
         .or_else(|| env::var("OPENAI_API_KEY").ok())
         .context("API key must be provided via --api-key or OPENAI_API_KEY environment variable")?;
 
-    Ok(ProviderType::OpenAi(OpenAiProvider::new(OpenAiProviderConfig {
-        api_key,
-        host: "https://api.openai.com".to_string(),
-    })?))
+    Ok(ProviderType::OpenAi(OpenAiProvider::new(
+        OpenAiProviderConfig {
+            api_key,
+            host: "https://api.openai.com".to_string(),
+        },
+    )?))
 }
 
 fn create_databricks_provider(cli: &Cli) -> Result<ProviderType> {
@@ -170,10 +164,12 @@ fn create_databricks_provider(cli: &Cli) -> Result<ProviderType> {
         .or_else(|| env::var("DATABRICKS_TOKEN").ok())
         .context("Databricks token must be provided via --databricks-token or DATABRICKS_TOKEN environment variable")?;
 
-    Ok(ProviderType::Databricks(DatabricksProvider::new(DatabricksProviderConfig {
-        host: databricks_host,
-        token: databricks_token,
-    })?))
+    Ok(ProviderType::Databricks(DatabricksProvider::new(
+        DatabricksProviderConfig {
+            host: databricks_host,
+            token: databricks_token,
+        },
+    )?))
 }
 
 impl Provider for ProviderType {
@@ -188,11 +184,15 @@ impl Provider for ProviderType {
     ) -> Result<(Message, Usage)> {
         match self {
             ProviderType::OpenAi(provider) => {
-                provider.complete(model, system, messages, tools, temperature, max_tokens).await
-            },
+                provider
+                    .complete(model, system, messages, tools, temperature, max_tokens)
+                    .await
+            }
             ProviderType::Databricks(provider) => {
-                provider.complete(model, system, messages, tools, temperature, max_tokens).await
-            },
+                provider
+                    .complete(model, system, messages, tools, temperature, max_tokens)
+                    .await
+            }
         }
     }
 

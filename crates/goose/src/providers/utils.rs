@@ -3,7 +3,7 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use super::types::{
-    content::{Content, Text, ToolUse},
+    content::{Content, Text},
     message::Message,
     tool::Tool,
 };
@@ -103,9 +103,7 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
 
     if let Some(text) = original.get("content") {
         if let Some(text_str) = text.as_str() {
-            content.push(Content::Text(Text {
-                text: text_str.to_string(),
-            }));
+            content.push(Content::text(text_str));
         }
     }
 
@@ -123,38 +121,26 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
                     .to_string();
 
                 if !is_valid_function_name(&function_name) {
-                    content.push(Content::ToolUse(ToolUse {
-                        id,
-                        name: function_name.clone(),
-                        parameters: json!(arguments),
-                        is_error: true,
-                        error_message: Some(format!(
+                    content.push(Content::tool_use_error(
+                        function_name.clone(),
+                        format!(
                             "The provided function name '{}' had invalid characters, it must match this regex [a-zA-Z0-9_-]+",
                             function_name
-                        )),
-                    }));
+                        ),
+                    ));
                 } else {
                     match serde_json::from_str::<Value>(&arguments) {
                         Ok(params) => {
-                            content.push(Content::ToolUse(ToolUse {
-                                id,
-                                name: function_name,
-                                parameters: params,
-                                is_error: false,
-                                error_message: None,
-                            }));
+                            content.push(Content::tool_use(function_name, params));
                         }
                         Err(_) => {
-                            content.push(Content::ToolUse(ToolUse {
-                                id: id.clone(),
-                                name: function_name,
-                                parameters: json!(arguments),
-                                is_error: true,
-                                error_message: Some(format!(
+                            content.push(Content::tool_use_error(
+                                function_name,
+                                format!(
                                     "Could not interpret tool use parameters for id {}: {}",
                                     id, arguments
-                                )),
-                            }));
+                                ),
+                            ));
                         }
                     }
                 }
@@ -196,7 +182,6 @@ pub fn check_openai_context_length_error(error: &Value) -> Option<InitialMessage
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::providers::types::content::ToolResult;
     use crate::providers::types::message::Role;
     use serde_json::json;
 
@@ -234,14 +219,21 @@ mod tests {
     #[test]
     fn test_tools_to_openai_spec() -> Result<()> {
         let parameters = json!({
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Test parameter"
+                }
+            },
+            "required": ["input"]
         });
-        let tool = Tool::new(
-            "test_tool".to_string(),
-            "A test tool".to_string(),
+
+        let tool = Tool {
+            name: "test_tool".to_string(),
+            description: "A test tool".to_string(),
             parameters,
-            |_| Ok(json!({})),
-        );
+        };
 
         let spec = tools_to_openai_spec(&[tool])?;
 
@@ -273,22 +265,9 @@ mod tests {
             Message::user("How are you?")?,
             Message::new(
                 Role::Assistant,
-                vec![Content::ToolUse(ToolUse {
-                    id: "1".to_string(),
-                    name: "tool1".to_string(),
-                    parameters: json!({"param1": "value1"}),
-                    is_error: false,
-                    error_message: None,
-                })],
+                vec![Content::tool_use("tool1", json!({"param1": "value1"}))],
             )?,
-            Message::new(
-                Role::User,
-                vec![Content::ToolResult(ToolResult {
-                    tool_use_id: "1".to_string(),
-                    output: "Result".to_string(),
-                    is_error: false,
-                })],
-            )?,
+            Message::new(Role::User, vec![Content::tool_result("1", "Result")])?,
         ];
 
         let spec = messages_to_openai_spec(&messages);
@@ -310,22 +289,27 @@ mod tests {
     #[test]
     fn test_tools_to_openai_spec_duplicate() -> Result<()> {
         let parameters = json!({
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Test parameter"
+                }
+            },
+            "required": ["input"]
         });
 
-        let tool1 = Tool::new(
-            "test_tool".to_string(),
-            "Test tool".to_string(),
-            parameters.clone(),
-            |_| Ok(json!({})),
-        );
+        let tool1 = Tool {
+            name: "test_tool".to_string(),
+            description: "Test tool".to_string(),
+            parameters: parameters.clone(),
+        };
 
-        let tool2 = Tool::new(
-            "test_tool".to_string(),
-            "Test tool".to_string(),
-            parameters.clone(),
-            |_| Ok(json!({})),
-        );
+        let tool2 = Tool {
+            name: "test_tool".to_string(),
+            description: "Test tool".to_string(),
+            parameters: parameters.clone(),
+        };
 
         let result = tools_to_openai_spec(&[tool1, tool2]);
         assert!(result.is_err());

@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::content::{Content, Text, ToolResult, ToolUse};
+use super::content::{Content, ToolResult, ToolUse};
 use super::objectid::create_object_id;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,22 +104,12 @@ impl Message {
             .any(|c| matches!(c, Content::ToolResult(_)))
     }
 
-    pub fn user(text: &str) -> Result<Self> {
-        Self::new(
-            Role::User,
-            vec![Content::Text(Text {
-                text: text.to_string(),
-            })],
-        )
+    pub fn user<S: Into<String>>(text: S) -> Result<Self> {
+        Self::new(Role::User, vec![Content::text(text)])
     }
 
-    pub fn assistant(text: &str) -> Result<Self> {
-        Self::new(
-            Role::Assistant,
-            vec![Content::Text(Text {
-                text: text.to_string(),
-            })],
-        )
+    pub fn assistant<S: Into<String>>(text: S) -> Result<Self> {
+        Self::new(Role::Assistant, vec![Content::text(text)])
     }
 
     pub fn summary(&self) -> String {
@@ -151,24 +141,12 @@ mod tests {
 
     #[test]
     fn test_message_tool_use() -> Result<()> {
-        let tu1 = ToolUse {
-            id: "1".to_string(),
-            name: "tool".to_string(),
-            parameters: json!({}),
-            is_error: false,
-            error_message: None,
-        };
-        let tu2 = ToolUse {
-            id: "2".to_string(),
-            name: "tool".to_string(),
-            parameters: json!({}),
-            is_error: false,
-            error_message: None,
-        };
-
         let message = Message::new(
             Role::Assistant,
-            vec![Content::ToolUse(tu1), Content::ToolUse(tu2)],
+            vec![
+                Content::tool_use("tool", json!({})),
+                Content::tool_use("tool", json!({})),
+            ],
         )?;
 
         let tool_uses = message.tool_use();
@@ -179,20 +157,12 @@ mod tests {
 
     #[test]
     fn test_message_tool_result() -> Result<()> {
-        let tr1 = ToolResult {
-            tool_use_id: "1".to_string(),
-            output: "result".to_string(),
-            is_error: false,
-        };
-        let tr2 = ToolResult {
-            tool_use_id: "2".to_string(),
-            output: "result".to_string(),
-            is_error: false,
-        };
-
         let message = Message::new(
             Role::User,
-            vec![Content::ToolResult(tr1), Content::ToolResult(tr2)],
+            vec![
+                Content::tool_result("1", "result"),
+                Content::tool_result("2", "result"),
+            ],
         )?;
 
         let tool_results = message.tool_result();
@@ -214,34 +184,14 @@ mod tests {
         // Invalid message: user with tool_use
         let result = Message::new(
             Role::User,
-            vec![
-                Content::Text(Text {
-                    text: "".to_string(),
-                }),
-                Content::ToolUse(ToolUse {
-                    id: "1".to_string(),
-                    name: "tool".to_string(),
-                    parameters: json!({}),
-                    is_error: false,
-                    error_message: None,
-                }),
-            ],
+            vec![Content::text(""), Content::tool_use("tool", json!({}))],
         );
         assert!(result.is_err());
 
         // Invalid message: assistant with tool_result
         let result = Message::new(
             Role::Assistant,
-            vec![
-                Content::Text(Text {
-                    text: "".to_string(),
-                }),
-                Content::ToolResult(ToolResult {
-                    tool_use_id: "1".to_string(),
-                    output: "result".to_string(),
-                    is_error: false,
-                }),
-            ],
+            vec![Content::text(""), Content::tool_result("1", "result")],
         );
         assert!(result.is_err());
         Ok(())
@@ -257,21 +207,11 @@ mod tests {
         assert!(matches!(deserialized.role, Role::User));
 
         // Test complex message with tool use
-        let tool_use = ToolUse {
-            id: "test_id".to_string(),
-            name: "test_tool".to_string(),
-            parameters: json!({"key": "value"}),
-            is_error: false,
-            error_message: None,
-        };
-
         let message = Message::new(
             Role::Assistant,
             vec![
-                Content::Text(Text {
-                    text: "Using tool".to_string(),
-                }),
-                Content::ToolUse(tool_use),
+                Content::text("Using tool"),
+                Content::tool_use("test_tool", json!({"key": "value"})),
             ],
         )?;
 
