@@ -39,9 +39,7 @@ pub trait Provider: Send + Sync {
         messages: &[Message],
         tools: &[Tool],
         temperature: Option<f32>,
-        max_tokens: Option<i32>,
-        stop_sequences: Option<&[String]>,
-        top_p: Option<f32>,
+        max_tokens: Option<i32>
     ) -> impl std::future::Future<Output = Result<(Message, Usage)>> + Send;
 }
 

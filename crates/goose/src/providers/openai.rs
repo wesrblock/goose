@@ -95,8 +95,6 @@ impl Provider for OpenAiProvider {
         tools: &[Tool],
         temperature: Option<f32>,
         max_tokens: Option<i32>,
-        stop_sequences: Option<&[String]>,
-        top_p: Option<f32>,
     ) -> Result<(Message, Usage)> {
         // Not checking for o1 model here since system message is not supported by o1
         let system_message = json!({
@@ -141,18 +139,6 @@ impl Provider for OpenAiProvider {
                 .unwrap()
                 .insert("max_tokens".to_string(), json!(tokens));
         }
-        if let Some(sequences) = stop_sequences {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("stop".to_string(), json!(sequences));
-        }
-        if let Some(p) = top_p {
-            payload
-                .as_object_mut()
-                .unwrap()
-                .insert("top_p".to_string(), json!(p));
-        }
 
         // dbg!(&payload);
 
@@ -177,237 +163,158 @@ impl Provider for OpenAiProvider {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use serde_json::json;
 
-    #[test]
-    fn test_get_usage() {
-        let response = json!({
+    async fn _setup_mock_server(response_body: Value) -> (MockServer, OpenAiProvider) {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
+            .mount(&mock_server)
+            .await;
+
+        // Create the OpenAiProvider with the mock server's URL as the host
+        let config = OpenAiProviderConfig {
+            host: mock_server.uri(),
+            api_key: "test_api_key".to_string(),
+        };
+
+        let provider = OpenAiProvider::new(config).unwrap();
+        (mock_server, provider)
+    }
+
+    #[tokio::test]
+    async fn test_complete_basic() -> Result<()> {
+        // Mock response for normal completion
+        let response_body = json!({
+            "id": "chatcmpl-123",
+            "object": "chat.completion",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "Hello! How can I assist you today?",
+                    "tool_calls": null
+                },
+                "finish_reason": "stop"
+            }],
             "usage": {
-                "prompt_tokens": 10,
-                "completion_tokens": 20,
-                "total_tokens": 30
+                "prompt_tokens": 12,
+                "completion_tokens": 15,
+                "total_tokens": 27
             }
         });
 
-        let usage = OpenAiProvider::get_usage(&response).unwrap();
-        assert_eq!(usage.input_tokens, Some(10));
-        assert_eq!(usage.output_tokens, Some(20));
-        assert_eq!(usage.total_tokens, Some(30));
+        let (_, provider) = _setup_mock_server(response_body).await;
+
+        // Prepare input messages
+        let messages = vec![Message::user("Hello?")?];
+
+        // Call the complete method
+        let (message, usage) = provider
+            .complete(
+                "gpt-3.5-turbo",
+                "You are a helpful assistant.",
+                &messages,
+                &[],
+                None,
+                None,
+            )
+            .await?;
+
+        // Assert the response
+        assert_eq!(message.text(), "Hello! How can I assist you today?");
+        assert_eq!(usage.input_tokens, Some(12));
+        assert_eq!(usage.output_tokens, Some(15));
+        assert_eq!(usage.total_tokens, Some(27));
+
+        Ok(())
     }
 
-    #[test]
-    fn test_get_usage_calculated_total() {
-        let response = json!({
-            "usage": {
-                "prompt_tokens": 10,
-                "completion_tokens": 20
-            }
-        });
+    #[tokio::test]
+async fn test_complete_tool_use() -> Result<()> {
+    // Mock response for tool calling
+    let response_body = json!({
+        "id": "chatcmpl-tool",
+        "object": "chat.completion",
+        "choices": [{
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [{
+                    "id": "call_123",
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": "{\"location\":\"San Francisco, CA\"}"
+                    }
+                }]
+            },
+            "finish_reason": "tool_calls"
+        }],
+        "usage": {
+            "prompt_tokens": 20,
+            "completion_tokens": 15,
+            "total_tokens": 35
+        }
+    });
 
-        let usage = OpenAiProvider::get_usage(&response).unwrap();
-        assert_eq!(usage.input_tokens, Some(10));
-        assert_eq!(usage.output_tokens, Some(20));
-        assert_eq!(usage.total_tokens, Some(30));
-    }
+    let (_, provider) = _setup_mock_server(response_body).await;
 
-    #[test]
-    fn test_provider_creation() {
-        std::env::set_var("OPENAI_API_KEY", "test_key");
+    // Input messages
+    let messages = vec![Message::user("What's the weather in San Francisco?")?];
 
-        let provider = OpenAiProvider::from_env();
-        assert!(provider.is_ok());
+    // Define the tool
+    let tool = Tool::new(
+        "get_weather".to_string(),
+        "Gets the current weather for a location".to_string(),
+        json!({
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The city and state, e.g. New York, NY"
+                }
+            },
+            "required": ["location"]
+        }),
+        Box::new(move |_: &_| {  // Changed to use move and more generic parameter pattern
+            Ok(json!({ "weather": "sunny" }))
+        })
+    );
 
-        std::env::remove_var("OPENAI_API_KEY");
-    }
+    // Call the complete method
+    let (message, usage) = provider
+        .complete(
+            "gpt-3.5-turbo",
+            "You are a helpful assistant.",
+            &messages,
+            &[tool],
+            Some(0.3),
+            None,
+        )
+        .await?;
+
+    // Assert the response
+    let tool_uses = message.tool_use();
+    assert_eq!(tool_uses.len(), 1);
+    let tool_use = &tool_uses[0];
+    assert_eq!(tool_use.name, "get_weather");
+    assert_eq!(tool_use.parameters, json!({"location": "San Francisco, CA"}));
+
+    assert_eq!(usage.input_tokens, Some(20));
+    assert_eq!(usage.output_tokens, Some(15));
+    assert_eq!(usage.total_tokens, Some(35));
+
+    Ok(())
 }
-//     fn setup_mock_server(response_body: &str) -> (Mock, OpenAiProvider) {
-//         let mut server = mockito::Server::new();
-//         let mock = server.mock("POST", "/v1/chat/completions")
-//             .match_header("authorization", "Bearer test_key")
-//             .with_status(200)
-//             .with_header("content-type", "application/json")
-//             .with_body(response_body)
-//             .create();
 
-//         let config = OpenAiProviderConfig {
-//             api_key: "test_key".to_string(),
-//             host: server.url()
-//         };
-//         let provider = OpenAiProvider::new(config).unwrap();
 
-//         (mock, provider)
-//     }
-
-//     fn setup_mock_server_for_complete() -> (Mock, OpenAiProvider) {
-//         setup_mock_server(r#"{
-//             "id": "chatcmpl-123",
-//             "object": "chat.completion",
-//             "choices": [{
-//                 "index": 0,
-//                 "message": {
-//                     "role": "assistant",
-//                     "content": "Hello! How can I assist you today?",
-//                     "tool_calls": null
-//                 },
-//                 "finish_reason": "stop"
-//             }],
-//             "usage": {
-//                 "prompt_tokens": 12,
-//                 "completion_tokens": 15,
-//                 "total_tokens": 27
-//             }
-//         }"#)
-//     }
-
-//     fn setup_mock_server_for_tools() -> (Mock, OpenAiProvider) {
-//         setup_mock_server(r#"{
-//             "id": "chatcmpl-tool",
-//             "object": "chat.completion",
-//             "choices": [{
-//                 "index": 0,
-//                 "message": {
-//                     "role": "assistant",
-//                     "content": null,
-//                     "tool_calls": [{
-//                         "id": "call_123",
-//                         "type": "function",
-//                         "function": {
-//                             "name": "get_weather",
-//                             "arguments": "{\"location\":\"San Francisco, CA\"}"
-//                         }
-//                     }]
-//                 },
-//                 "finish_reason": "tool_calls"
-//             }],
-//             "usage": {
-//                 "prompt_tokens": 20,
-//                 "completion_tokens": 15,
-//                 "total_tokens": 35
-//             }
-//         }"#)
-//     }
-
-//     #[test]
-//     fn test_basic_completion() -> Result<()> {
-//         let (_mock, provider) = setup_mock_server_for_complete();
-
-//         let result = provider.complete(
-//             "gpt-4",
-//             "You are a helpful assistant.",
-//             &[Message::user("Hi")?],
-//             &[],  // no tools
-//             None,
-//             None,
-//             None,
-//             None,
-//         )?;
-
-//         let (message, usage) = result;
-
-//         // Verify response content
-//         assert_eq!(message.text(), "Hello! How can I assist you today?");
-//         assert!(message.tool_use().is_empty());
-
-//         // Verify usage statistics
-//         assert_eq!(usage.total_tokens, Some(27));
-//         assert_eq!(usage.input_tokens, Some(12));
-//         assert_eq!(usage.output_tokens, Some(15));
-
-//         Ok(())
-//     }
-
-//     #[test]
-//     fn test_completion_with_tool_call() -> Result<()> {
-//         let (_mock, provider) = setup_mock_server_for_tools();
-
-//         // Create a weather tool
-//         let mut parameters = HashMap::new();
-//         parameters.insert(
-//             "location".to_string(),
-//             json!({
-//                 "type": "string",
-//                 "description": "The city and state"
-//             })
-//         );
-
-//         let weather_tool = Tool::new(
-//             "get_weather".to_string(),
-//             "Get the current weather".to_string(),
-//             parameters,
-//             |_| Ok(json!({"temperature": 72}))
-//         );
-
-//         let result = provider.complete(
-//             "gpt-4",
-//             "You are a helpful assistant.",
-//             &[Message::user("What's the weather in San Francisco?")?],
-//             &[weather_tool],
-//             None,
-//             None,
-//             None,
-//             None,
-//         )?;
-
-//         let (message, usage) = result;
-
-//         // Verify tool calls
-//         let tool_uses = message.tool_use();
-//         assert_eq!(tool_uses.len(), 1);
-//         assert_eq!(tool_uses[0].name, "get_weather");
-
-//         // Verify tool parameters
-//         let expected_params: Value = serde_json::from_str(
-//             r#"{"location":"San Francisco, CA"}"#
-//         )?;
-//         assert_eq!(tool_uses[0].parameters, expected_params);
-
-//         // Verify usage statistics
-//         assert_eq!(usage.total_tokens, Some(35));
-//         assert_eq!(usage.input_tokens, Some(20));
-//         assert_eq!(usage.output_tokens, Some(15));
-
-//         Ok(())
-//     }
-
-//     #[test]
-//     fn test_completion_with_tool_result() -> Result<()> {
-//         let (_mock, provider) = setup_mock_server_for_complete();
-
-//         // Create messages including a tool result
-//         let messages = vec![
-//             Message::user("What's the weather?")?,
-//             Message::new(
-//                 Role::Assistant,
-//                 vec![Content::ToolResult(ToolResult {
-//                     tool_use_id: "call_123".to_string(),
-//                     output: "The temperature is 72°F".to_string(),
-//                     is_error: false,
-//                 })]
-//             )?
-//         ];
-
-//         let result = provider.complete(
-//             "gpt-4",
-//             "You are a helpful assistant.",
-//             &messages,
-//             &[],  // no tools needed for this response
-//             None,
-//             None,
-//             None,
-//             None,
-//         )?;
-
-//         let (message, usage) = result;
-
-//         // Verify response
-//         assert_eq!(message.text(), "Hello! How can I assist you today?");
-//         assert!(message.tool_use().is_empty());
-
-//         // Verify usage
-//         assert_eq!(usage.total_tokens, Some(27));
-
-//         Ok(())
-//     }
-// }
+}

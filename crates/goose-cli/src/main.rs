@@ -92,8 +92,6 @@ async fn main() -> Result<()> {
             &tools,  // Changed from &[] to &tools
             None,    // default temperature
             None,    // default max_tokens
-            None,    // no stop sequences
-            None,    // default top_p
         ).await?;  // Added .await since complete returns a Future
 
         spin.stop("");
