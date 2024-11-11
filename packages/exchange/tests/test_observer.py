@@ -1,6 +1,7 @@
 from exchange.observers import ObserverManager, observe_wrapper
 from exchange.observers.base import Observer
 
+
 class MockObserver(Observer):
     def __init__(self):
         self.initialized = False
@@ -16,6 +17,7 @@ class MockObserver(Observer):
             self.args = args
             self.kwargs = kwargs
             return func
+
         return wrapper
 
     def finalize(self):
