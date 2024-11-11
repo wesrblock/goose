@@ -44,6 +44,7 @@ def test_wrapper_is_invoked():
     assert mock_observer.args == ("arg0",)
     assert mock_observer.kwargs == {"arg1": "arg2"}
 
+
 def test_multiple_wrappers():
     manager = ObserverManager.get_instance()
     mock_observer_1 = MockObserver()
