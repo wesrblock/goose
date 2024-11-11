@@ -129,6 +129,32 @@ enum ProviderType {
     Databricks(DatabricksProvider),
 }
 
+impl ProviderType {
+    async fn complete(
+        &self,
+        model: &str,
+        system: &str,
+        messages: &[Message],
+        tools: &[Tool],
+        temperature: Option<f32>,
+        max_tokens: Option<i32>,
+    ) -> Result<(Message, Usage)> {
+        match self {
+            ProviderType::OpenAi(provider) => {
+                provider
+                    .complete(model, system, messages, tools, temperature, max_tokens)
+                    .await
+            }
+            ProviderType::Databricks(provider) => {
+                provider
+                    .complete(model, system, messages, tools, temperature, max_tokens)
+                    .await
+            }
+        }
+    }
+
+}
+
 fn get_provider(cli: &Cli) -> Result<ProviderType> {
     match cli.provider {
         ProviderVariant::OpenAi => create_openai_provider(cli),
@@ -170,30 +196,4 @@ fn create_databricks_provider(cli: &Cli) -> Result<ProviderType> {
             token: databricks_token,
         },
     )?))
-}
-
-impl ProviderType {
-    async fn complete(
-        &self,
-        model: &str,
-        system: &str,
-        messages: &[Message],
-        tools: &[Tool],
-        temperature: Option<f32>,
-        max_tokens: Option<i32>,
-    ) -> Result<(Message, Usage)> {
-        match self {
-            ProviderType::OpenAi(provider) => {
-                provider
-                    .complete(model, system, messages, tools, temperature, max_tokens)
-                    .await
-            }
-            ProviderType::Databricks(provider) => {
-                provider
-                    .complete(model, system, messages, tools, temperature, max_tokens)
-                    .await
-            }
-        }
-    }
-
 }
