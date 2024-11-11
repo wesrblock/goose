@@ -10,6 +10,8 @@ use goose::systems::System;
 /// A simple system that echoes input back to the caller
 pub struct EchoSystem {
     tools: Vec<Tool>,
+    // if we want to add state to the system, we can do that here
+    // eg. current working directory, counter, active files, etc.
 }
 
 impl EchoSystem {
