@@ -1,5 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use async_trait::async_trait;
 
 use super::types::message::Message;
 use crate::tool::Tool;
@@ -26,14 +27,10 @@ impl Usage {
 }
 
 /// Base trait for AI providers (OpenAI, Anthropic, etc)
+#[async_trait]
 pub trait Provider: Send + Sync {
-    /// Create a provider instance from environment variables
-    fn from_env() -> Result<Self>
-    where
-        Self: Sized;
-
     /// Generate the next message using the specified model and other parameters
-    fn complete(
+    async fn complete(
         &self,
         model: &str,
         system: &str,
@@ -41,7 +38,7 @@ pub trait Provider: Send + Sync {
         tools: &[Tool],
         temperature: Option<f32>,
         max_tokens: Option<i32>,
-    ) -> impl std::future::Future<Output = Result<(Message, Usage)>> + Send;
+    ) -> Result<(Message, Usage)>;
 }
 
 #[cfg(test)]

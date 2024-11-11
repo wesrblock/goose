@@ -4,8 +4,7 @@ use reqwest::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::{Provider, Usage};
-use super::configs::base::ProviderConfig;
+use super::base::Usage;
 use super::configs::openai::OpenAiProviderConfig;
 use super::types::message::Message;
 use super::utils::{
@@ -77,15 +76,8 @@ impl OpenAiProvider {
             _ => Err(anyhow!("Request failed: {}", response.status())),
         }
     }
-}
 
-impl Provider for OpenAiProvider {
-    fn from_env() -> Result<Self> {
-        let config = OpenAiProviderConfig::from_env()?;
-        Self::new(config)
-    }
-
-    async fn complete(
+    pub async fn complete(
         &self,
         model: &str,
         system: &str,
@@ -159,6 +151,7 @@ impl Provider for OpenAiProvider {
 
         Ok((message, usage))
     }
+
 }
 
 #[cfg(test)]

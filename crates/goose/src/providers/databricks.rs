@@ -3,8 +3,7 @@ use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::{Provider, Usage};
-use super::configs::base::ProviderConfig;
+use super::base::Usage;
 use super::configs::databricks::DatabricksProviderConfig;
 use super::types::message::Message;
 use super:: utils::{
@@ -80,15 +79,8 @@ impl DatabricksProvider {
             }
         }
     }
-}
 
-impl Provider for DatabricksProvider {
-    fn from_env() -> Result<Self> {
-        let config = DatabricksProviderConfig::from_env()?;
-        Self::new(config)
-    }
-
-    async fn complete(
+    pub async fn complete(
         &self,
         model: &str,
         system: &str,

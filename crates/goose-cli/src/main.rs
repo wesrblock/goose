@@ -6,7 +6,7 @@ use console::style;
 use serde_json::json;
 use std::env;
 
-use goose::providers::base::{Provider, Usage};
+use goose::providers::base::Usage;
 use goose::providers::configs::databricks::DatabricksProviderConfig;
 use goose::providers::configs::openai::OpenAiProviderConfig;
 use goose::providers::databricks::DatabricksProvider;
@@ -172,7 +172,7 @@ fn create_databricks_provider(cli: &Cli) -> Result<ProviderType> {
     )?))
 }
 
-impl Provider for ProviderType {
+impl ProviderType {
     async fn complete(
         &self,
         model: &str,
@@ -196,8 +196,4 @@ impl Provider for ProviderType {
         }
     }
 
-    fn from_env() -> Result<Self> {
-        // Default to Databricks provider if no specific environment is set
-        create_databricks_provider(&Cli::parse())
-    }
 }
