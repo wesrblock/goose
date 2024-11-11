@@ -1,13 +1,15 @@
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::base::Usage;
-use super::configs::databricks::DatabricksProviderConfig;
+use super::base::{Provider, Usage};
+use super::configs::DatabricksProviderConfig;
 use super::types::message::Message;
-use super:: utils::{
-        check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
+use super::utils::{
+    check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
+    tools_to_openai_spec,
 };
 use crate::tool::Tool;
 
@@ -79,8 +81,11 @@ impl DatabricksProvider {
             }
         }
     }
+}
 
-    pub async fn complete(
+#[async_trait]
+impl Provider for DatabricksProvider {
+    async fn complete(
         &self,
         model: &str,
         system: &str,

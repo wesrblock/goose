@@ -3,12 +3,13 @@ use bat::PrettyPrinter;
 use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
+use goose::providers::base::Provider;
 use serde_json::json;
 use std::env;
 
 use goose::providers::base::Usage;
-use goose::providers::configs::databricks::DatabricksProviderConfig;
-use goose::providers::configs::openai::OpenAiProviderConfig;
+use goose::providers::configs::DatabricksProviderConfig;
+use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::databricks::DatabricksProvider;
 use goose::providers::openai::OpenAiProvider;
 use goose::providers::types::content::Content;
@@ -104,7 +105,8 @@ async fn main() -> Result<()> {
 
         if response_message.has_tool_request() {
             render(
-                &Content::ToolRequest(response_message.tool_request().first().unwrap().clone()).summary(),
+                &Content::ToolRequest(response_message.tool_request().first().unwrap().clone())
+                    .summary(),
             )
             .await;
         } else {
@@ -152,7 +154,6 @@ impl ProviderType {
             }
         }
     }
-
 }
 
 fn get_provider(cli: &Cli) -> Result<ProviderType> {

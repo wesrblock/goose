@@ -4,29 +4,18 @@
 // use tokio::sync::RwLock;
 
 // use crate::{
-//     providers::{base::Provider, databricks::DatabricksProvider, openai::OpenAiProvider, types::{content::{Content, ToolRequest, ToolResponse}, message::{Message, Role}}},
+//     providers::{factory::{ProviderType, get_provider}, types::{content::{Content, ToolRequest, ToolResponse}, message::{Message, Role}}},
 //     systems::System,
 //     tool::{Tool, ToolCall},
 // };
 
-// enum ProviderType {
-//     OpenAi,
-//     Databricks,
-// }
-
-// // Step 4: Factory function to create the desired provider
-// fn get_provider(provider_type: ProviderType) -> Box<dyn Provider> {
-//     match provider_type {
-//         ProviderType::OpenAi => Box::new(OpenAiProvider),
-//         ProviderType::Databricks => Box::new(DatabricksProvider),
-//     }
-// }
 
 
 // pub struct Agent {
 //     systems: Vec<Box<dyn System>>,
 //     interface_messages: RwLock<Vec<Message>>,
 //     provider: ProviderType,
+//     provider_config: ProviderConfig,
 //     processor_model: String,
 //     model_messages: RwLock<Vec<Message>>,
 // }
@@ -35,12 +24,14 @@
 //     pub fn new(
 //         systems: Vec<Box<dyn System>>,
 //         provider_type: ProviderType,
+//         provider_config: ProviderConfig,
 //         processor_model: String,
 //     ) -> Self {
 //         Self {
 //             systems,
 //             interface_messages: RwLock::new(Vec::new()),
-//             provider,
+//             provider_type,
+//             provider_config,
 //             processor_model,
 //             model_messages: RwLock::new(Vec::new()),
 //         }

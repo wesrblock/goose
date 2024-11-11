@@ -228,9 +228,7 @@ impl DeveloperSystem {
         let path = self.resolve_path(path_str)?;
 
         match command {
-            "view" => {
-                self.text_editor_view(&path, params.get("view_range")).await
-            }
+            "view" => self.text_editor_view(&path, params.get("view_range")).await,
             "create" => {
                 let file_text = params
                     .get("file_text")
@@ -255,8 +253,7 @@ impl DeveloperSystem {
                         AgentError::InvalidParameters("Missing 'new_str' parameter".into())
                     })?;
 
-                self.text_editor_str_replace(&path, old_str, new_str)
-                    .await
+                self.text_editor_str_replace(&path, old_str, new_str).await
             }
             "insert" => {
                 let insert_line = params
@@ -275,9 +272,7 @@ impl DeveloperSystem {
                 self.text_editor_insert(&path, insert_line as usize, new_str)
                     .await
             }
-            "undo_edit" => {
-                self.text_editor_undo_edit(&path).await
-            }
+            "undo_edit" => self.text_editor_undo_edit(&path).await,
             _ => Err(AgentError::InvalidParameters(format!(
                 "Unknown command '{}'",
                 command
@@ -292,16 +287,15 @@ impl DeveloperSystem {
     ) -> AgentResult<Value> {
         if path.is_file() {
             // Read the file content
-            let content = std::fs::read_to_string(path).map_err(|e| {
-                AgentError::ExecutionError(format!("Failed to read file: {}", e))
-            })?;
+            let content = std::fs::read_to_string(path)
+                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
 
             // Handle view_range if provided
             let lines: Vec<&str> = content.lines().collect();
             let viewed_content = if let Some(range_value) = view_range {
-                let range = range_value
-                    .as_array()
-                    .ok_or_else(|| AgentError::InvalidParameters("Invalid 'view_range' parameter".into()))?;
+                let range = range_value.as_array().ok_or_else(|| {
+                    AgentError::InvalidParameters("Invalid 'view_range' parameter".into())
+                })?;
 
                 if range.len() != 2 {
                     return Err(AgentError::InvalidParameters(
@@ -361,11 +355,7 @@ impl DeveloperSystem {
         }
     }
 
-    async fn text_editor_create(
-        &self,
-        path: &PathBuf,
-        file_text: &str,
-    ) -> AgentResult<Value> {
+    async fn text_editor_create(&self, path: &PathBuf, file_text: &str) -> AgentResult<Value> {
         // Check if file already exists and is active
         if path.exists() && !self.active_files.lock().unwrap().contains(path) {
             return Err(AgentError::InvalidParameters(format!(
@@ -378,9 +368,8 @@ impl DeveloperSystem {
         self.save_file_history(path)?;
 
         // Write to the file
-        std::fs::write(path, file_text).map_err(|e| {
-            AgentError::ExecutionError(format!("Failed to write file: {}", e))
-        })?;
+        std::fs::write(path, file_text)
+            .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         // Add to active files
         self.active_files.lock().unwrap().insert(path.clone());
@@ -409,9 +398,8 @@ impl DeveloperSystem {
         }
 
         // Read content
-        let content = std::fs::read_to_string(path).map_err(|e| {
-            AgentError::ExecutionError(format!("Failed to read file: {}", e))
-        })?;
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
 
         // Ensure 'old_str' appears exactly once
         if content.matches(old_str).count() != 1 {
@@ -425,9 +413,8 @@ impl DeveloperSystem {
 
         // Replace and write back
         let new_content = content.replace(old_str, new_str);
-        std::fs::write(path, new_content).map_err(|e| {
-            AgentError::ExecutionError(format!("Failed to write file: {}", e))
-        })?;
+        std::fs::write(path, new_content)
+            .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         Ok(json!({ "result": "Successfully replaced text" }))
     }
@@ -453,9 +440,8 @@ impl DeveloperSystem {
         }
 
         // Read lines
-        let content = std::fs::read_to_string(path).map_err(|e| {
-            AgentError::ExecutionError(format!("Failed to read file: {}", e))
-        })?;
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
         let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
         if insert_line > lines.len() {
@@ -471,9 +457,8 @@ impl DeveloperSystem {
         lines.insert(insert_line, new_str.to_string());
 
         // Write back to file
-        std::fs::write(path, lines.join("\n")).map_err(|e| {
-            AgentError::ExecutionError(format!("Failed to write file: {}", e))
-        })?;
+        std::fs::write(path, lines.join("\n"))
+            .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         Ok(json!({ "result": "Successfully inserted text" }))
     }
@@ -502,13 +487,15 @@ impl DeveloperSystem {
     fn save_file_history(&self, path: &PathBuf) -> AgentResult<()> {
         let mut history = self.file_history.lock().unwrap();
         let content = if path.exists() {
-            std::fs::read_to_string(path).map_err(|e| {
-                AgentError::ExecutionError(format!("Failed to read file: {}", e))
-            })?
+            std::fs::read_to_string(path)
+                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?
         } else {
             String::new()
         };
-        history.entry(path.clone()).or_insert_with(Vec::new).push(content);
+        history
+            .entry(path.clone())
+            .or_insert_with(Vec::new)
+            .push(content);
         Ok(())
     }
 }
@@ -556,7 +543,6 @@ impl System for DeveloperSystem {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -567,29 +553,28 @@ mod tests {
     static DEV_SYSTEM: OnceCell<DeveloperSystem> = OnceCell::const_new();
 
     async fn get_system() -> &'static DeveloperSystem {
-        DEV_SYSTEM.get_or_init(|| async { DeveloperSystem::new() }).await
+        DEV_SYSTEM
+            .get_or_init(|| async { DeveloperSystem::new() })
+            .await
     }
 
     #[tokio::test]
     async fn test_bash_change_directory() {
         let system = get_system().await;
 
-        let tool_call = ToolCall::new(
-            "bash",
-            json!({ "working_dir": "." }),
-        );
+        let tool_call = ToolCall::new("bash", json!({ "working_dir": "." }));
         let result = system.call(tool_call).await.unwrap();
-        assert!(result["result"].as_str().unwrap().contains("Changed directory to"));
+        assert!(result["result"]
+            .as_str()
+            .unwrap()
+            .contains("Changed directory to"));
     }
 
     #[tokio::test]
     async fn test_bash_invalid_directory() {
         let system = get_system().await;
 
-        let tool_call = ToolCall::new(
-            "bash",
-            json!({ "working_dir": "non_existent_dir" }),
-        );
+        let tool_call = ToolCall::new("bash", json!({ "working_dir": "non_existent_dir" }));
         let error = system.call(tool_call).await.unwrap_err();
         assert!(matches!(error, AgentError::InvalidParameters(_)));
     }
@@ -612,7 +597,10 @@ mod tests {
             }),
         );
         let create_result = system.call(create_call).await.unwrap();
-        assert!(create_result["result"].as_str().unwrap().contains("Successfully wrote to"));
+        assert!(create_result["result"]
+            .as_str()
+            .unwrap()
+            .contains("Successfully wrote to"));
 
         // View the file
         let view_call = ToolCall::new(
@@ -668,7 +656,10 @@ mod tests {
             }),
         );
         let replace_result = system.call(replace_call).await.unwrap();
-        assert!(replace_result["result"].as_str().unwrap().contains("Successfully replaced text"));
+        assert!(replace_result["result"]
+            .as_str()
+            .unwrap()
+            .contains("Successfully replaced text"));
 
         // View the file again
         let view_call = ToolCall::new(
@@ -734,16 +725,22 @@ mod tests {
             }),
         );
         let undo_result = system.call(undo_call).await.unwrap();
-        assert!(undo_result["result"].as_str().unwrap().contains("Successfully undid the last edit"));
+        assert!(undo_result["result"]
+            .as_str()
+            .unwrap()
+            .contains("Successfully undid the last edit"));
 
         // View the file again
-        let view_result = system.call(ToolCall::new(
-            "text_editor",
-            json!({
-                "command": "view",
-                "path": file_path_str
-            }),
-        )).await.unwrap();
+        let view_result = system
+            .call(ToolCall::new(
+                "text_editor",
+                json!({
+                    "command": "view",
+                    "path": file_path_str
+                }),
+            ))
+            .await
+            .unwrap();
         assert_eq!(view_result["content"].as_str().unwrap(), "First line");
 
         temp_dir.close().unwrap();

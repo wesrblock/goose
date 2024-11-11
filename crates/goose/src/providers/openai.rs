@@ -1,14 +1,17 @@
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use reqwest::Client; // we are using blocking API here to make sync calls
 use reqwest::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
 
+use super::base::Provider;
 use super::base::Usage;
-use super::configs::openai::OpenAiProviderConfig;
+use super::configs::OpenAiProviderConfig;
 use super::types::message::Message;
 use super::utils::{
-        check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
+    check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
+    tools_to_openai_spec,
 };
 use crate::tool::Tool;
 
@@ -76,8 +79,11 @@ impl OpenAiProvider {
             _ => Err(anyhow!("Request failed: {}", response.status())),
         }
     }
+}
 
-    pub async fn complete(
+#[async_trait]
+impl Provider for OpenAiProvider {
+    async fn complete(
         &self,
         model: &str,
         system: &str,
@@ -151,7 +157,6 @@ impl OpenAiProvider {
 
         Ok((message, usage))
     }
-
 }
 
 #[cfg(test)]
@@ -292,14 +297,15 @@ mod tests {
         // Assert the response
         let tool_requests = message.tool_request();
         assert_eq!(tool_requests.len(), 1);
-        let Ok(tool_call) = &tool_requests[0].call else {panic!("should be tool call")};
+        let Ok(tool_call) = &tool_requests[0].call else {
+            panic!("should be tool call")
+        };
 
         assert_eq!(tool_call.name, "get_weather");
         assert_eq!(
             tool_call.parameters,
             json!({"location": "San Francisco, CA"})
         );
-
 
         assert_eq!(usage.input_tokens, Some(20));
         assert_eq!(usage.output_tokens, Some(15));
