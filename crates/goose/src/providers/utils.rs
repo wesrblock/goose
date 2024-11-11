@@ -2,11 +2,10 @@ use anyhow::{anyhow, Result};
 use regex::Regex;
 use serde_json::{json, Value};
 
-use super::types::{
-    content::{Content, Text, ToolUse},
-    message::Message,
-    tool::Tool,
-};
+use super::types::content::{Content, Text};
+use super::types::message::{Message, Role};
+use crate::tool::{Tool};
+use crate::errors::AgentError;
 
 /// Convert internal Message format to OpenAI's API message specification
 pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
@@ -24,41 +23,64 @@ pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
                 Content::Text(Text { text }) => {
                     converted["content"] = json!(text);
                 }
-                Content::ToolUse(tool_use) => {
-                    let sanitized_name = sanitize_function_name(&tool_use.name);
-                    let tool_calls = converted
-                        .as_object_mut()
-                        .unwrap()
-                        .entry("tool_calls")
-                        .or_insert(json!([]));
+                Content::ToolRequest(tool_request) => {
+                    match &tool_request.call {
+                        Ok(tool_call) => {
+                            let sanitized_name = sanitize_function_name(&tool_call.name);
+                            let tool_calls = converted
+                                .as_object_mut()
+                                .unwrap()
+                                .entry("tool_calls")
+                                .or_insert(json!([]));
 
-                    tool_calls.as_array_mut().unwrap().push(json!({
-                        "id": tool_use.id,
-                        "type": "function",
-                        "function": {
-                            "name": sanitized_name,
-                            "arguments": tool_use.parameters.to_string(),
+                            tool_calls.as_array_mut().unwrap().push(json!({
+                                "id": tool_request.id,
+                                "type": "function",
+                                "function": {
+                                    "name": sanitized_name,
+                                    "arguments": tool_call.parameters.to_string(),
+                                }
+                            }));
                         }
-                    }));
+                        Err(e) => {
+                            output.push(json!({
+                                "role": "tool",
+                                "content": format!("Error: {}", e),
+                                "tool_call_id": tool_request.id
+                            }));
+                        }
+                    }
                 }
-                Content::ToolResult(tool_result) => {
-                    // Handle image results (assuming similar functionality as Python)
-                    if tool_result.output.starts_with("\"image:") {
-                        // TODO: Implement image handling if needed
-                        output.push(json!({
-                            "role": "tool",
-                            "content": [{
-                                "type": "text",
-                                "text": "This tool result included an image that is uploaded in the next message."
-                            }],
-                            "tool_call_id": tool_result.tool_use_id
-                        }));
-                    } else {
-                        output.push(json!({
-                            "role": "tool",
-                            "content": tool_result.output,
-                            "tool_call_id": tool_result.tool_use_id
-                        }));
+                Content::ToolResponse(tool_response) => {
+                    match &tool_response.output {
+                        Ok(value) => {
+                            // Handle image results
+                            if let Some(s) = value.as_str() {
+                                if s.starts_with("image:") {
+                                    output.push(json!({
+                                        "role": "tool",
+                                        "content": [{
+                                            "type": "text",
+                                            "text": "This tool result included an image that is uploaded in the next message."
+                                        }],
+                                        "tool_call_id": tool_response.request_id
+                                    }));
+                                    continue;
+                                }
+                            }
+                            output.push(json!({
+                                "role": "tool",
+                                "content": value,
+                                "tool_call_id": tool_response.request_id
+                            }));
+                        }
+                        Err(e) => {
+                            output.push(json!({
+                                "role": "tool",
+                                "content": format!("Error: {}", e),
+                                "tool_call_id": tool_response.request_id
+                            }));
+                        }
                     }
                 }
             }
@@ -103,9 +125,7 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
 
     if let Some(text) = original.get("content") {
         if let Some(text_str) = text.as_str() {
-            content.push(Content::Text(Text {
-                text: text_str.to_string(),
-            }));
+            content.push(Content::text(text_str));
         }
     }
 
@@ -123,38 +143,22 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
                     .to_string();
 
                 if !is_valid_function_name(&function_name) {
-                    content.push(Content::ToolUse(ToolUse {
-                        id,
-                        name: function_name.clone(),
-                        parameters: json!(arguments),
-                        is_error: true,
-                        error_message: Some(format!(
-                            "The provided function name '{}' had invalid characters, it must match this regex [a-zA-Z0-9_-]+",
-                            function_name
-                        )),
-                    }));
+                    let error = AgentError::ToolNotFound(format!(
+                        "The provided function name '{}' had invalid characters, it must match this regex [a-zA-Z0-9_-]+",
+                        function_name
+                    ));
+                    content.push(Content::tool_request_error(id, error));
                 } else {
                     match serde_json::from_str::<Value>(&arguments) {
                         Ok(params) => {
-                            content.push(Content::ToolUse(ToolUse {
-                                id,
-                                name: function_name,
-                                parameters: params,
-                                is_error: false,
-                                error_message: None,
-                            }));
+                            content.push(Content::tool_request_success(id, function_name, params));
                         }
-                        Err(_) => {
-                            content.push(Content::ToolUse(ToolUse {
-                                id: id.clone(),
-                                name: function_name,
-                                parameters: json!(arguments),
-                                is_error: true,
-                                error_message: Some(format!(
-                                    "Could not interpret tool use parameters for id {}: {}",
-                                    id, arguments
-                                )),
-                            }));
+                        Err(e) => {
+                            let error = AgentError::InvalidParameters(format!(
+                                "Could not interpret tool use parameters for id {}: {}",
+                                id, e
+                            ));
+                            content.push(Content::tool_request_error(id, error));
                         }
                     }
                 }
@@ -162,7 +166,7 @@ pub fn openai_response_to_message(response: Value) -> Result<Message> {
         }
     }
 
-    Message::new(super::types::message::Role::Assistant, content)
+    Message::new(Role::Assistant, content)
 }
 
 fn sanitize_function_name(name: &str) -> String {
@@ -196,8 +200,6 @@ pub fn check_openai_context_length_error(error: &Value) -> Option<InitialMessage
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::providers::types::content::ToolResult;
-    use crate::providers::types::message::Role;
     use serde_json::json;
 
     const OPENAI_TOOL_USE_RESPONSE: &str = r#"{
@@ -234,14 +236,21 @@ mod tests {
     #[test]
     fn test_tools_to_openai_spec() -> Result<()> {
         let parameters = json!({
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Test parameter"
+                }
+            },
+            "required": ["input"]
         });
-        let tool = Tool::new(
-            "test_tool".to_string(),
-            "A test tool".to_string(),
+
+        let tool = Tool {
+            name: "test_tool".to_string(),
+            description: "A test tool".to_string(),
             parameters,
-            |_| Ok(json!({})),
-        );
+        };
 
         let spec = tools_to_openai_spec(&[tool])?;
 
@@ -268,28 +277,26 @@ mod tests {
 
     #[test]
     fn test_messages_to_openai_spec_complex() -> Result<()> {
-        let messages = vec![
+        let mut messages = vec![
             Message::assistant("Hello!")?,
             Message::user("How are you?")?,
             Message::new(
                 Role::Assistant,
-                vec![Content::ToolUse(ToolUse {
-                    id: "1".to_string(),
-                    name: "tool1".to_string(),
-                    parameters: json!({"param1": "value1"}),
-                    is_error: false,
-                    error_message: None,
-                })],
-            )?,
-            Message::new(
-                Role::User,
-                vec![Content::ToolResult(ToolResult {
-                    tool_use_id: "1".to_string(),
-                    output: "Result".to_string(),
-                    is_error: false,
-                })],
+                vec![Content::tool_request(
+                    "tool1", json!({"param1": "value1"}),
+                )],
             )?,
         ];
+        let Content::ToolRequest(request) = &messages[2].content[0] else {panic!("should be request")};
+        messages.push(
+            Message::new(
+                Role::User,
+                vec![Content::tool_response(
+                    &request.id,
+                    "Result".into()
+                )]
+            )?
+        );
 
         let spec = messages_to_openai_spec(&messages);
 
@@ -302,7 +309,7 @@ mod tests {
         assert!(spec[2]["tool_calls"].is_array());
         assert_eq!(spec[3]["role"], "tool");
         assert_eq!(spec[3]["content"], "Result");
-        assert_eq!(spec[3]["tool_call_id"], "1");
+        assert_eq!(spec[3]["tool_call_id"], spec[2]["tool_calls"][0]["id"]);
 
         Ok(())
     }
@@ -310,22 +317,27 @@ mod tests {
     #[test]
     fn test_tools_to_openai_spec_duplicate() -> Result<()> {
         let parameters = json!({
-            "type": "object"
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "description": "Test parameter"
+                }
+            },
+            "required": ["input"]
         });
 
-        let tool1 = Tool::new(
-            "test_tool".to_string(),
-            "Test tool".to_string(),
-            parameters.clone(),
-            |_| Ok(json!({})),
-        );
+        let tool1 = Tool {
+            name: "test_tool".to_string(),
+            description: "Test tool".to_string(),
+            parameters: parameters.clone(),
+        };
 
-        let tool2 = Tool::new(
-            "test_tool".to_string(),
-            "Test tool".to_string(),
-            parameters.clone(),
-            |_| Ok(json!({})),
-        );
+        let tool2 = Tool {
+            name: "test_tool".to_string(),
+            description: "Test tool".to_string(),
+            parameters: parameters.clone(),
+        };
 
         let result = tools_to_openai_spec(&[tool1, tool2]);
         assert!(result.is_err());
@@ -368,16 +380,15 @@ mod tests {
     }
 
     #[test]
-    fn test_openai_response_to_message_valid_tooluse() -> Result<()> {
+    fn test_openai_response_to_message_valid_toolrequest() -> Result<()> {
         let response: Value = serde_json::from_str(OPENAI_TOOL_USE_RESPONSE)?;
         let message = openai_response_to_message(response)?;
 
-        let tool_uses = message.tool_use();
-        assert_eq!(tool_uses.len(), 1);
-        assert_eq!(tool_uses[0].name, "example_fn");
-        assert_eq!(tool_uses[0].parameters, json!({"param": "value"}));
-        assert!(!tool_uses[0].is_error);
-        assert!(tool_uses[0].error_message.is_none());
+        let tool_requests = message.tool_request();
+        assert_eq!(tool_requests.len(), 1);
+        let tool_call = tool_requests[0].call.as_ref().unwrap();
+        assert_eq!(tool_call.name, "example_fn");
+        assert_eq!(tool_call.parameters, json!({"param": "value"}));
 
         Ok(())
     }
@@ -389,15 +400,14 @@ mod tests {
             json!("invalid fn");
 
         let message = openai_response_to_message(response)?;
-        let tool_uses = message.tool_use();
-
-        assert_eq!(tool_uses[0].name, "invalid fn");
-        assert!(tool_uses[0].is_error);
-        assert!(tool_uses[0]
-            .error_message
-            .as_ref()
-            .unwrap()
-            .starts_with("The provided function name"));
+        let tool_requests = message.tool_request();
+        
+        match &tool_requests[0].call {
+            Err(AgentError::ToolNotFound(msg)) => {
+                assert!(msg.starts_with("The provided function name"));
+            }
+            _ => panic!("Expected ToolNotFound error"),
+        }
 
         Ok(())
     }
@@ -409,15 +419,14 @@ mod tests {
             json!("invalid json {");
 
         let message = openai_response_to_message(response)?;
-        let tool_uses = message.tool_use();
+        let tool_requests = message.tool_request();
 
-        assert_eq!(tool_uses[0].name, "example_fn");
-        assert!(tool_uses[0].is_error);
-        assert!(tool_uses[0]
-            .error_message
-            .as_ref()
-            .unwrap()
-            .starts_with("Could not interpret tool use parameters"));
+        match &tool_requests[0].call {
+            Err(AgentError::InvalidParameters(msg)) => {
+                assert!(msg.starts_with("Could not interpret tool use parameters"));
+            }
+            _ => panic!("Expected InvalidParameters error"),
+        }
 
         Ok(())
     }

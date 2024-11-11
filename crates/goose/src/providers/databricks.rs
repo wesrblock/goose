@@ -3,16 +3,14 @@ use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::{
-    base::{Provider, Usage},
-    configs::base::ProviderConfig,
-    configs::databricks::DatabricksProviderConfig,
-    types::{message::Message, tool::Tool},
-    utils::{
-        check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
-        tools_to_openai_spec,
-    },
+use super::base::{Provider, Usage};
+use super::configs::base::ProviderConfig;
+use super::configs::databricks::DatabricksProviderConfig;
+use super::types::message::Message;
+use super:: utils::{
+        check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
 };
+use crate::tool::Tool;
 
 pub struct DatabricksProvider {
     client: Client,
@@ -195,9 +193,7 @@ mod tests {
 
         // Set up the mock to intercept the request and respond with the mocked response
         Mock::given(method("POST"))
-            .and(path(
-                "/serving-endpoints/my-databricks-model/invocations",
-            ))
+            .and(path("/serving-endpoints/my-databricks-model/invocations"))
             .and(header("Authorization", "Bearer test_token"))
             .and(body_json(expected_request_body.clone()))
             .respond_with(ResponseTemplate::new(200).set_body_json(mock_response))
