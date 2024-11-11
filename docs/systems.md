@@ -26,16 +26,11 @@ Tools are the primary way Systems expose functionality to agents. Each tool has:
 - A set of parameters
 - An implementation that executes the tool's functionality
 
-Tools are defined using a custom attribute macro:
+A tool must take a Value and return an AgentResult<Value> (it must also be async). This
+is what makes it compatible with the tool calling framework from the agent. 
 
 ```rust
-#[tool(
-    name = "echo",
-    description = "Echoes back the input"
-)]
-async fn echo(&self, message: String) -> ToolResult<Value> {
-    Ok(json!({ "response": message }))
-}
+async fn echo(&self, params: Value) -> AgentResult<Value>
 ```
 
 ## Architecture
@@ -44,7 +39,7 @@ async fn echo(&self, message: String) -> ToolResult<Value> {
 
 1. **System Trait**: The core interface that all systems must implement
 2. **Error Handling**: Specialized error types for tool execution
-3. **Proc Macros**: Simplify tool definition and registration
+3. **Proc Macros**: Simplify tool definition and registration [*not yet implemented*]
 
 ### Error Handling
 
@@ -60,9 +55,8 @@ This split allows precise error handling for tool execution while maintaining fl
 
 1. **Clear Names**: Use clear, action-oriented names for tools (e.g., "create_user" not "user")
 2. **Descriptive Parameters**: Each parameter should have a clear description
-3. **Error Handling**: Return specific errors when possible
-4. **Idempotency**: Tools should be idempotent when possible
-5. **State Management**: Be explicit about state modifications
+3. **Error Handling**: Return specific errors when possible, the errors become "prompts"
+4. **State Management**: Be explicit about state modifications
 
 ### System Implementation
 
