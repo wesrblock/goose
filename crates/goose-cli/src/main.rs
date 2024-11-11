@@ -1,17 +1,17 @@
+use std::collections::HashMap;
 use anyhow::Result;
 use bat::PrettyPrinter;
 use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
-use goose::providers::base::Provider;
-use goose::providers::factory::{get_provider, ProviderType};
-use serde_json::json;
+use goose::providers::factory::ProviderType;
 
+use goose::agent::Agent;
+use goose::developer_system::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::types::content::Content;
-use goose::providers::types::message::Message;
-use goose::tool::Tool;
+use goose::systems::System;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -48,26 +48,21 @@ enum CliProviderVariant {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let provider = create_provider_from_cli(&cli);
+    let provider_type = match cli.provider {
+        CliProviderVariant::OpenAi => ProviderType::OpenAi,
+        CliProviderVariant::Databricks => ProviderType::Databricks,
+    };
+    let systems: Vec<Box<dyn System>> = vec![Box::new(DeveloperSystem::new())];
 
-    // Add word counting tool
-    let parameters = json!({
-        "type": "object",
-        "properties": {
-                "text": {
-                    "type": "string",
-                    "description": "The text to count words in"
-                }
-        },
-        "required": ["text"]
-    });
-    let word_count_tool = Tool::new(
-        "count_words",
-        "Count the number of words in text",
-        parameters,
+    let agent = Agent::new(
+        systems,
+        provider_type,
+        create_provider_config(&cli),
+        cli.model,
     );
 
-    let tools = vec![word_count_tool];
+    let model_messages = agent.model_messages().await;
+    println!("Model messages: {:?}", model_messages);
 
     println!(
         "Example goose CLI {}",
@@ -86,28 +81,28 @@ async fn main() -> Result<()> {
         spin.start("awaiting reply");
 
         // Create user message and get completion
-        let user_message = Message::user(&message_text)?;
-        let (response_message, _usage) = provider
-            .complete(
-                &cli.model,
-                "You are a helpful assistant.",
-                &[user_message],
-                &tools, // Changed from &[] to &tools
-                None,   // default temperature
-                None,   // default max_tokens
-            )
-            .await?; // Added .await since complete returns a Future
+        let interface_message = HashMap::from([
+            ("role".to_string(), "user".to_string()),
+            ("content".to_string(), message_text),
+        ]);
+
+        // Get agent response
+        let responses = agent.reply(vec![interface_message], None).await?;
+        // dbg!(&responses);
 
         spin.stop("");
 
-        if response_message.has_tool_request() {
-            render(
-                &Content::ToolRequest(response_message.tool_request().first().unwrap().clone())
-                    .summary(),
-            )
-            .await;
-        } else {
-            render(&response_message.text()).await;
+        // Display the last response
+        if let Some(last_response) = responses.last() {
+            if last_response.has_tool_request() {
+                render(
+                    &Content::ToolRequest(last_response.tool_request().first().unwrap().clone())
+                        .summary(),
+                )
+                .await;
+            } else {
+                render(&last_response.text()).await;
+            }
         }
 
         println!("\n");
@@ -123,27 +118,21 @@ async fn render(content: &str) {
         .unwrap();
 }
 
-fn create_provider_from_cli(cli: &Cli) -> Box<dyn Provider + Send + Sync> {
+fn create_provider_config(cli: &Cli) -> ProviderConfig {
     match cli.provider {
-        CliProviderVariant::OpenAi => {
-            let openai_config = ProviderConfig::OpenAi(OpenAiProviderConfig {
-                host: "https://api.openai.com".to_string(),
-                api_key: cli.api_key.clone().unwrap_or_else(|| {
-                    std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
-                }),
-            });
-            get_provider(ProviderType::OpenAi, openai_config).unwrap()
-        }
-        CliProviderVariant::Databricks => {
-            let databricks_config = ProviderConfig::Databricks(DatabricksProviderConfig {
-                host: cli.databricks_host.clone().unwrap_or_else(|| {
-                    std::env::var("DATABRICKS_HOST").expect("DATABRICKS_HOST must be set")
-                }),
-                token: cli.databricks_token.clone().unwrap_or_else(|| {
-                    std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")
-                }),
-            });
-            get_provider(ProviderType::Databricks, databricks_config).unwrap()
-        }
+        CliProviderVariant::OpenAi => ProviderConfig::OpenAi(OpenAiProviderConfig {
+            host: "https://api.openai.com".to_string(),
+            api_key: cli.api_key.clone().unwrap_or_else(|| {
+                std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
+            }),
+        }),
+        CliProviderVariant::Databricks => ProviderConfig::Databricks(DatabricksProviderConfig {
+            host: cli.databricks_host.clone().unwrap_or_else(|| {
+                std::env::var("DATABRICKS_HOST").expect("DATABRICKS_HOST must be set")
+            }),
+            token: cli.databricks_token.clone().unwrap_or_else(|| {
+                std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")
+            }),
+        }),
     }
 }

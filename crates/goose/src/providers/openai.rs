@@ -135,7 +135,6 @@ impl Provider for OpenAiProvider {
                 .unwrap()
                 .insert("max_tokens".to_string(), json!(tokens));
         }
-
         // dbg!(&payload);
 
         // Make request

@@ -1,209 +1,167 @@
-// use anyhow::Result;
-// use serde_json::{json, Value};
-// use std::collections::HashMap;
-// use tokio::sync::RwLock;
+use anyhow::Result;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use tokio::sync::RwLock;
 
-// use crate::{
-//     providers::{factory::{ProviderType, get_provider}, types::{content::{Content, ToolRequest, ToolResponse}, message::{Message, Role}}},
-//     systems::System,
-//     tool::{Tool, ToolCall},
-// };
+use crate::{
+    providers::{
+        base::Provider,
+        configs::ProviderConfig,
+        factory::{get_provider, ProviderType},
+        types::{
+            content::{Content, ToolResponse},
+            message::{Message, Role},
+        },
+    },
+    systems::System,
+    tool::{Tool, ToolCall},
+};
 
-// pub struct Agent {
-//     systems: Vec<Box<dyn System>>,
-//     interface_messages: RwLock<Vec<Message>>,
-//     provider: ProviderType,
-//     provider_config: ProviderConfig,
-//     processor_model: String,
-//     model_messages: RwLock<Vec<Message>>,
-// }
+pub struct Agent {
+    systems: Vec<Box<dyn System>>,
+    provider: Box<dyn Provider>,
+    processor_model: String,
+    model_messages: RwLock<Vec<Message>>,
+}
 
-// impl Agent {
-//     pub fn new(
-//         systems: Vec<Box<dyn System>>,
-//         provider_type: ProviderType,
-//         provider_config: ProviderConfig,
-//         processor_model: String,
-//     ) -> Self {
-//         Self {
-//             systems,
-//             interface_messages: RwLock::new(Vec::new()),
-//             provider_type,
-//             provider_config,
-//             processor_model,
-//             model_messages: RwLock::new(Vec::new()),
-//         }
-//     }
+impl Agent {
+    pub fn new(
+        systems: Vec<Box<dyn System>>,
+        provider_type: ProviderType,
+        provider_config: ProviderConfig,
+        processor_model: String,
+    ) -> Self {
+        Self {
+            systems,
+            provider: get_provider(provider_type, provider_config).unwrap(),
+            processor_model,
+            model_messages: RwLock::new(Vec::new()),
+        }
+    }
 
-//     fn get_tools(&self) -> Vec<Tool> {
-//         self.systems.iter().flat_map(|system| system.tools().iter().cloned()).collect()
-//     }
+    pub async fn model_messages(&self) -> Vec<Message> {
+        self.model_messages.read().await.clone()
+    }
 
-//     async fn logged(&self, message: Message) -> Result<Message> {
-//         let mut messages = self.interface_messages.write().await;
-//         messages.push(message.clone());
-//         Ok(message)
-//     }
+    fn get_tools(&self) -> Vec<Tool> {
+        self.systems
+            .iter()
+            .flat_map(|system| system.tools().iter().cloned())
+            .collect()
+    }
 
-//     async fn get_status(&self) -> Result<(Message, Message)> {
-//         // TODO: Implement proper status prompt
-//         let status = "TODO: implement status prompt".to_string();
+    fn tool_to_system_map(&self) -> HashMap<String, &dyn System> {
+        let mut map = HashMap::new();
+        for system in &self.systems {
+            for tool in system.tools() {
+                map.insert(tool.name.clone(), system.as_ref());
+            }
+        }
+        map
+    }
 
-//         let message_use = Message::new(
-//             Role::Assistant,
-//             vec![Content::ToolRequest(ToolRequest::new("status", json!({})))],
-//         )?;
+    async fn call_system_tool(&self, tool_call: ToolCall) -> Result<Value> {
+        let tool_map = self.tool_to_system_map();
 
-//         let message_result = Message::new(
-//             Role::User,
-//             vec![Content::ToolResponse(ToolResponse::new("000", json!(status)))],
-//         )?;
+        if let Some(system) = tool_map.get(&tool_call.name) {
+            Ok(system.call(tool_call).await?)
+        } else {
+            let valid_tools = tool_map.keys().cloned().collect::<Vec<_>>().join(", ");
+            Err(anyhow::anyhow!(
+                "No tool exists with name '{}'. Valid tools are: {}",
+                tool_call.name,
+                valid_tools
+            ))
+        }
+    }
 
-//         Ok((message_use, message_result))
-//     }
+    pub async fn reply(
+        &self,
+        interface_messages: Vec<HashMap<String, String>>,
+        max_tool_calls: Option<i32>,
+    ) -> Result<Vec<Message>> {
+        let mut max_tool_calls = max_tool_calls.unwrap_or(10);
+        let mut responses = Vec::new();
 
-//     fn _complete(&self, messages: &[Message], tools: &[Tool], temperature: Option<f32>, max_tokens: Option<i32>) -> Result<(Message, Usage)> {
-//         let temperature = temperature.unwrap_or(0.0);
-//         let max_tokens = max_tokens.unwrap_or(4096);
+        // TODO: Load prompt from file
+        // system_prompt = Message.load("prompt.md", systems=self.systems).text
+        let system_prompt = "You are a helpful assistant.";
 
-//         self.provider.complete(self.processor_model, system, messages, tools, temperature, max_tokens)
-//     }
+        // interface_messages = list[dict], model_messages = list[Message]
+        // model_messages =  interface_messages.convert() + [status_use, status_result]
+        let mut model_messages = Vec::new();
+        model_messages.extend(interface_messages.iter().map(|msg| {
+            Message::new(Role::User, vec![Content::text(msg["content"].clone())]).unwrap()
+        }));
 
-//     async fn get_summary(&self) -> Result<String> {
-//         let interface_messages = self.interface_messages.read().await;
-//         let summary = interface_messages
-//             .iter()
-//             .map(|m| m.summary())
-//             .collect::<Vec<_>>()
-//             .join("\n\n");
+        // let (status_use, status_result) = self.get_status().await?;
+        // model_messages.push(status_use);
+        // model_messages.push(status_result);
 
-//         let message = Message::user(summary)?;
-//         let (response_msg, _) = self
-//             .provider
-//             .complete(
-//                 &self.processor_model,
-//                 "TODO: implement summary prompt",
-//                 &[message],
-//                 &[],
-//                 None,
-//                 None,
-//             )
-//             .await?;
+        let (response, _) = self
+            .provider
+            .complete(
+                &self.processor_model,
+                system_prompt,
+                &model_messages,
+                &self.get_tools(),
+                None,
+                None,
+            )
+            .await?;
 
-//         Ok(response_msg.text())
-//     }
+        // println!("Response: {:?}", response);
 
-//     async fn initialize(&self, messages: &[Message]) -> Result<Vec<Message>> {
-//         let (status_use, status_result) = self.get_status().await?;
+        responses.push(response.clone());
 
-//         let mut result = Vec::new();
-//         result.extend(self.interface_messages.read().await.clone());
-//         result.push(status_use);
-//         result.push(status_result);
+        // Handle tool calls
+        while !response.tool_request().is_empty() && max_tool_calls > 0 {
+            let mut tool_responses = Vec::new();
 
-//         Ok(result)
-//     }
+            for tool_request in response.tool_request() {
+                let response_content = match &tool_request.call {
+                    Ok(tool_call) => match self.call_system_tool(tool_call.clone()).await {
+                        Ok(result) => result,
+                        Err(e) => json!({
+                            "error": format!("Tool execution failed: {}", e)
+                        }),
+                    },
+                    Err(e) => json!({
+                        "error": format!("Invalid tool request: {}", e)
+                    }),
+                };
 
-//     fn tool_to_system_map(&self) -> HashMap<String, &dyn System> {
-//         let mut map = HashMap::new();
-//         for system in &self.systems {
-//             for tool in system.tools() {
-//                 map.insert(tool.name.clone(), system.as_ref());
-//             }
-//         }
-//         map
-//     }
+                // println!("In tool calling loop -> response: {:?}", response_content);
 
-//     async fn call_system_tool(&self, tool_call: ToolCall) -> Result<Value> {
-//         let tool_map = self.tool_to_system_map();
+                tool_responses.push(Content::ToolResponse(ToolResponse::new(
+                    &tool_request.id,
+                    response_content,
+                )));
+            }
 
-//         if let Some(system) = tool_map.get(&tool_call.name) {
-//             system.call(tool_call).await?.map_err(|e| anyhow!(e))
-//         } else {
-//             let valid_tools = tool_map.keys().cloned().collect::<Vec<_>>().join(", ");
-//             Err(anyhow!(
-//                 "No tool exists with name '{}'. Valid tools are: {}",
-//                 tool_call.name,
-//                 valid_tools
-//             ))
-//         }
-//     }
+            let result = Message::new(Role::User, tool_responses)?;
+            responses.push(result.clone());
 
-//     pub async fn reply(&self, messages: Vec<Value>) -> Result<Vec<Message>> {
-//         let mut responses = Vec::new();
+            // Update model messages for next iteration
+            model_messages.push(response.clone());
+            model_messages.push(result);
 
-//         for msg in messages {
-//             let content = msg["content"]
-//                 .as_str()
-//                 .ok_or_else(|| anyhow!("Message content must be a string"))?;
-//             let message = Message::user(content)?;
-//             responses.push(self.logged(message).await?);
-//         }
+            let (new_response, _) = self
+                .provider
+                .complete(
+                    &self.processor_model,
+                    system_prompt,
+                    &model_messages,
+                    &self.get_tools(),
+                    None,
+                    None,
+                )
+                .await?;
 
-//         // TODO: Load prompt from file
-//         let prompt = "TODO: implement prompt loading";
+            responses.push(new_response.clone());
+            max_tool_calls -= 1;
+        }
 
-//         let mut model_messages = self.initialize(&responses).await?;
-
-//         let (response, _) = self
-//             .provider
-//             .complete(
-//                 &self.processor_model,
-//                 prompt,
-//                 &model_messages,
-//                 &self.get_tools(),
-//                 None,
-//                 None,
-//             )
-//             .await?;
-
-//         responses.push(self.logged(response.clone()).await?);
-
-//         // Handle tool calls
-//         while !response.tool_request().is_empty() {
-//             let mut tool_responses = Vec::new();
-
-//             for tool_request in response.tool_request() {
-//                 if let Some(call) = tool_request.call {
-//                     match self.call_system_tool(call).await {
-//                         Ok(result) => {
-//                             tool_responses.push(Content::ToolResponse(
-//                                 ToolResponse::new(&tool_request.id, result)
-//                             ));
-//                         }
-//                         Err(e) => {
-//                             tool_responses.push(Content::ToolResponse(
-//                                 ToolResponse::new(&tool_request.id, json!({
-//                                     "error": e.to_string()
-//                                 }))
-//                             ));
-//                         }
-//                     }
-//                 }
-//             }
-
-//             let result = Message::new(Role::User, tool_responses)?;
-//             responses.push(self.logged(result.clone()).await?);
-
-//             // Update model messages for next iteration
-//             model_messages.push(response.clone());
-//             model_messages.push(result);
-
-//             let (new_response, _) = self
-//                 .provider
-//                 .complete(
-//                     &self.processor_model,
-//                     prompt,
-//                     &model_messages,
-//                     &self.get_tools(),
-//                     None,
-//                     None,
-//                 )
-//                 .await?;
-
-//             responses.push(self.logged(new_response.clone()).await?);
-//         }
-
-//         Ok(responses)
-//     }
-// }
+        Ok(responses)
+    }
+}
