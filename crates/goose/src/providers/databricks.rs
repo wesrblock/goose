@@ -14,18 +14,30 @@ use super::{
     },
 };
 
+use super::databricks_oauth::get_oauth_token;
+
 pub struct DatabricksProvider {
     client: Client,
     config: DatabricksProviderConfig,
 }
 
 impl DatabricksProvider {
+
     pub fn new(config: DatabricksProviderConfig) -> Result<Self> {
+        // Determine the token to use
+        let token = if let Some(token) = &config.token {
+            token.clone()
+        } else if config.use_oauth {
+            get_oauth_token(&config.host)?
+        } else {
+            return Err(anyhow::anyhow!("No authentication method provided"));
+        };
+
         let client = Client::builder()
-            .timeout(Duration::from_secs(600)) // 10 minutes timeout
+            .timeout(Duration::from_secs(600))
             .default_headers({
                 let mut headers = reqwest::header::HeaderMap::new();
-                headers.insert("Authorization", format!("Bearer {}", config.token).parse()?);
+                headers.insert("Authorization", format!("Bearer {}", token).parse()?);
                 headers
             })
             .build()?;
@@ -208,7 +220,8 @@ mod tests {
         // Create the DatabricksProvider with the mock server's URL as the host
         let config = DatabricksProviderConfig {
             host: mock_server.uri(),
-            token: "test_token".to_string(),
+            token: Some("test_token".to_string()),
+            use_oauth: false,
         };
 
         let provider = DatabricksProvider::new(config)?;
