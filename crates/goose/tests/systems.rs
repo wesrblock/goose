@@ -3,9 +3,9 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use goose::providers::types::content::ToolUse;
-use goose::providers::types::tool::Tool;
-use goose::systems::{System, ToolError, ToolResult};
+use goose::tool::{Tool, ToolCall};
+use goose::errors::{AgentError, AgentResult};
+use goose::systems::System;
 
 /// A simple system that echoes input back to the caller
 pub struct EchoSystem {
@@ -32,11 +32,11 @@ impl EchoSystem {
         }
     }
 
-    async fn echo(&self, params: Value) -> ToolResult<Value> {
+    async fn echo(&self, params: Value) -> AgentResult<Value> {
         let message = params
             .get("message")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParameters("message parameter required".into()))?;
+            .ok_or_else(|| AgentError::InvalidParameters("message parameter required".into()))?;
 
         Ok(json!({ "response": message }))
     }
@@ -64,10 +64,10 @@ impl System for EchoSystem {
         Ok(HashMap::new()) // Echo system has no state to report
     }
 
-    async fn call_tool(&self, tool_use: ToolUse) -> ToolResult<Value> {
-        match tool_use.name.as_str() {
-            "echo" => self.echo(tool_use.parameters).await,
-            _ => ToolResult::Err(ToolError::ToolNotFound(tool_use.name)),
+    async fn call(&self, tool_call: ToolCall) -> AgentResult<Value> {
+        match tool_call.name.as_str() {
+            "echo" => self.echo(tool_call.parameters).await,
+            _ => Err(AgentError::ToolNotFound(tool_call.name)),
         }
     }
 }
@@ -79,8 +79,8 @@ mod tests {
     async fn test_echo_success() {
         let system = EchoSystem::new();
 
-        let tool_use = ToolUse::new("echo", json!({"message": "hello world"}));
-        let result = system.call_tool(tool_use).await.unwrap();
+        let tool_call = ToolCall::new("echo", json!({"message": "hello world"}));
+        let result = system.call(tool_call).await.unwrap();
         assert_eq!(result, json!({ "response": "hello world" }));
     }
 
@@ -88,19 +88,19 @@ mod tests {
     async fn test_echo_missing_message() {
         let system = EchoSystem::new();
 
-        let tool_use = ToolUse::new("echo", json!({}));
-        let error = system.call_tool(tool_use).await.unwrap_err();
+        let tool_call = ToolCall::new("echo", json!({}));
+        let error = system.call(tool_call).await.unwrap_err();
 
-        assert!(matches!(error, ToolError::InvalidParameters(_)));
+        assert!(matches!(error, AgentError::InvalidParameters(_)));
     }
 
     #[tokio::test]
     async fn test_unknown_tool() {
         let system = EchoSystem::new();
 
-        let tool_use = ToolUse::new("unknown", json!({}));
-        let error = system.call_tool(tool_use).await.unwrap_err();
+        let tool_call = ToolCall::new("unknown", json!({}));
+        let error = system.call(tool_call).await.unwrap_err();
 
-        assert!(matches!(error, ToolError::ToolNotFound(_)));
+        assert!(matches!(error, AgentError::ToolNotFound(_)));
     }
 }

@@ -1,7 +1,8 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use super::types::{message::Message, tool::Tool};
+use super::types::message::Message;
+use crate::tool::Tool;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Usage {
