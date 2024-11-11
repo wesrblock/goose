@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::fmt::Debug;
 
 /// A tool that can be used by a model.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tool {
     /// The name of the tool
     pub name: String,
@@ -28,12 +28,21 @@ impl Tool {
     }
 }
 
-impl Debug for Tool {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Tool")
-            .field("name", &self.name)
-            .field("description", &self.description)
-            .field("parameters", &self.parameters)
-            .finish()
+/// A tool call request that a system can execute
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    /// The name of the tool to execute
+    pub name: String,
+    /// The parameters for the execution
+    pub parameters: Value,
+}
+
+impl ToolCall {
+    /// Create a new ToolUse with the given name and parameters
+    pub fn new<S: Into<String>>(name: S, parameters: Value) -> Self {
+        Self {
+            name: name.into(),
+            parameters,
+        }
     }
 }

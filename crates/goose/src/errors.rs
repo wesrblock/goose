@@ -1,7 +1,9 @@
+use serde::{Serialize, Deserialize};
 use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum ToolError {
+#[non_exhaustive]
+#[derive(Error, Debug, Clone, Deserialize, Serialize)]
+pub enum AgentError {
     #[error("Tool not found: {0}")]
     ToolNotFound(String),
 
@@ -15,4 +17,4 @@ pub enum ToolError {
     Internal(String),
 }
 
-pub type ToolResult<T> = Result<T, ToolError>;
+pub type AgentResult<T> = Result<T, AgentError>;
