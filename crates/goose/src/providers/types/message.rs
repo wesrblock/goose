@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::content::{Content, ToolResult, ToolUse};
+use super::content::{Content, Text, ToolRequest, ToolResponse};
 use super::objectid::create_object_id;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,19 +38,19 @@ impl Message {
     fn validate(&self) -> Result<()> {
         match self.role {
             Role::User => {
-                if !self.has_text() && !self.has_tool_result() {
-                    return Err(anyhow!("User message must include a Text or ToolResult"));
+                if !self.has_text() && !self.has_tool_response() {
+                    return Err(anyhow!("User message must include a Text or ToolResponse"));
                 }
-                if self.has_tool_use() {
-                    return Err(anyhow!("User message does not support ToolUse"));
+                if self.has_tool_request() {
+                    return Err(anyhow!("User message does not support ToolRequest"));
                 }
             }
             Role::Assistant => {
-                if !self.has_text() && !self.has_tool_use() {
-                    return Err(anyhow!("Assistant message must include a Text or ToolUse"));
+                if !self.has_text() && !self.has_tool_request() {
+                    return Err(anyhow!("Assistant message must include a Text or ToolRequest"));
                 }
-                if self.has_tool_result() {
-                    return Err(anyhow!("Assistant message does not support ToolResult"));
+                if self.has_tool_response() {
+                    return Err(anyhow!("Assistant message does not support ToolResponse"));
                 }
             }
         }
@@ -68,21 +68,21 @@ impl Message {
             .join("\n")
     }
 
-    pub fn tool_use(&self) -> Vec<ToolUse> {
+    pub fn tool_request(&self) -> Vec<ToolRequest> {
         self.content
             .iter()
             .filter_map(|content| match content {
-                Content::ToolUse(tool_use) => Some(tool_use.clone()),
+                Content::ToolRequest(tool_request) => Some(tool_request.clone()),
                 _ => None,
             })
             .collect()
     }
 
-    pub fn tool_result(&self) -> Vec<ToolResult> {
+    pub fn tool_response(&self) -> Vec<ToolResponse> {
         self.content
             .iter()
             .filter_map(|content| match content {
-                Content::ToolResult(tool_result) => Some(tool_result.clone()),
+                Content::ToolResponse(tool_response) => Some(tool_response.clone()),
                 _ => None,
             })
             .collect()
@@ -92,24 +92,24 @@ impl Message {
         self.content.iter().any(|c| matches!(c, Content::Text(_)))
     }
 
-    pub fn has_tool_use(&self) -> bool {
+    pub fn has_tool_request(&self) -> bool {
         self.content
             .iter()
-            .any(|c| matches!(c, Content::ToolUse(_)))
+            .any(|c| matches!(c, Content::ToolRequest(_)))
     }
 
-    pub fn has_tool_result(&self) -> bool {
+    pub fn has_tool_response(&self) -> bool {
         self.content
             .iter()
-            .any(|c| matches!(c, Content::ToolResult(_)))
+            .any(|c| matches!(c, Content::ToolResponse(_)))
     }
 
     pub fn user<S: Into<String>>(text: S) -> Result<Self> {
-        Self::new(Role::User, vec![Content::text(text)])
+        Self::new(Role::User, vec![Content::Text(Text::new(text))])
     }
 
     pub fn assistant<S: Into<String>>(text: S) -> Result<Self> {
-        Self::new(Role::Assistant, vec![Content::text(text)])
+        Self::new(Role::Assistant, vec![Content::Text(Text::new(text))])
     }
 
     pub fn summary(&self) -> String {
@@ -140,34 +140,34 @@ mod tests {
     }
 
     #[test]
-    fn test_message_tool_use() -> Result<()> {
+    fn test_message_tool_request() -> Result<()> {
         let message = Message::new(
             Role::Assistant,
             vec![
-                Content::tool_use("tool", json!({})),
-                Content::tool_use("tool", json!({})),
+                Content::tool_request("tool", json!({})),
+                Content::tool_request("tool", json!({})),
             ],
         )?;
 
-        let tool_uses = message.tool_use();
-        assert_eq!(tool_uses.len(), 2);
-        assert_eq!(tool_uses[0].name, "tool");
+        let tool_requests = message.tool_request();
+        assert_eq!(tool_requests.len(), 2);
+        assert_eq!(tool_requests[0].clone().call.unwrap().name, "tool");
         Ok(())
     }
 
     #[test]
-    fn test_message_tool_result() -> Result<()> {
+    fn test_message_tool_response() -> Result<()> {
         let message = Message::new(
             Role::User,
             vec![
-                Content::tool_result("1", "result"),
-                Content::tool_result("2", "result"),
+                Content::tool_response("1", json!("result")),
+                Content::tool_response("2", json!("result")),
             ],
         )?;
 
-        let tool_results = message.tool_result();
-        assert_eq!(tool_results.len(), 2);
-        assert_eq!(tool_results[0].output, "result");
+        let tool_responses = message.tool_response();
+        assert_eq!(tool_responses.len(), 2);
+        assert_eq!(tool_responses[0].clone().output.unwrap(), json!("result"));
         Ok(())
     }
 
@@ -181,19 +181,19 @@ mod tests {
         let message = Message::assistant("Hello")?;
         assert_eq!(message.text(), "Hello");
 
-        // Invalid message: user with tool_use
-        let result = Message::new(
+        // Invalid message: user with tool_request
+        let response = Message::new(
             Role::User,
-            vec![Content::text(""), Content::tool_use("tool", json!({}))],
+            vec![Content::text(""), Content::tool_request("tool", json!({}))],
         );
-        assert!(result.is_err());
+        assert!(response.is_err());
 
-        // Invalid message: assistant with tool_result
-        let result = Message::new(
+        // Invalid message: assistant with tool_response
+        let response = Message::new(
             Role::Assistant,
-            vec![Content::text(""), Content::tool_result("1", "result")],
+            vec![Content::text(""), Content::tool_response("1", json!("result"))],
         );
-        assert!(result.is_err());
+        assert!(response.is_err());
         Ok(())
     }
 
@@ -211,7 +211,7 @@ mod tests {
             Role::Assistant,
             vec![
                 Content::text("Using tool"),
-                Content::tool_use("test_tool", json!({"key": "value"})),
+                Content::tool_request("test_tool", json!({"key": "value"})),
             ],
         )?;
 
@@ -219,8 +219,11 @@ mod tests {
         let deserialized: Message = serde_json::from_str(&serialized)?;
 
         assert_eq!(message.text(), deserialized.text());
-        assert_eq!(message.tool_use().len(), deserialized.tool_use().len());
-        assert_eq!(message.tool_use()[0].name, deserialized.tool_use()[0].name);
+        assert_eq!(message.tool_request().len(), deserialized.tool_request().len());
+        assert_eq!(
+            message.tool_request()[0].clone().call.unwrap().name,
+            deserialized.tool_request()[0].clone().call.unwrap().name
+        );
 
         // Verify JSON structure
         let json_value: Value = serde_json::from_str(&serialized)?;

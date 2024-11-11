@@ -13,7 +13,7 @@ use goose::providers::databricks::DatabricksProvider;
 use goose::providers::openai::OpenAiProvider;
 use goose::providers::types::content::Content;
 use goose::providers::types::message::Message;
-use goose::providers::types::tool::Tool;
+use goose::tool::Tool;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -102,9 +102,9 @@ async fn main() -> Result<()> {
 
         spin.stop("");
 
-        if response_message.has_tool_use() {
+        if response_message.has_tool_request() {
             render(
-                &Content::ToolUse(response_message.tool_use().first().unwrap().clone()).summary(),
+                &Content::ToolRequest(response_message.tool_request().first().unwrap().clone()).summary(),
             )
             .await;
         } else {

@@ -4,16 +4,14 @@ use reqwest::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
 
-use super::{
-    base::{Provider, Usage},
-    configs::base::ProviderConfig,
-    configs::openai::OpenAiProviderConfig,
-    types::{message::Message, tool::Tool},
-    utils::{
-        check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
-        tools_to_openai_spec,
-    },
+use super::base::{Provider, Usage};
+use super::configs::base::ProviderConfig;
+use super::configs::openai::OpenAiProviderConfig;
+use super::types::message::Message;
+use super::utils::{
+        check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
 };
+use crate::tool::Tool;
 
 pub struct OpenAiProvider {
     client: Client,
@@ -237,7 +235,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_complete_tool_use() -> Result<()> {
+    async fn test_complete_tool_request() -> Result<()> {
         // Mock response for tool calling
         let response_body = json!({
             "id": "chatcmpl-tool",
@@ -299,14 +297,16 @@ mod tests {
             .await?;
 
         // Assert the response
-        let tool_uses = message.tool_use();
-        assert_eq!(tool_uses.len(), 1);
-        let tool_use = &tool_uses[0];
-        assert_eq!(tool_use.name, "get_weather");
+        let tool_requests = message.tool_request();
+        assert_eq!(tool_requests.len(), 1);
+        let Ok(tool_call) = &tool_requests[0].call else {panic!("should be tool call")};
+
+        assert_eq!(tool_call.name, "get_weather");
         assert_eq!(
-            tool_use.parameters,
+            tool_call.parameters,
             json!({"location": "San Francisco, CA"})
         );
+
 
         assert_eq!(usage.input_tokens, Some(20));
         assert_eq!(usage.output_tokens, Some(15));

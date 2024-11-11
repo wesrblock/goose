@@ -1,13 +1,10 @@
-mod error;
-
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::providers::types::content::ToolUse;
-use crate::providers::types::tool::Tool;
-pub use error::{ToolError, ToolResult};
+use crate::tool::{Tool, ToolCall};
+use crate::errors::AgentResult;
 
 /// Core trait that defines a system that can be operated by an AI agent
 #[async_trait]
@@ -28,5 +25,5 @@ pub trait System: Send + Sync {
     async fn status(&self) -> AnyhowResult<HashMap<String, Value>>;
 
     /// Call a tool with the given parameters
-    async fn call_tool(&self, tool_use: ToolUse) -> ToolResult<Value>;
+    async fn call(&self, tool_call: ToolCall) -> AgentResult<Value>;
 }

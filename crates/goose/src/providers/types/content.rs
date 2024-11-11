@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
+use crate::tool::ToolCall;
+use crate::errors::{AgentResult, AgentError};
 
 // Text content
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,78 +17,52 @@ impl Text {
     }
 }
 
-// Tool use content
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolUse {
+/// A request for a tool call from the agent
+pub struct ToolRequest {
+    /// A unique identifier for this tool request
     pub id: String,
-    pub name: String,
-    pub parameters: Value,
-    #[serde(default)]
-    pub is_error: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_message: Option<String>,
+    /// The requested tool call, which is a Result because it may be malformed
+    pub call: AgentResult<ToolCall>,
 }
 
-impl ToolUse {
-    /// Create a new ToolUse with the given name and parameters
+impl ToolRequest {
+    /// Create a new well-formed ToolRequest
     pub fn new<S: Into<String>>(name: S, parameters: Value) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
-            name: name.into(),
-            parameters,
-            is_error: false,
-            error_message: None,
-        }
-    }
-
-    /// Create a new error ToolUse with the given name and error message
-    pub fn error<S1: Into<String>, S2: Into<String>>(name: S1, error_message: S2) -> Self {
-        Self {
-            id: Uuid::new_v4().to_string(),
-            name: name.into(),
-            parameters: Value::Null,
-            is_error: true,
-            error_message: Some(error_message.into()),
+            call: Ok(ToolCall::new(name, parameters)),
         }
     }
 }
 
-// Tool result content
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolResult {
-    pub tool_use_id: String,
-    pub output: String,
-    #[serde(default)]
-    pub is_error: bool,
+pub struct ToolResponse {
+    /// The unique identifier for the original tool request
+    pub request_id: String,
+    /// The output of the tool call, which is a Result because the call may have errored
+    pub output: AgentResult<Value>,
 }
 
-impl ToolResult {
-    /// Create a new successful ToolResult
-    pub fn success<S1: Into<String>, S2: Into<String>>(tool_use_id: S1, output: S2) -> Self {
+impl ToolResponse {
+    /// Create a new well-formed ToolRequest
+    pub fn new<S: Into<String>>(request_id: S, output: Value) -> Self {
         Self {
-            tool_use_id: tool_use_id.into(),
-            output: output.into(),
-            is_error: false,
-        }
-    }
-
-    /// Create a new error ToolResult
-    pub fn error<S1: Into<String>, S2: Into<String>>(tool_use_id: S1, error: S2) -> Self {
-        Self {
-            tool_use_id: tool_use_id.into(),
-            output: error.into(),
-            is_error: true,
+            request_id: request_id.into(),
+            output: Ok(output.into()),
         }
     }
 }
+
 
 // Enum to handle all content types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum Content {
     Text(Text),
-    ToolUse(ToolUse),
-    ToolResult(ToolResult),
+    ToolRequest(ToolRequest),
+    ToolResponse(ToolResponse),
 }
 
 impl Content {
@@ -95,41 +71,69 @@ impl Content {
         Content::Text(Text::new(text))
     }
 
-    /// Create a new ToolUse content
-    pub fn tool_use<S: Into<String>>(name: S, parameters: Value) -> Self {
-        Content::ToolUse(ToolUse::new(name, parameters))
+    /// Create a new ToolRequest with generated id
+    pub fn tool_request<S: Into<String>>(name: S, parameters: Value) -> Self {
+        Content::ToolRequest(ToolRequest::new(name, parameters))
     }
 
-    /// Create a new error ToolUse content
-    pub fn tool_use_error<S1: Into<String>, S2: Into<String>>(name: S1, error: S2) -> Self {
-        Content::ToolUse(ToolUse::error(name, error))
+    /// Create a new ToolRequest content with a successful tool call
+    pub fn tool_request_success<T: Into<String>, S: Into<String>>(id: T, name: S, parameters: Value) -> Self {
+        Content::ToolRequest(ToolRequest {
+            id: id.into(),
+            call: Ok(ToolCall::new(name, parameters)),
+        })
     }
 
-    /// Create a new successful ToolResult content
-    pub fn tool_result<S1: Into<String>, S2: Into<String>>(tool_use_id: S1, output: S2) -> Self {
-        Content::ToolResult(ToolResult::success(tool_use_id, output))
+    /// Create a new ToolRequest content with an error
+    pub fn tool_request_error<S: Into<String>>(id: S, error: AgentError) -> Self {
+        Content::ToolRequest(ToolRequest {
+            id: id.into(),
+            call: Err(error),
+        })
     }
 
-    /// Create a new error ToolResult content
-    pub fn tool_result_error<S1: Into<String>, S2: Into<String>>(
-        tool_use_id: S1,
-        error: S2,
-    ) -> Self {
-        Content::ToolResult(ToolResult::error(tool_use_id, error))
+    /// Create a new ToolResponse content
+    pub fn tool_response<S: Into<String>>(request_id: S, output: Value) -> Self {
+        Content::ToolResponse(ToolResponse::new(request_id, output))
+    }
+
+    /// Create a new ToolResponse content with a successful result
+    pub fn tool_response_success<S: Into<String>>(request_id: S, output: Value) -> Self {
+        Content::ToolResponse(ToolResponse::new(request_id, output))
+    }
+
+    /// Create a new ToolResponse content with an error
+    pub fn tool_response_error<S: Into<String>>(request_id: S, error: AgentError) -> Self {
+        Content::ToolResponse(ToolResponse {
+            request_id: request_id.into(),
+            output: Err(error),
+        })
     }
 
     pub fn summary(&self) -> String {
         match self {
             Content::Text(t) => format!("content:text\n{}", t.text),
-            Content::ToolUse(t) => format!(
-                "content:tool_use:{}\nparameters:{}",
-                t.name,
-                serde_json::to_string(&t.parameters).unwrap_or_default()
-            ),
-            Content::ToolResult(t) => format!(
-                "content:tool_result:error={}\noutput:{}",
-                t.is_error, t.output
-            ),
+            Content::ToolRequest(t) => match &t.call {
+                Ok(call) => format!(
+                    "content:tool_use:{}\nparameters:{}",
+                    call.name,
+                    serde_json::to_string(&call.parameters).unwrap_or_default()
+                ),
+                Err(err) => format!(
+                    "content:tool_use:error\nerror:{}",
+                    err.to_string()
+                )
+            }
+            Content::ToolResponse(t) => match &t.output {
+                Ok(value) => format!(
+                    "content:tool_result\noutput:{}",
+                    serde_json::to_string(&value).unwrap_or("".to_string())
+                ),
+                Err(err) => format!(
+                    "content:tool_result:error\nerror:{}",
+                    err.to_string()
+                )
+            }
         }
     }
 }
