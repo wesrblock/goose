@@ -1,17 +1,14 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use bat::PrettyPrinter;
 use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
 use goose::providers::base::Provider;
+use goose::providers::factory::{ProviderType, get_provider};
 use serde_json::json;
-use std::env;
 
-use goose::providers::base::Usage;
-use goose::providers::configs::DatabricksProviderConfig;
+use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::configs::OpenAiProviderConfig;
-use goose::providers::databricks::DatabricksProvider;
-use goose::providers::openai::OpenAiProvider;
 use goose::providers::types::content::Content;
 use goose::providers::types::message::Message;
 use goose::tool::Tool;
@@ -22,7 +19,7 @@ struct Cli {
     /// Provider option (openai or databricks)
     #[arg(short, long, default_value = "open-ai")]
     #[arg(value_enum)]
-    provider: ProviderVariant,
+    provider: CliProviderVariant,
 
     /// OpenAI API Key (can also be set via OPENAI_API_KEY environment variable)
     #[arg(long)]
@@ -42,7 +39,7 @@ struct Cli {
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
-enum ProviderVariant {
+enum CliProviderVariant {
     OpenAi,
     Databricks,
 }
@@ -51,7 +48,7 @@ enum ProviderVariant {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let provider = get_provider(&cli)?;
+    let provider = create_provider_from_cli(&cli);
 
     // Add word counting tool
     let parameters = json!({
@@ -126,75 +123,22 @@ async fn render(content: &str) {
         .unwrap();
 }
 
-enum ProviderType {
-    OpenAi(OpenAiProvider),
-    Databricks(DatabricksProvider),
-}
 
-impl ProviderType {
-    async fn complete(
-        &self,
-        model: &str,
-        system: &str,
-        messages: &[Message],
-        tools: &[Tool],
-        temperature: Option<f32>,
-        max_tokens: Option<i32>,
-    ) -> Result<(Message, Usage)> {
-        match self {
-            ProviderType::OpenAi(provider) => {
-                provider
-                    .complete(model, system, messages, tools, temperature, max_tokens)
-                    .await
-            }
-            ProviderType::Databricks(provider) => {
-                provider
-                    .complete(model, system, messages, tools, temperature, max_tokens)
-                    .await
-            }
+fn create_provider_from_cli(cli: &Cli) -> Box<dyn Provider + Send + Sync> {
+    match cli.provider {
+        CliProviderVariant::OpenAi => {
+            let openai_config = ProviderConfig::OpenAi(OpenAiProviderConfig {
+                host: "https://api.openai.com".to_string(),
+                api_key: cli.api_key.clone().unwrap_or_else(|| std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set"))
+            });
+            get_provider(ProviderType::OpenAi, openai_config).unwrap()
+        }
+        CliProviderVariant::Databricks => {
+            let databricks_config = ProviderConfig::Databricks(DatabricksProviderConfig {
+                host: cli.databricks_host.clone().unwrap_or_else(|| std::env::var("DATABRICKS_HOST").expect("DATABRICKS_HOST must be set")),
+                token: cli.databricks_token.clone().unwrap_or_else(|| std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")),
+            });
+            get_provider(ProviderType::Databricks, databricks_config).unwrap()
         }
     }
-}
-
-fn get_provider(cli: &Cli) -> Result<ProviderType> {
-    match cli.provider {
-        ProviderVariant::OpenAi => create_openai_provider(cli),
-        ProviderVariant::Databricks => create_databricks_provider(cli),
-    }
-}
-
-fn create_openai_provider(cli: &Cli) -> Result<ProviderType> {
-    let api_key = cli
-        .api_key
-        .clone()
-        .or_else(|| env::var("OPENAI_API_KEY").ok())
-        .context("API key must be provided via --api-key or OPENAI_API_KEY environment variable")?;
-
-    Ok(ProviderType::OpenAi(OpenAiProvider::new(
-        OpenAiProviderConfig {
-            api_key,
-            host: "https://api.openai.com".to_string(),
-        },
-    )?))
-}
-
-fn create_databricks_provider(cli: &Cli) -> Result<ProviderType> {
-    let databricks_host = cli
-        .databricks_host
-        .clone()
-        .or_else(|| env::var("DATABRICKS_HOST").ok())
-        .unwrap_or("https://block-lakehouse-production.cloud.databricks.com".to_string());
-
-    let databricks_token = cli
-        .databricks_token
-        .clone()
-        .or_else(|| env::var("DATABRICKS_TOKEN").ok())
-        .context("Databricks token must be provided via --databricks-token or DATABRICKS_TOKEN environment variable")?;
-
-    Ok(ProviderType::Databricks(DatabricksProvider::new(
-        DatabricksProviderConfig {
-            host: databricks_host,
-            token: databricks_token,
-        },
-    )?))
 }
