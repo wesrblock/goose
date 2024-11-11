@@ -9,8 +9,6 @@
 //     tool::{Tool, ToolCall},
 // };
 
-
-
 // pub struct Agent {
 //     systems: Vec<Box<dyn System>>,
 //     interface_messages: RwLock<Vec<Message>>,

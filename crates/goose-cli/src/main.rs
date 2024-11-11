@@ -4,11 +4,11 @@ use clap::Parser;
 use cliclack::{input, spinner};
 use console::style;
 use goose::providers::base::Provider;
-use goose::providers::factory::{ProviderType, get_provider};
+use goose::providers::factory::{get_provider, ProviderType};
 use serde_json::json;
 
-use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::configs::OpenAiProviderConfig;
+use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::types::content::Content;
 use goose::providers::types::message::Message;
 use goose::tool::Tool;
@@ -123,20 +123,25 @@ async fn render(content: &str) {
         .unwrap();
 }
 
-
 fn create_provider_from_cli(cli: &Cli) -> Box<dyn Provider + Send + Sync> {
     match cli.provider {
         CliProviderVariant::OpenAi => {
             let openai_config = ProviderConfig::OpenAi(OpenAiProviderConfig {
                 host: "https://api.openai.com".to_string(),
-                api_key: cli.api_key.clone().unwrap_or_else(|| std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set"))
+                api_key: cli.api_key.clone().unwrap_or_else(|| {
+                    std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
+                }),
             });
             get_provider(ProviderType::OpenAi, openai_config).unwrap()
         }
         CliProviderVariant::Databricks => {
             let databricks_config = ProviderConfig::Databricks(DatabricksProviderConfig {
-                host: cli.databricks_host.clone().unwrap_or_else(|| std::env::var("DATABRICKS_HOST").expect("DATABRICKS_HOST must be set")),
-                token: cli.databricks_token.clone().unwrap_or_else(|| std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")),
+                host: cli.databricks_host.clone().unwrap_or_else(|| {
+                    std::env::var("DATABRICKS_HOST").expect("DATABRICKS_HOST must be set")
+                }),
+                token: cli.databricks_token.clone().unwrap_or_else(|| {
+                    std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")
+                }),
             });
             get_provider(ProviderType::Databricks, databricks_config).unwrap()
         }

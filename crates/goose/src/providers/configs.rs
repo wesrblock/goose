@@ -4,7 +4,6 @@ pub enum ProviderConfig {
     Databricks(DatabricksProviderConfig),
 }
 
-
 // Define specific config structs for each provider
 pub struct OpenAiProviderConfig {
     pub host: String,
