@@ -1,10 +1,10 @@
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::fs;
 use anyhow::Result;
+use base64::Engine;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::Digest;
-use base64::Engine;
+use std::fs;
+use std::path::PathBuf;
 use url::Url;
 
 #[derive(Debug, Clone)]
@@ -64,8 +64,6 @@ impl TokenCache {
     }
 }
 
-
-
 async fn get_workspace_endpoints(host: &str) -> Result<OidcEndpoints> {
     let host = host.trim_end_matches('/');
     let oidc_url = format!("{}/oidc/.well-known/oauth-authorization-server", host);
@@ -74,7 +72,10 @@ async fn get_workspace_endpoints(host: &str) -> Result<OidcEndpoints> {
     let resp = client.get(&oidc_url).send().await?;
 
     if !resp.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to get OIDC configuration from {}", oidc_url));
+        return Err(anyhow::anyhow!(
+            "Failed to get OIDC configuration from {}",
+            oidc_url
+        ));
     }
 
     let oidc_config: Value = resp.json().await?;
@@ -96,7 +97,6 @@ async fn get_workspace_endpoints(host: &str) -> Result<OidcEndpoints> {
         token_endpoint,
     })
 }
-
 
 struct OAuthClient {
     oidc_endpoints: OidcEndpoints,
@@ -173,9 +173,9 @@ impl Consent {
         }
 
         // Start a local server to receive the redirect
-        use warp::Filter;
         use std::sync::{Arc, Mutex};
         use tokio::sync::oneshot;
+        use warp::Filter;
 
         let (tx, rx) = oneshot::channel();
 
@@ -184,7 +184,9 @@ impl Consent {
 
         let routes = warp::get()
             .and(warp::path::end())
-            .and(warp::query::query::<std::collections::HashMap<String, String>>())
+            .and(warp::query::query::<
+                std::collections::HashMap<String, String>,
+            >())
             .map(move |params: std::collections::HashMap<String, String>| {
                 let code = params.get("code").cloned();
                 let received_state = params.get("state").cloned();
@@ -237,7 +239,10 @@ impl Consent {
 
         if !resp.status().is_success() {
             let err_text = resp.text().await?;
-            return Err(anyhow::anyhow!("Failed to exchange code for token: {}", err_text));
+            return Err(anyhow::anyhow!(
+                "Failed to exchange code for token: {}",
+                err_text
+            ));
         }
 
         let token_response: serde_json::Value = resp.json().await?;
@@ -263,14 +268,11 @@ impl Consent {
 
 pub fn get_oauth_token(host: &str) -> Result<String> {
     tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(async {
-            get_oauth_token_async(host).await
-        })
+        tokio::runtime::Handle::current().block_on(async { get_oauth_token_async(host).await })
     })
 }
 
 pub async fn get_oauth_token_async(host: &str) -> Result<String> {
-
     let client_id = "databricks-cli";
     let redirect_url = "http://localhost:8020";
 
@@ -302,5 +304,4 @@ pub async fn get_oauth_token_async(host: &str) -> Result<String> {
     token_cache.save_token(&token_data)?;
 
     Ok(token_data.access_token)
-
 }
