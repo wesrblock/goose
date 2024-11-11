@@ -1,18 +1,21 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::tool::ToolCall;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::content::{Content, Text, ToolRequest, ToolResponse};
 use super::objectid::create_object_id;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     User,
     Assistant,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Message {
     pub role: Role,
     pub id: String,
@@ -110,6 +113,21 @@ impl Message {
 
     pub fn assistant<S: Into<String>>(text: S) -> Result<Self> {
         Self::new(Role::Assistant, vec![Content::Text(Text::new(text))])
+    }
+
+    pub fn assistant_with_tool_calls(text: Option<String>, tool_calls: Vec<ToolCall>) -> Result<Self> {
+        let mut content = Vec::new();
+        if let Some(text) = text {
+            content.push(Content::Text(Text::new(text)));
+        }
+        for tool_call in tool_calls {
+            content.push(Content::tool_request(&tool_call.name, tool_call.parameters));
+        }
+        Self::new(Role::Assistant, content)
+    }
+
+    pub fn tool_result(id: String, output: Value) -> Result<Self> {
+        Self::new(Role::User, vec![Content::tool_response(&id, output)])
     }
 
     pub fn summary(&self) -> String {

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::types::message::Message;
 use crate::tool::Tool;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Usage {
     pub input_tokens: Option<i32>,
     pub output_tokens: Option<i32>,
@@ -25,7 +25,10 @@ impl Usage {
     }
 }
 
+use async_trait::async_trait;
+
 /// Base trait for AI providers (OpenAI, Anthropic, etc)
+#[async_trait]
 pub trait Provider: Send + Sync {
     /// Create a provider instance from environment variables
     fn from_env() -> Result<Self>
@@ -33,7 +36,7 @@ pub trait Provider: Send + Sync {
         Self: Sized;
 
     /// Generate the next message using the specified model and other parameters
-    fn complete(
+    async fn complete(
         &self,
         model: &str,
         system: &str,
@@ -41,7 +44,7 @@ pub trait Provider: Send + Sync {
         tools: &[Tool],
         temperature: Option<f32>,
         max_tokens: Option<i32>,
-    ) -> impl std::future::Future<Output = Result<(Message, Usage)>> + Send;
+    ) -> Result<(Message, Usage)>;
 }
 
 #[cfg(test)]

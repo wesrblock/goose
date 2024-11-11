@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use reqwest::Client; // we are using blocking API here to make sync calls
 use reqwest::StatusCode;
 use serde_json::{json, Value};
@@ -79,6 +80,7 @@ impl OpenAiProvider {
     }
 }
 
+#[async_trait]
 impl Provider for OpenAiProvider {
     fn from_env() -> Result<Self> {
         let config = OpenAiProviderConfig::from_env()?;

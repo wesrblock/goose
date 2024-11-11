@@ -5,7 +5,7 @@ use crate::tool::ToolCall;
 use crate::errors::{AgentResult, AgentError};
 
 // Text content
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Text {
     pub text: String,
 }
@@ -18,7 +18,7 @@ impl Text {
 }
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// A request for a tool call from the agent
 pub struct ToolRequest {
     /// A unique identifier for this tool request
@@ -37,7 +37,7 @@ impl ToolRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolResponse {
     /// The unique identifier for the original tool request
     pub request_id: String,
@@ -57,7 +57,7 @@ impl ToolResponse {
 
 
 // Enum to handle all content types
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum Content {
     Text(Text),

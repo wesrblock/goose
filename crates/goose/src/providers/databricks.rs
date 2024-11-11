@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -82,6 +83,7 @@ impl DatabricksProvider {
     }
 }
 
+#[async_trait]
 impl Provider for DatabricksProvider {
     fn from_env() -> Result<Self> {
         let config = DatabricksProviderConfig::from_env()?;
