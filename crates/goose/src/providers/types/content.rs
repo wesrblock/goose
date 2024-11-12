@@ -114,7 +114,7 @@ impl Content {
 
     pub fn summary(&self) -> String {
         match self {
-            Content::Text(t) => format!("\"{}\"", t.text.replace('\n', " ")),
+            Content::Text(t) => t.text.clone(),
             Content::ToolRequest(t) => match &t.call {
                 Ok(call) => format!(
                     "content:tool_use:{}\nparameters:{}",

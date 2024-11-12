@@ -220,7 +220,13 @@ async fn chat_handler(
                                     }
                                     _ => {
                                         let text = content.summary();
-                                        let _ = tx.send(format!("0:{}\n", text)).await;
+                                        // Split text by newlines and send each line separately
+                                        for line in text.lines() {
+                                            if let Err(e) = tx.send(format!("0:\"{}\"\n", line)).await {
+                                                tracing::error!("Error sending line through channel: {}", e);
+                                                break;
+                                            }
+                                        }
                                     }
                                 }
                             }
