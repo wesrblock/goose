@@ -24,10 +24,6 @@ impl MockProvider {
 
 #[async_trait]
 impl Provider for MockProvider {
-    fn from_env() -> Result<Self> {
-        Ok(Self::new(Vec::new()))
-    }
-
     async fn complete(
         &self,
         _model: &str,

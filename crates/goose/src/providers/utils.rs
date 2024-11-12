@@ -70,7 +70,7 @@ pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
                             }
                             output.push(json!({
                                 "role": "tool",
-                                "content": value,
+                                "content": value.to_string(),
                                 "tool_call_id": tool_response.request_id
                             }));
                         }
@@ -308,7 +308,7 @@ mod tests {
         assert_eq!(spec[2]["role"], "assistant");
         assert!(spec[2]["tool_calls"].is_array());
         assert_eq!(spec[3]["role"], "tool");
-        assert_eq!(spec[3]["content"], "Result");
+        assert_eq!(spec[3]["content"], "\"Result\"");
         assert_eq!(spec[3]["tool_call_id"], spec[2]["tool_calls"][0]["id"]);
 
         Ok(())

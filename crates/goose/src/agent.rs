@@ -37,7 +37,7 @@ impl Agent {
         for system in &self.systems {
             for tool in system.tools() {
                 tools.push(Tool::new(
-                    &format!("{}.{}", system.name(), tool.name),
+                    &format!("{}__{}", system.name(), tool.name),
                     &tool.description,
                     tool.parameters.clone(),
                 ));
@@ -48,7 +48,7 @@ impl Agent {
 
     /// Find the appropriate system for a tool call based on the prefixed name
     fn get_system_for_tool(&self, prefixed_name: &str) -> Option<&Box<dyn System>> {
-        let parts: Vec<&str> = prefixed_name.split('.').collect();
+        let parts: Vec<&str> = prefixed_name.split("__").collect();
         if parts.len() != 2 {
             return None;
         }
@@ -61,7 +61,7 @@ impl Agent {
         let system = self.get_system_for_tool(&tool_call.name)
             .ok_or_else(|| AgentError::ToolNotFound(tool_call.name.clone()))?;
 
-        let tool_name = tool_call.name.split('.').nth(1)
+        let tool_name = tool_call.name.split("__").nth(1)
             .ok_or_else(|| AgentError::InvalidToolName(tool_call.name.clone()))?;
         let system_tool_call = ToolCall::new(tool_name, tool_call.parameters);
         

@@ -6,8 +6,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 use super::base::{Provider, Usage};
-use super::configs::base::ProviderConfig;
-use super::configs::openai::OpenAiProviderConfig;
+use super::configs::OpenAiProviderConfig;
 use super::types::message::Message;
 use super::utils::{
         check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
@@ -75,18 +74,13 @@ impl OpenAiProvider {
                 // Implement retry logic here if needed
                 Err(anyhow!("Server error: {}", status))
             }
-            _ => Err(anyhow!("Request failed: {}", response.status())),
+            _ => Err(anyhow!("Request failed: {}\nPayload: {}", response.status(), payload)),
         }
     }
 }
 
 #[async_trait]
 impl Provider for OpenAiProvider {
-    fn from_env() -> Result<Self> {
-        let config = OpenAiProviderConfig::from_env()?;
-        Self::new(config)
-    }
-
     async fn complete(
         &self,
         model: &str,
@@ -140,7 +134,7 @@ impl Provider for OpenAiProvider {
                 .insert("max_tokens".to_string(), json!(tokens));
         }
 
-        // dbg!(&payload);
+        //println!("{}", serde_json::to_string_pretty(&payload).unwrap());
 
         // Make request
         let response = self.post(payload).await?;

@@ -5,8 +5,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 use super::base::{Provider, Usage};
-use super::configs::base::ProviderConfig;
-use super::configs::databricks::DatabricksProviderConfig;
+use super::configs::DatabricksProviderConfig;
 use super::types::message::Message;
 use super:: utils::{
         check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
@@ -85,11 +84,6 @@ impl DatabricksProvider {
 
 #[async_trait]
 impl Provider for DatabricksProvider {
-    fn from_env() -> Result<Self> {
-        let config = DatabricksProviderConfig::from_env()?;
-        Self::new(config)
-    }
-
     async fn complete(
         &self,
         model: &str,

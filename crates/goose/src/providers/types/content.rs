@@ -42,6 +42,8 @@ pub struct ToolResponse {
     /// The unique identifier for the original tool request
     pub request_id: String,
     /// The output of the tool call, which is a Result because the call may have errored
+    // TODO should this be a Value or a string? the llms only accept strings today, but should
+    // the decision to convert it be pushed into the provider?
     pub output: AgentResult<Value>,
 }
 

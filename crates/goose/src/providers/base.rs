@@ -30,11 +30,6 @@ use async_trait::async_trait;
 /// Base trait for AI providers (OpenAI, Anthropic, etc)
 #[async_trait]
 pub trait Provider: Send + Sync {
-    /// Create a provider instance from environment variables
-    fn from_env() -> Result<Self>
-    where
-        Self: Sized;
-
     /// Generate the next message using the specified model and other parameters
     async fn complete(
         &self,
