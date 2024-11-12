@@ -79,6 +79,7 @@ impl IntoResponse for SseResponse {
             .header("Content-Type", "text/event-stream")
             .header("Cache-Control", "no-cache")
             .header("Connection", "keep-alive")
+            .header("x-vercel-ai-data-stream", "v1")
             .body(body)
             .unwrap()
     }
