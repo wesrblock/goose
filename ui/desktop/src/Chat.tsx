@@ -102,7 +102,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
               <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
                 <div className="flex-1 relative">
                   <Input
-                    placeholder="Ask goose to..."
+                    placeholder="What's next?"
                     value={input}
                     onChange={handleInputChange}
                     className="pr-10"

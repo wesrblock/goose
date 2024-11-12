@@ -50,6 +50,7 @@ const startGoosed = () => {
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     frame: false, // This makes the window chromeless
+    opacity: 0.96,
     width: 1024,
     height: 768,
     webPreferences: {
