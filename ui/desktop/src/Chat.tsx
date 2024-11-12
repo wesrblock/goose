@@ -23,7 +23,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   const chatIndex = chats.findIndex((c: any) => c.id === selectedChatId)
 
   const { messages, input, handleInputChange, handleSubmit } = useChat({
-    api: 'http://127.0.0.1:3000/chat',
+    api: 'http://127.0.0.1:3000/reply',
     initialMessages: chat.messages,
     id: chat.id.toString(),
   })
