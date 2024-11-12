@@ -1,11 +1,51 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
-import { setupAgent } from './agent';
-
+import { spawn } from 'child_process';
 import started from "electron-squirrel-startup";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
+
+// Start the goosed binary
+const startGoosed = () => {
+  // In development, the binary is in src/bin
+  // In production, it will be in the resources/bin directory
+  const isDev = process.env.NODE_ENV === 'development';
+  let goosedPath;
+  
+  if (isDev) {
+    // In development, use the absolute path from the project root
+    goosedPath = path.join(process.cwd(), 'src', 'bin', process.platform === 'win32' ? 'goosed.exe' : 'goosed');
+  } else {
+    // In production, use the path relative to the app resources
+    goosedPath = path.join(process.resourcesPath, 'bin', process.platform === 'win32' ? 'goosed.exe' : 'goosed');
+  }
+
+  console.log(`Starting goosed from: ${goosedPath}`);
+  
+  const goosedProcess = spawn(goosedPath);
+
+  goosedProcess.stdout.on('data', (data) => {
+    console.log(`goosed stdout: ${data}`);
+  });
+
+  goosedProcess.stderr.on('data', (data) => {
+    console.error(`goosed stderr: ${data}`);
+  });
+
+  goosedProcess.on('close', (code) => {
+    console.log(`goosed process exited with code ${code}`);
+  });
+
+  goosedProcess.on('error', (err) => {
+    console.error('Failed to start goosed:', err);
+  });
+
+  // Ensure goosed is terminated when the app quits
+  app.on('will-quit', () => {
+    goosedProcess.kill();
+  });
+};
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
@@ -32,12 +72,10 @@ const createWindow = () => {
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  startGoosed();
   createWindow();
 
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -45,18 +83,9 @@ app.whenReady().then(() => {
   });
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// Quit when all windows are closed, except on macOS.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
-
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.
-
-// Just while we're testing, before we have the rust tool
-setupAgent();

@@ -8,7 +8,9 @@ export OPENAI_API_KEY=...
 npm start
 ```
 
-WIP: 
+This will run `goosed` from src/bin (currently just copied into place from goose core) listening automatically.
+
+testing the rust server from source: 
 
 See test.sh for curl on how to use goose daemon - which is from rust version: 
 
