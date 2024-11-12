@@ -207,7 +207,7 @@ class Session:
         time_end = datetime.now()
         self._log_cost(start_time=time_start, end_time=time_end)
 
-    @observe_wrapper(trace_id=lambda instance: instance.name)
+    @observe_wrapper(session_id=lambda instance: instance.name)
     def reply(self) -> None:
         """Reply to the last user message, calling tools as needed"""
         # These are the *raw* messages, before the moderator rewrites things

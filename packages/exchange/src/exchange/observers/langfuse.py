@@ -17,7 +17,7 @@ import os
 import sys
 from functools import cache, wraps
 from io import StringIO
-from typing import Callable, Optional
+from typing import Callable
 
 from langfuse.decorators import langfuse_context
 
@@ -67,10 +67,10 @@ class LangfuseObserver(Observer):
         langfuse_context.configure(enabled=False)
         self.tracing = False
 
-    def trace_id_wrapper(self, func: Callable, trace_id) -> Callable:
+    def session_id_wrapper(self, func: Callable, session_id) -> Callable:
         @wraps(func)  # This will preserve the metadata of 'func'
         def wrapper(*args, **kwargs):
-            langfuse_context.update_current_trace(trace_id)
+            langfuse_context.update_current_trace(session_id=session_id)
             return func(*args, **kwargs)
         return wrapper
 
@@ -81,10 +81,10 @@ class LangfuseObserver(Observer):
                 @wraps(fn)
                 def wrapped_fn(*fargs, **fkwargs) -> Callable:  # noqa: ANN002, ANN003
                     # group all traces under the same session
-                    if "trace_id" in kwargs:
-                        trace_id_function = kwargs.pop("trace_id")
-                        trace_id_value = trace_id_function(fargs[0])
-                        modified_fn = self.trace_id_wrapper(fn, trace_id_value)
+                    if "session_id" in kwargs:
+                        session_id_function = kwargs.pop("session_id")
+                        session_id_value = session_id_function(fargs[0])
+                        modified_fn = self.session_id_wrapper(fn, session_id_value)
                         return langfuse_context.observe(*args, **kwargs)(modified_fn)(*fargs, **fkwargs)
                     else:
                         return langfuse_context.observe(*args, **kwargs)(fn)(*fargs, **fkwargs)
