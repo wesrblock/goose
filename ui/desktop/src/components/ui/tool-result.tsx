@@ -40,10 +40,10 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
   if (!result) return null
 
   let parsedResult: any = null
-  console.log("RESULT", result)
+  console.log("RESULT", result.result)
   if (result.result) {
     try {
-      parsedResult = result.Ok.result
+      parsedResult = result.result
     } catch (error) {
       console.log("not parsing", error)
     }

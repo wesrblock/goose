@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { useChat } from 'ai/react'
 import { useNavigate } from 'react-router-dom'
+import { getApiUrl } from './config'
 import ReactMarkdown from 'react-markdown'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, X, Send, Share } from 'lucide-react'
@@ -17,7 +18,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   const chatIndex = chats.findIndex((c: any) => c.id === selectedChatId)
 
   const { messages, input, handleInputChange, handleSubmit } = useChat({
-    api: 'http://127.0.0.1:3000/reply',
+    api: getApiUrl("/reply"),
     initialMessages: chat.messages,
     id: chat.id.toString(),
   })
@@ -83,7 +84,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
               {messages.map((message) => (
                 <div key={message.id} className={`p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'}`}>
                   <div className="font-semibold">{message.role === 'user' ? 'You' : 'Goose 🪿'}</div>
-                  {message.toolInvocations == null ? (
+                  {true || message.toolInvocations == null ? (
                   <ReactMarkdown
                     components={{
                       code({ node, className, children, ...props }) {

@@ -74,7 +74,15 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 app.whenReady().then(() => {
-  startGoosed();
+  // Get the server startup configuration
+  const shouldStartServer = (import.meta.env.VITE_START_EMBEDDED_SERVER || 'yes').toLowerCase() === 'yes';
+  
+  if (shouldStartServer) {
+    console.log('Starting embedded goosed server');
+    startGoosed();
+  } else {
+    console.log('Skipping embedded server startup (disabled by configuration)');
+  }
   createWindow();
 
   app.on('activate', () => {
