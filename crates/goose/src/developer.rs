@@ -30,6 +30,12 @@ pub struct DeveloperSystem {
     file_history: Mutex<HashMap<PathBuf, Vec<String>>>, // Moved file_history here
 }
 
+impl Default for DeveloperSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeveloperSystem {
     pub fn new() -> Self {
         // TODO i suggest we make working_dir required, we're seeing abs paths are more clear
@@ -496,7 +502,7 @@ impl DeveloperSystem {
         };
         history
             .entry(path.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(content);
         Ok(())
     }

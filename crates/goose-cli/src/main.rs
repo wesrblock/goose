@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use anyhow::Result;
 use bat::PrettyPrinter;
 use clap::Parser;
@@ -11,8 +10,8 @@ use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
-use goose::providers::types::message::Message;
 use goose::providers::factory;
+use goose::providers::types::message::Message;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -37,6 +36,14 @@ struct Cli {
     /// Model to use
     #[arg(short, long, default_value = "gpt-4o")]
     model: String,
+
+    /// Temperature (0.0 to 1.0)
+    #[arg(short, long)]
+    temperature: Option<f32>,
+
+    /// Maximum tokens to generate
+    #[arg(long)]
+    max_tokens: Option<i32>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -62,7 +69,7 @@ async fn main() -> Result<()> {
 
     let system = Box::new(DeveloperSystem::new());
     let provider = factory::get_provider(provider_type, create_provider_config(&cli)).unwrap();
-    let mut agent = Agent::new(provider, cli.model.clone());
+    let mut agent = Agent::new(provider);
     agent.add_system(system);
     println!("Connected the developer system");
 
@@ -116,6 +123,9 @@ fn create_provider_config(cli: &Cli) -> ProviderConfig {
             api_key: cli.api_key.clone().unwrap_or_else(|| {
                 std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
             }),
+            model: cli.model.clone(),
+            temperature: cli.temperature,
+            max_tokens: cli.max_tokens,
         }),
         CliProviderVariant::Databricks => ProviderConfig::Databricks(DatabricksProviderConfig {
             host: cli.databricks_host.clone().unwrap_or_else(|| {
@@ -124,6 +134,9 @@ fn create_provider_config(cli: &Cli) -> ProviderConfig {
             token: cli.databricks_token.clone().unwrap_or_else(|| {
                 std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")
             }),
+            model: cli.model.clone(),
+            temperature: cli.temperature,
+            max_tokens: cli.max_tokens,
         }),
     }
 }

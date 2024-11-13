@@ -7,8 +7,9 @@ use std::time::Duration;
 use super::base::{Provider, Usage};
 use super::configs::DatabricksProviderConfig;
 use super::types::message::Message;
-use super:: utils::{
-        check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
+use super::utils::{
+    check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
+    tools_to_openai_spec,
 };
 use crate::tool::Tool;
 
@@ -58,11 +59,11 @@ impl DatabricksProvider {
         Ok(Usage::new(input_tokens, output_tokens, total_tokens))
     }
 
-    async fn post(&self, model: &str, payload: Value) -> Result<Value> {
+    async fn post(&self, payload: Value) -> Result<Value> {
         let url = format!(
             "{}/serving-endpoints/{}/invocations",
             self.config.host.trim_end_matches('/'),
-            model
+            self.config.model
         );
 
         let response = self.client.post(&url).json(&payload).send().await?;
@@ -86,12 +87,9 @@ impl DatabricksProvider {
 impl Provider for DatabricksProvider {
     async fn complete(
         &self,
-        model: &str,
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-        temperature: Option<f32>,
-        max_tokens: Option<i32>,
     ) -> Result<(Message, Usage)> {
         // Prepare messages and tools
         let messages_spec = messages_to_openai_spec(messages);
@@ -111,10 +109,10 @@ impl Provider for DatabricksProvider {
         if !tools_spec.is_empty() {
             payload["tools"] = json!(tools_spec);
         }
-        if let Some(temp) = temperature {
+        if let Some(temp) = self.config.temperature {
             payload["temperature"] = json!(temp);
         }
-        if let Some(tokens) = max_tokens {
+        if let Some(tokens) = self.config.max_tokens {
             payload["max_tokens"] = json!(tokens);
         }
 
@@ -130,7 +128,7 @@ impl Provider for DatabricksProvider {
         );
 
         // Make request
-        let response = self.post(model, payload).await?;
+        let response = self.post(payload).await?;
 
         // Handle errors
         if let Some(error) = response.get("error") {
@@ -201,22 +199,19 @@ mod tests {
         let config = DatabricksProviderConfig {
             host: mock_server.uri(),
             token: "test_token".to_string(),
+            model: "my-databricks-model".to_string(),
+            temperature: None,
+            max_tokens: None,
         };
 
         let provider = DatabricksProvider::new(config)?;
 
         // Prepare input
-        let model = "my-databricks-model";
         let messages = vec![Message::user("Hello")?];
         let tools = vec![]; // Empty tools list
 
         // Call the complete method
-        let (reply_message, reply_usage) = provider
-            .complete(
-                model, system, &messages, &tools, None, // temperature
-                None, // max_tokens
-            )
-            .await?;
+        let (reply_message, reply_usage) = provider.complete(system, &messages, &tools).await?;
 
         // Assert the response
         assert_eq!(reply_message.text(), "Hello!");

@@ -1,29 +1,27 @@
 use anyhow::Result;
-use serde_json::{Value, json};
-use futures::stream::BoxStream;
 use async_stream;
+use futures::stream::BoxStream;
+use serde_json::{json, Value};
 
+use crate::errors::{AgentError, AgentResult};
 use crate::providers::base::Provider;
-use crate::providers::types::message::{Message, Role};
 use crate::providers::types::content::Content;
+use crate::providers::types::message::{Message, Role};
 use crate::systems::System;
 use crate::tool::{Tool, ToolCall};
-use crate::errors::{AgentError, AgentResult};
 
 /// Agent integrates a foundational LLM with the systems it needs to pilot
 pub struct Agent {
     systems: Vec<Box<dyn System>>,
     provider: Box<dyn Provider>,
-    model: String,
 }
 
 impl Agent {
-    /// Create a new Agent with the specified provider and model
-    pub fn new(provider: Box<dyn Provider>, model: String) -> Self {
+    /// Create a new Agent with the specified provider
+    pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
             systems: Vec::new(),
             provider,
-            model,
         }
     }
 
@@ -59,13 +57,17 @@ impl Agent {
 
     /// Dispatch a single tool call to the appropriate system
     async fn dispatch_tool_call(&self, tool_call: ToolCall) -> AgentResult<Value> {
-        let system = self.get_system_for_tool(&tool_call.name)
+        let system = self
+            .get_system_for_tool(&tool_call.name)
             .ok_or_else(|| AgentError::ToolNotFound(tool_call.name.clone()))?;
 
-        let tool_name = tool_call.name.split("__").nth(1)
+        let tool_name = tool_call
+            .name
+            .split("__")
+            .nth(1)
             .ok_or_else(|| AgentError::InvalidToolName(tool_call.name.clone()))?;
         let system_tool_call = ToolCall::new(tool_name, tool_call.parameters);
-        
+
         system.call(system_tool_call).await
     }
 
@@ -74,22 +76,19 @@ impl Agent {
     pub fn reply(&self, messages: &[Message]) -> BoxStream<'_, Result<Message>> {
         let mut messages = messages.to_vec();
         let tools = self.get_prefixed_tools();
-        
+
         Box::pin(async_stream::try_stream! {
             loop {
                 // Get completion from provider
                 let (response, _) = self.provider.complete(
-                    &self.model,
                     "You are an AI agent called Goose. You use tools of connected systems to solve problems.",
                     &messages,
                     &tools,
-                    None,
-                    None,
                 ).await?;
 
                 // Add the assistant's response to the conversation history
                 messages.push(response.clone());
-                
+
                 // Yield the assistant's response
                 yield response.clone();
 
@@ -123,16 +122,15 @@ impl Agent {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::providers::mock::MockProvider;
     use crate::providers::types::content::Content;
     use async_trait::async_trait;
+    use futures::StreamExt;
     use serde_json::json;
     use std::collections::HashMap;
-    use futures::StreamExt;
 
     // Mock system for testing
     struct MockSystem {
@@ -185,19 +183,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_response() -> Result<()> {
-        let response = Message::new(
-            Role::Assistant,
-            vec![Content::text("Hello!")],
-        )?;
+        let response = Message::new(Role::Assistant, vec![Content::text("Hello!")])?;
         let provider = MockProvider::new(vec![response.clone()]);
-        let agent = Agent::new(Box::new(provider), "test-model".to_string());
+        let agent = Agent::new(Box::new(provider));
 
-        let initial_message = Message::new(
-            Role::User,
-            vec![Content::text("Hi")],
-        )?;
+        let initial_message = Message::new(Role::User, vec![Content::text("Hi")])?;
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent.reply(&initial_messages)
+        let messages: Vec<Message> = agent
+            .reply(&initial_messages)
             .collect::<Vec<Result<Message>>>()
             .await
             .into_iter()
@@ -210,31 +203,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_call() -> Result<()> {
-        let mut agent = Agent::new(
-            Box::new(MockProvider::new(vec![
-                Message::new(
-                    Role::Assistant,
-                    vec![Content::tool_request(
-                        "test__echo",
-                        json!({"message": "test"}),
-                    )],
-                )?,
-                Message::new(
-                    Role::Assistant,
-                    vec![Content::text("Done!")],
-                )?,
-            ])),
-            "test-model".to_string(),
-        );
+        let mut agent = Agent::new(Box::new(MockProvider::new(vec![
+            Message::new(
+                Role::Assistant,
+                vec![Content::tool_request(
+                    "test__echo",
+                    json!({"message": "test"}),
+                )],
+            )?,
+            Message::new(Role::Assistant, vec![Content::text("Done!")])?,
+        ])));
 
         agent.add_system(Box::new(MockSystem::new("test")));
 
-        let initial_message = Message::new(
-            Role::User,
-            vec![Content::text("Echo test")],
-        )?;
+        let initial_message = Message::new(Role::User, vec![Content::text("Echo test")])?;
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent.reply(&initial_messages)
+        let messages: Vec<Message> = agent
+            .reply(&initial_messages)
             .collect::<Vec<Result<Message>>>()
             .await
             .into_iter()
@@ -249,31 +234,20 @@ mod tests {
 
     #[tokio::test]
     async fn test_invalid_tool() -> Result<()> {
-        let mut agent = Agent::new(
-            Box::new(MockProvider::new(vec![
-                Message::new(
-                    Role::Assistant,
-                    vec![Content::tool_request(
-                        "invalid.tool",
-                        json!({}),
-                    )],
-                )?,
-                Message::new(
-                    Role::Assistant,
-                    vec![Content::text("Error occurred")],
-                )?,
-            ])),
-            "test-model".to_string(),
-        );
+        let mut agent = Agent::new(Box::new(MockProvider::new(vec![
+            Message::new(
+                Role::Assistant,
+                vec![Content::tool_request("invalid.tool", json!({}))],
+            )?,
+            Message::new(Role::Assistant, vec![Content::text("Error occurred")])?,
+        ])));
 
         agent.add_system(Box::new(MockSystem::new("test")));
 
-        let initial_message = Message::new(
-            Role::User,
-            vec![Content::text("Invalid tool")],
-        )?;
+        let initial_message = Message::new(Role::User, vec![Content::text("Invalid tool")])?;
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent.reply(&initial_messages)
+        let messages: Vec<Message> = agent
+            .reply(&initial_messages)
             .collect::<Vec<Result<Message>>>()
             .await
             .into_iter()
@@ -288,37 +262,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_tool_calls() -> Result<()> {
-        let mut agent = Agent::new(
-            Box::new(MockProvider::new(vec![
-                Message::new(
-                    Role::Assistant,
-                    vec![
-                        Content::tool_request(
-                            "test__echo",
-                            json!({"message": "first"}),
-                        ),
-                        Content::tool_request(
-                            "test__echo",
-                            json!({"message": "second"}),
-                        ),
-                    ],
-                )?,
-                Message::new(
-                    Role::Assistant,
-                    vec![Content::text("All done!")],
-                )?,
-            ])),
-            "test-model".to_string(),
-        );
+        let mut agent = Agent::new(Box::new(MockProvider::new(vec![
+            Message::new(
+                Role::Assistant,
+                vec![
+                    Content::tool_request("test__echo", json!({"message": "first"})),
+                    Content::tool_request("test__echo", json!({"message": "second"})),
+                ],
+            )?,
+            Message::new(Role::Assistant, vec![Content::text("All done!")])?,
+        ])));
 
         agent.add_system(Box::new(MockSystem::new("test")));
 
-        let initial_message = Message::new(
-            Role::User,
-            vec![Content::text("Multiple calls")],
-        )?;
+        let initial_message = Message::new(Role::User, vec![Content::text("Multiple calls")])?;
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent.reply(&initial_messages)
+        let messages: Vec<Message> = agent
+            .reply(&initial_messages)
             .collect::<Vec<Result<Message>>>()
             .await
             .into_iter()
@@ -333,47 +293,45 @@ mod tests {
 
     #[tokio::test]
     async fn test_conversation_flow() -> Result<()> {
-        let mut agent = Agent::new(
-            Box::new(MockProvider::new(vec![
-                // First interaction: tool request
-                Message::new(
-                    Role::Assistant,
-                    vec![Content::tool_request(
-                        "test__echo",
-                        json!({"message": "first"}),
-                    )],
-                )?,
-                // Second interaction: final response
-                Message::new(
-                    Role::Assistant,
-                    vec![Content::text("Done!")],
-                )?,
-            ])),
-            "test-model".to_string(),
-        );
+        let mut agent = Agent::new(Box::new(MockProvider::new(vec![
+            // First interaction: tool request
+            Message::new(
+                Role::Assistant,
+                vec![Content::tool_request(
+                    "test__echo",
+                    json!({"message": "first"}),
+                )],
+            )?,
+            // Second interaction: final response
+            Message::new(Role::Assistant, vec![Content::text("Done!")])?,
+        ])));
 
         agent.add_system(Box::new(MockSystem::new("test")));
 
-        let initial_message = Message::new(
-            Role::User,
-            vec![Content::text("Test conversation")],
-        )?;
+        let initial_message = Message::new(Role::User, vec![Content::text("Test conversation")])?;
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent.reply(&initial_messages)
+        let messages: Vec<Message> = agent
+            .reply(&initial_messages)
             .collect::<Vec<Result<Message>>>()
             .await
             .into_iter()
             .collect::<Result<Vec<Message>>>()?;
 
         assert_eq!(messages.len(), 3);
-        
+
         // First message should be the tool request
         assert!(messages[0].has_tool_request());
         let tool_requests: Vec<_> = messages[0].tool_request().into_iter().collect();
         assert_eq!(tool_requests[0].call.as_ref().unwrap().name, "test__echo");
-        
+
         // Second message should be the tool response
-        assert_eq!(messages[1].content[0], Content::tool_response_success(tool_requests[0].id.clone(), json!({"message": "first"})));
+        assert_eq!(
+            messages[1].content[0],
+            Content::tool_response_success(
+                tool_requests[0].id.clone(),
+                json!({"message": "first"})
+            )
+        );
 
         // Third message should be the final response
         assert_eq!(messages[2].content[0], Content::text("Done!"));
