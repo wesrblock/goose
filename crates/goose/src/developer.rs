@@ -30,7 +30,7 @@ impl DeveloperSystem {
             At least one of the parameters must be provided.",
             json!({
                 "type": "object",
-                "required": ["working_dir"],
+                "required": [],
                 "properties": {
                     "command": {
                         "type": "string",
@@ -546,7 +546,7 @@ mod tests {
     async fn test_bash_missing_parameters() {
         let system = get_system().await;
 
-        let tool_call = ToolCall::new("bash", json!({}));
+        let tool_call = ToolCall::new("bash", json!({"working_dir": "."}));
         let error = system.call(tool_call).await.unwrap_err();
         assert!(matches!(error, AgentError::InvalidParameters(_)));
     }
