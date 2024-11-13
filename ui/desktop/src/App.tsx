@@ -10,7 +10,7 @@ export interface Chat {
 
 export default function App() {
   const initialChats: Chat[] = [
-    { id: 1, title: 'Chat #1', messages: [] },
+    { id: 1, title: 'Chat 1', messages: [] },
   ]
 
   const [chats, setChats] = useState(initialChats)
