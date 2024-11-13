@@ -14,59 +14,27 @@ import ToolResult from './components/ui/tool-result'
 import ToolCall from './components/ui/tool-call'
 
 export default function Chat({ chats, setChats, selectedChatId, setSelectedChatId }) {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
+  const chat = chats.find((c) => c.id === selectedChatId);
 
-  // Find the currently selected chat, or create a placeholder if not found
-  const chat = chats.find((c) => c.id === selectedChatId) || {
-    id: -1,
-    title: 'New Chat',
-    messages: [],
-  };
-
-  // Initialize the useChat hook with the selected chat's data
   const { messages, input, handleInputChange, handleSubmit } = useChat({
-    api: getApiUrl('/reply'),
-    initialMessages: chat.messages,
-    id: chat.id.toString(),
-  });
+    api: getApiUrl("/reply"),
+    initialMessages: chat.messages
+  })
 
-  // Update the chats array whenever messages in the selected chat change
+  // Combine messages in the currently rendered chat with global chat state
   useEffect(() => {
-    if (chat.id !== -1) {
-      const updatedChats = chats.map((c) =>
-        c.id === chat.id ? { ...c, messages } : c
-      );
-      setChats(updatedChats);
-    }
-  }, [messages, chat.id, chats, setChats]);
+    const updatedChats = [...chats]
+    updatedChats.find((c) => c.id === selectedChatId).messages = messages
+    setChats(updatedChats)
+  }, [messages, selectedChatId])
 
-  // Navigate to a chat by ID and set it as the selected chat
-  const navigateChat = (newChatId: number) => {
-    setSelectedChatId(newChatId);
-    navigate(`/chat/${newChatId}`);
-  };
+  const navigateChat = (chatId) => {
+    setSelectedChatId(chatId)
+    navigate(`/chat/${chatId}`)
+  }
 
-  // Handle sending a message and optionally create a new chat
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (chat.id === -1) {
-      // Create a new chat if the current one is a placeholder
-      const newChatId = chats.length + 1;
-      const newChat = {
-        id: newChatId,
-        title: `Chat ${newChatId}`,
-        messages: [],
-      };
-      setChats([...chats, newChat]);
-      navigateChat(newChatId);
-    } else {
-      // Otherwise, just send the message
-      handleSubmit(e);
-    }
-  };
-
-  // Add a new chat and navigate to it
-  const addNewChat = () => {
+  const addChat = () => {
     const newChatId = chats.length + 1;
     const newChat = {
       id: newChatId,
@@ -77,9 +45,14 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
     navigateChat(newChatId);
   };
 
+  const removeChat = (chatId: number) => {
+    const updatedChats = chats.filter((chat: any) => chat.id !== chatId);
+    setChats(updatedChats);
+    navigateChat(1);
+  };
+
   return (
     <div className="flex flex-col h-full">
-
      <div className="flex items-center bg-gray-200 p-1 rounded-t-lg overflow-x-auto">
         {chats.map(chat => (
           <div
@@ -109,7 +82,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
         ))}
         <button
           className="flex items-center justify-center w-8 h-8 rounded-full bg-transparent hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          onClick={addNewChat}
+          onClick={addChat}
           aria-label="New chat"
         >
           <Plus className="w-5 h-5 text-gray-700" />
@@ -182,7 +155,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
       </ScrollArea>
 
       <div className="p-4 border-t">
-        <form onSubmit={handleSendMessage} className="relative">
+        <form onSubmit={handleSubmit} className="relative">
           <Input
             placeholder="What next?"
             value={input}

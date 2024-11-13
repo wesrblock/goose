@@ -21,7 +21,7 @@ export default function App() {
       <Routes>
         <Route
           path="/chat/:id"
-          element={<Chat chats={chats} setChats={setChats} selectedChatId={selectedChatId} setSelectedChatId={setSelectedChatId} />}
+          element={<Chat key={selectedChatId} chats={chats} setChats={setChats} selectedChatId={selectedChatId} setSelectedChatId={setSelectedChatId} />}
         />
         <Route path="*" element={<Navigate to="/chat/1" replace />} />
       </Routes>
