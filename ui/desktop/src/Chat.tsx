@@ -3,189 +3,202 @@ import { useChat } from 'ai/react'
 import { useNavigate } from 'react-router-dom'
 import { getApiUrl } from './config'
 import ReactMarkdown from 'react-markdown'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, X, Send, Share } from 'lucide-react'
-import { Card } from './components/ui/card'
-import { Input } from './components/ui/input'
+import { X, Plus, MessageSquare } from 'lucide-react'
+import { Send, FileText } from 'lucide-react'
+import { Avatar } from "./components/ui/avatar"
 import { Button } from "./components/ui/button"
+import { Card } from "./components/ui/card"
+import { Input } from "./components/ui/input"
 import { ScrollArea } from "./components/ui/scroll-area"
 import ToolResult from './components/ui/tool-result'
 import ToolCall from './components/ui/tool-call'
 
 export default function Chat({ chats, setChats, selectedChatId, setSelectedChatId }) {
-  const navigate = useNavigate()
-  const chat = selectedChatId === 'new' ? { id: chats.length + 1, title: `Chat ${chats.length + 1}`, messages: [] } : chats.find((c: any) => c.id === selectedChatId)
-  const chatIndex = chats.findIndex((c: any) => c.id === selectedChatId)
+  const navigate = useNavigate();
 
+  // Find the currently selected chat, or create a placeholder if not found
+  const chat = chats.find((c) => c.id === selectedChatId) || {
+    id: -1,
+    title: 'New Chat',
+    messages: [],
+  };
+
+  // Initialize the useChat hook with the selected chat's data
   const { messages, input, handleInputChange, handleSubmit } = useChat({
-    api: getApiUrl("/reply"),
+    api: getApiUrl('/reply'),
     initialMessages: chat.messages,
     id: chat.id.toString(),
-  })
+  });
 
+  // Update the chats array whenever messages in the selected chat change
   useEffect(() => {
-    if (selectedChatId !== 'new') {
-      const updatedChats = [...chats]
-      updatedChats[chatIndex].messages = messages
-      setChats(updatedChats)
+    if (chat.id !== -1) {
+      const updatedChats = chats.map((c) =>
+        c.id === chat.id ? { ...c, messages } : c
+      );
+      setChats(updatedChats);
     }
-  }, [messages])
+  }, [messages, chat.id, chats, setChats]);
 
-  const navigateChat = (direction: string) => {
-    let newChatId = 0;
-    if (direction === 'next') {
-      newChatId = selectedChatId === chats.length ? 1 : selectedChatId + 1
-    } else {
-      newChatId = selectedChatId === 1 ? chats[chats.length - 1].id : selectedChatId - 1
-    }
-    setSelectedChatId(newChatId)
-    navigate(`/chat/${newChatId}`)
-  }
+  // Navigate to a chat by ID and set it as the selected chat
+  const navigateChat = (newChatId: number) => {
+    setSelectedChatId(newChatId);
+    navigate(`/chat/${newChatId}`);
+  };
 
-  const handleSendMessage = (e: any) => {
-    e.preventDefault()
-    if (selectedChatId === 'new') {
+  // Handle sending a message and optionally create a new chat
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (chat.id === -1) {
+      // Create a new chat if the current one is a placeholder
+      const newChatId = chats.length + 1;
       const newChat = {
-        id: chats.length + 1,
-        title: `Chat ${chats.length + 1}`,
+        id: newChatId,
+        title: `Chat ${newChatId}`,
         messages: [],
-      }
-      setChats([...chats, newChat])
-      navigate(`/chat/${newChat.id}`)
+      };
+      setChats([...chats, newChat]);
+      navigateChat(newChatId);
+    } else {
+      // Otherwise, just send the message
+      handleSubmit(e);
     }
-    handleSubmit(e)
-  }
+  };
+
+  // Add a new chat and navigate to it
+  const addNewChat = () => {
+    const newChatId = chats.length + 1;
+    const newChat = {
+      id: newChatId,
+      title: `Chat ${newChatId}`,
+      messages: [],
+    };
+    setChats([...chats, newChat]);
+    navigateChat(newChatId);
+  };
 
   return (
-    <div className="w-full min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 flex items-center justify-center p-[30px]">
-      <Card className="w-full h-[calc(100vh-60px)] flex flex-col bg-white/80 backdrop-blur-sm shadow-xl">
-        <AnimatePresence initial={false}>
-          <motion.div
+    <div className="flex flex-col h-full">
+
+     <div className="flex items-center bg-gray-200 p-1 rounded-t-lg overflow-x-auto">
+        {chats.map(chat => (
+          <div
             key={chat.id}
-            className="flex flex-col h-full"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.2 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className={`flex items-center min-w-[140px] max-w-[240px] h-9 px-4 mr-1 rounded-t-lg cursor-pointer transition-colors ${
+              selectedChatId === chat.id ? 'bg-white' : 'bg-gray-100 hover:bg-gray-300'
+            }`}
+            onClick={() => navigateChat(chat.id)}
+            onKeyDown={(e) => e.key === 'Enter' && navigateChat(chat.id)}
+            tabIndex={0}
+            role="tab"
+            aria-selected={selectedChatId === chat.id}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <div className="text-sm text-muted-foreground">
-                Current session: {chat.title}
-              </div>
-              <Button variant="ghost" size="icon">
-                <Share className="h-4 w-4" />
-              </Button>
+            <MessageSquare className="w-4 h-4 mr-2 text-gray-500" />
+            <span className="flex-grow truncate text-sm">{chat.title}</span>
+            <button
+              className="ml-2 p-1 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400"
+              onClick={(e) => {
+                e.stopPropagation()
+                removeChat(chat.id)
+              }}
+              aria-label={`Close ${chat.title} chat`}
+            >
+              <X className="w-3 h-3 text-gray-500" />
+            </button>
+          </div>
+        ))}
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-transparent hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+          onClick={addNewChat}
+          aria-label="New chat"
+        >
+          <Plus className="w-5 h-5 text-gray-700" />
+        </button>
+      </div>
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {messages.map((message) => (
+            <div key={message.id}>
+              {message.role === 'user' ? (
+                <div className="flex justify-end mb-4">
+                  <div className="bg-[#6366F1] text-white rounded-2xl p-4 max-w-[80%]">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex mb-4">
+                  <div className="bg-gray-300 text-black rounded-2xl p-4 max-w-[80%]">
+                    <Avatar className="h-8 w-8 mt-1">🪿</Avatar>
+                    {message.toolInvocations ? (
+                      <div className="flex items-start gap-3">
+                        {message.toolInvocations.map((toolInvocation) => {
+                          if (toolInvocation.state === 'call') {
+                            return (
+                              <Card key={toolInvocation.toolCallId} className="p-4 space-y-2">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <FileText className="h-4 w-4" />
+                                  A file
+                                  <span className="text-xs">Link from clipboard</span>
+                                </div>
+                                <div className="font-mono text-sm whitespace-pre-wrap">
+                                  <ToolCall call={toolInvocation} />
+                                </div>
+                              </Card>
+                            )
+                          }
+                          if (toolInvocation.state === 'result') {
+                            return (
+                              <div key={toolInvocation.toolCallId} className="space-y-2">
+                                <div className="bg-gray-300 text-black rounded-2xl p-4 max-w-[80%]">
+                                  <ToolResult 
+                                    result={toolInvocation}
+                                    onSubmitInput={(input) => {
+                                      handleInputChange({ target: { value: input } })
+                                      handleSubmit({ preventDefault: () => {} })
+                                    }}
+                                  />
+                                </div>
+                                <Button
+                                  variant="secondary"
+                                  className="w-full text-indigo-600"
+                                >
+                                  Take flight with this direction
+                                </Button>
+                              </div>
+                            )
+                          }
+                          return null
+                        })}
+                      </div>
+                    ) : (
+                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
+          ))}
+        </div>
+      </ScrollArea>
 
-            {/* Main Content */}
-            <ScrollArea className="flex-grow p-4 space-y-4">
-            
-              {messages.map((message) => (
-                <div key={message.id} className={`p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                  <div className="font-semibold">{message.role === 'user' ? 'You' : 'Goose 🪿'}</div>
-                  {message.toolInvocations == null ? (
-                  <ReactMarkdown
-                    components={{
-                      code({ node, className, children, ...props }) {
-                        return (
-                          <code className={`${className} bg-gray-800 text-white p-1 rounded`} {...props}>
-                            {children}
-                          </code>
-                        )
-                      },
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                  ) : 
-                  
-                  <div>
-                  {message.toolInvocations.map((toolInvocation) => {
-                    const { toolCallId, state } = toolInvocation;
-                    console.log("Tool Invocation:", JSON.stringify(toolInvocation, null, 2))
-                    if (state === 'result') {
-                      return (
-                        <div key={toolCallId}>
-                          <div>
-                            <ToolResult 
-                              result={toolInvocation} 
-                              onSubmitInput={(input) => {
-                                handleInputChange({ target: { value: input } } as any);
-                                handleSubmit({ preventDefault: () => {} } as any);
-                              }}
-                            />
-                            <details className="mt-2">
-                              <summary className="cursor-pointer text-sm text-blue-600">View Raw JSON</summary>
-                              <pre className="mt-2 p-2 bg-gray-800 text-white rounded overflow-auto text-xs">
-                                {JSON.stringify(toolInvocation, null, 2)}
-                              </pre>
-                            </details>
-                          </div>
-                        </div>
-                      );
-                    }
-                    if (state === 'call') {
-                      return (
-                        <div key={toolCallId}>
-                          <ToolCall call={toolInvocation} />
-                        </div>
-                      );
-                    }
-                    return null;
-                  })}
-                </div>
-
-                  
-                  
-                  }
-
-                </div>
-              ))}
-
-              
-            </ScrollArea>
-
-            {/* Input Area */}
-            <div className="p-4 border-t">
-              <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-                <div className="flex-1 relative">
-                  <Input
-                    placeholder="What's next?"
-                    value={input}
-                    onChange={handleInputChange}
-                    className="pr-10"
-                  />
-                  <Button
-                    type="submit"
-                    size="icon"
-                    variant="ghost"
-                    className="absolute right-0 top-0 h-full"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-              </form>
-
-              {/* Bottom Actions */}
-              <div className="grid grid-cols-3 gap-2 mt-4">
-                <Button variant="secondary" size="sm" className="w-full" onClick={() => navigateChat('prev')}>
-                  <ChevronLeft className="w-4 h-4 mr-2" />
-                  Previous Chat
-                </Button>
-                <Button variant="secondary" size="sm" className="w-full" onClick={() => navigate('/')}>
-                  <X className="w-4 h-4 mr-2" />
-                  Close Session
-                </Button>
-                <Button variant="secondary" size="sm" className="w-full" onClick={() => navigateChat('next')}>
-                  Next Chat
-                  <ChevronRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-      </Card>
+      <div className="p-4 border-t">
+        <form onSubmit={handleSendMessage} className="relative">
+          <Input
+            placeholder="What next?"
+            value={input}
+            onChange={handleInputChange}
+            className="pr-12"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            variant="ghost"
+            className="absolute right-2 top-1/2 -translate-y-1/2"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </form>
+      </div>
     </div>
   )
 }
