@@ -84,7 +84,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
               {messages.map((message) => (
                 <div key={message.id} className={`p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'}`}>
                   <div className="font-semibold">{message.role === 'user' ? 'You' : 'Goose 🪿'}</div>
-                  {true || message.toolInvocations == null ? (
+                  {message.toolInvocations == null ? (
                   <ReactMarkdown
                     components={{
                       code({ node, className, children, ...props }) {
@@ -103,17 +103,25 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                   <div>
                   {message.toolInvocations.map((toolInvocation) => {
                     const { toolCallId, state } = toolInvocation;
-                    console.log("tool invocation", toolInvocation)
+                    console.log("Tool Invocation:", JSON.stringify(toolInvocation, null, 2))
                     if (state === 'result') {
                       return (
                         <div key={toolCallId}>
-                          <ToolResult 
-                            result={toolInvocation} 
-                            onSubmitInput={(input) => {
-                              handleInputChange({ target: { value: input } } as any);
-                              handleSubmit({ preventDefault: () => {} } as any);
-                            }}
-                          />
+                          <div>
+                            <ToolResult 
+                              result={toolInvocation} 
+                              onSubmitInput={(input) => {
+                                handleInputChange({ target: { value: input } } as any);
+                                handleSubmit({ preventDefault: () => {} } as any);
+                              }}
+                            />
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-sm text-blue-600">View Raw JSON</summary>
+                              <pre className="mt-2 p-2 bg-gray-800 text-white rounded overflow-auto text-xs">
+                                {JSON.stringify(toolInvocation, null, 2)}
+                              </pre>
+                            </details>
+                          </div>
                         </div>
                       );
                     }
