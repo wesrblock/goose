@@ -1,3 +1,3 @@
-pub fn get_version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+pub fn print_version() {
+    println!(env!("CARGO_PKG_VERSION"))
 }
