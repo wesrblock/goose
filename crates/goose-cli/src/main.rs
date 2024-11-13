@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use anyhow::Result;
 use bat::PrettyPrinter;
 use clap::Parser;
@@ -11,11 +10,14 @@ use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
-use goose::providers::types::message::Message;
 use goose::providers::factory;
+use goose::providers::types::message::Message;
 
+mod commands {
+    pub mod version;
+}
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author, about, long_about = None)]
 struct Cli {
     /// Provider option (openai or databricks)
     #[arg(short, long, default_value = "open-ai")]
@@ -37,6 +39,9 @@ struct Cli {
     /// Model to use
     #[arg(short, long, default_value = "gpt-4o")]
     model: String,
+
+    #[arg(short = 'v', long = "version")]
+    version: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -49,6 +54,10 @@ enum CliProviderVariant {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    if cli.version {
+        println!("{}", commands::version::get_version());
+        return Ok(());
+    }
     let provider_type = match cli.provider {
         CliProviderVariant::OpenAi => ProviderType::OpenAi,
         CliProviderVariant::Databricks => ProviderType::Databricks,
