@@ -158,7 +158,7 @@ impl Agent {
     // Initialize a new reply round, which may call multiple tools
     // NOTE this is a simple no-op in this implementation
     // NOTE this is a potential home for summarization, checkpointing, planning
-    async fn rewrite_messages_loopstart(&self, messages: &mut Vec<Message>, status: String) -> AgentResult<()> {
+    async fn rewrite_messages_on_reply(&self, messages: &mut Vec<Message>, status: String) -> AgentResult<()> {
         // Create tool use message for status check
         let message_use = Message::new(
                 Role::Assistant,
@@ -184,7 +184,7 @@ impl Agent {
     // we from a message list that always looks like:
     // [kickoff, tool_use_0, tool_result_0, ..., tool_use_n, tool_result_n, status_use, status_result]
     // where status contains system detail that we always want to include for the agent
-    async fn rewrite_messages_loopend(&self, messages: &mut Vec<Message>, pending: Vec<Message>) -> AgentResult<()> {
+    async fn rewrite_messages_on_tool_response(&self, messages: &mut Vec<Message>, pending: Vec<Message>) -> AgentResult<()> {
         // Remove the last two messages (status and tool response)
         messages.pop();
         messages.pop();
@@ -211,7 +211,7 @@ impl Agent {
             loop {
                 // Append the status tool request and response messages
                 let status = self.get_system_status().await.map_err(|e| AgentError::Internal(e.to_string()))?;
-                self.rewrite_messages_loopstart(&mut messages, status).await?;
+                self.rewrite_messages_on_reply(&mut messages, status).await?;
 
                 // Get completion from provider
                 let (response, _) = self.provider.complete(
@@ -223,9 +223,7 @@ impl Agent {
                     None,
                 ).await?;
 
-                // // Add the assistant's response to the conversation history
-                // messages.push(response.clone());
-
+                // The assistant's response is added in rewrite_messages_on_tool_response
                 // Yield the assistant's response
                 yield response.clone();
 
@@ -252,7 +250,7 @@ impl Agent {
                     yield tool_response.clone();
 
                     // Remove the last two status msgs and then add the response, and tool outputs
-                    self.rewrite_messages_loopend(&mut messages, vec![response.clone(), tool_response.clone()]).await?;
+                    self.rewrite_messages_on_tool_response(&mut messages, vec![response.clone(), tool_response.clone()]).await?;
                 } else {
                     // No more tool calls, end the conversation
                     break;

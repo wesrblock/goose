@@ -7,14 +7,8 @@ use tera::{Context, Error as TeraError, Tera};
 
 /// Get the path to the prompts directory
 fn prompts_dir() -> PathBuf {
-    // Option 1: Use env var for configuration
-    if let Ok(prompts_dir) = std::env::var("GOOSE_PROMPTS_DIR") {
-        PathBuf::from(prompts_dir)
-    } else {
-        // Option 2: Use crate-relative path
-        let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        PathBuf::from(manifest_dir).join("src").join("prompts")
-    }
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    PathBuf::from(manifest_dir).join("src").join("prompts")
 }
 
 pub fn load_prompt<T: Serialize>(template: &str, context_data: &T) -> Result<String, TeraError> {
