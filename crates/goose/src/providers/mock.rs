@@ -1,11 +1,11 @@
+use anyhow::Result;
+use async_trait::async_trait;
 use std::sync::Arc;
 use std::sync::Mutex;
-use async_trait::async_trait;
-use anyhow::Result;
 
 use crate::providers::base::{Provider, Usage};
-use crate::providers::types::message::{Message, Role};
 use crate::providers::types::content::Content;
+use crate::providers::types::message::{Message, Role};
 use crate::tool::Tool;
 
 /// A mock provider that returns pre-configured responses for testing
@@ -26,17 +26,18 @@ impl MockProvider {
 impl Provider for MockProvider {
     async fn complete(
         &self,
-        _model: &str,
         _system_prompt: &str,
         _messages: &[Message],
         _tools: &[Tool],
-        _temperature: Option<f32>,
-        _max_tokens: Option<i32>,
     ) -> Result<(Message, Usage)> {
         let mut responses = self.responses.lock().unwrap();
         if responses.is_empty() {
             // Return empty response if no more pre-configured responses
-            Ok((Message::new(Role::Assistant, vec![Content::text("")]).expect("Failed to create message"), Usage::default()))
+            Ok((
+                Message::new(Role::Assistant, vec![Content::text("")])
+                    .expect("Failed to create message"),
+                Usage::default(),
+            ))
         } else {
             Ok((responses.remove(0), Usage::default()))
         }

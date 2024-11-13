@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use reqwest::Client; // we are using blocking API here to make sync calls
+use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -9,7 +9,8 @@ use super::base::{Provider, Usage};
 use super::configs::OpenAiProviderConfig;
 use super::types::message::Message;
 use super::utils::{
-        check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec,
+    check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
+    tools_to_openai_spec,
 };
 use crate::tool::Tool;
 
@@ -74,7 +75,11 @@ impl OpenAiProvider {
                 // Implement retry logic here if needed
                 Err(anyhow!("Server error: {}", status))
             }
-            _ => Err(anyhow!("Request failed: {}\nPayload: {}", response.status(), payload)),
+            _ => Err(anyhow!(
+                "Request failed: {}\nPayload: {}",
+                response.status(),
+                payload
+            )),
         }
     }
 }
@@ -83,12 +88,9 @@ impl OpenAiProvider {
 impl Provider for OpenAiProvider {
     async fn complete(
         &self,
-        model: &str,
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-        temperature: Option<f32>,
-        max_tokens: Option<i32>,
     ) -> Result<(Message, Usage)> {
         // Not checking for o1 model here since system message is not supported by o1
         let system_message = json!({
@@ -110,7 +112,7 @@ impl Provider for OpenAiProvider {
         messages_array.extend(messages_spec);
 
         let mut payload = json!({
-            "model": model,
+            "model": self.config.model,
             "messages": messages_array
         });
 
@@ -121,20 +123,18 @@ impl Provider for OpenAiProvider {
                 .unwrap()
                 .insert("tools".to_string(), json!(tools_spec));
         }
-        if let Some(temp) = temperature {
+        if let Some(temp) = self.config.temperature {
             payload
                 .as_object_mut()
                 .unwrap()
                 .insert("temperature".to_string(), json!(temp));
         }
-        if let Some(tokens) = max_tokens {
+        if let Some(tokens) = self.config.max_tokens {
             payload
                 .as_object_mut()
                 .unwrap()
                 .insert("max_tokens".to_string(), json!(tokens));
         }
-
-        //println!("{}", serde_json::to_string_pretty(&payload).unwrap());
 
         // Make request
         let response = self.post(payload).await?;
@@ -176,6 +176,9 @@ mod tests {
         let config = OpenAiProviderConfig {
             host: mock_server.uri(),
             api_key: "test_api_key".to_string(),
+            model: "gpt-3.5-turbo".to_string(),
+            temperature: Some(0.7),
+            max_tokens: None,
         };
 
         let provider = OpenAiProvider::new(config).unwrap();
@@ -211,14 +214,7 @@ mod tests {
 
         // Call the complete method
         let (message, usage) = provider
-            .complete(
-                "gpt-3.5-turbo",
-                "You are a helpful assistant.",
-                &messages,
-                &[],
-                None,
-                None,
-            )
+            .complete("You are a helpful assistant.", &messages, &[])
             .await?;
 
         // Assert the response
@@ -282,27 +278,21 @@ mod tests {
 
         // Call the complete method
         let (message, usage) = provider
-            .complete(
-                "gpt-3.5-turbo",
-                "You are a helpful assistant.",
-                &messages,
-                &[tool],
-                Some(0.3),
-                None,
-            )
+            .complete("You are a helpful assistant.", &messages, &[tool])
             .await?;
 
         // Assert the response
         let tool_requests = message.tool_request();
         assert_eq!(tool_requests.len(), 1);
-        let Ok(tool_call) = &tool_requests[0].call else {panic!("should be tool call")};
+        let Ok(tool_call) = &tool_requests[0].call else {
+            panic!("should be tool call")
+        };
 
         assert_eq!(tool_call.name, "get_weather");
         assert_eq!(
             tool_call.parameters,
             json!({"location": "San Francisco, CA"})
         );
-
 
         assert_eq!(usage.input_tokens, Some(20));
         assert_eq!(usage.output_tokens, Some(15));
