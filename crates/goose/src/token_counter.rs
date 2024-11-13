@@ -6,6 +6,10 @@ pub struct TokenCounter {
     tokenizers: HashMap<String, Tokenizer>,
 }
 
+const GPT_4O_TOKENIZER_KEY: &str = "Xenova--gpt-4o";
+const CLAUDE_TOKENIZER_KEY: &str = "Xenova--claude-tokenizer";
+const QWEN_TOKENIZER_KEY: &str = "Qwen--Qwen2.5-Coder-32B-Instruct";
+
 
 impl TokenCounter {
     // static method to get the tokenizer files directory
@@ -15,45 +19,57 @@ impl TokenCounter {
         path
     }
 
-    pub fn new() -> Self {
-        let mut tokenizers = HashMap::new();
-        // Add debug logging to help diagnose file loading issues
-        match Tokenizer::from_file(Self::tokenizer_files_dir().join("Xenova--gpt-4o/tokenizer.json")) {
+    fn load_tokenizer(&mut self, tokenizer_key: &str, path: Option<PathBuf>) {
+        // if path is not provided, use the default path
+        let tokenizer_path = path.unwrap_or_else(|| {
+            Self::tokenizer_files_dir()
+                .join(tokenizer_key)
+                .join("tokenizer.json")
+        });
+
+        match Tokenizer::from_file(tokenizer_path) {
             Ok(tokenizer) => {
-                tokenizers.insert("gpt-4o".to_string(), tokenizer);
+                self.tokenizers.insert(tokenizer_key.to_string(), tokenizer);
             }
             Err(e) => {
-                eprintln!("Failed to load default tokenizer: {}", e);
+                eprintln!("Failed to load tokenizer {}: {}", tokenizer_key, e);
             }
         }
-        TokenCounter {
-            tokenizers,
-        }
     }
 
-    pub fn add_tokenizer(&mut self, tokenizer_name: &str, tokenizer_path: &str) {
-        if let Ok(tokenizer) = Tokenizer::from_file(Self::tokenizer_files_dir().join(tokenizer_path)) {
-            self.tokenizers.insert(tokenizer_name.to_string(), tokenizer);
-        }
-    }
-
-    pub fn count_tokens(&self, model_name: &str, text: &str) -> Option<usize> {
-        // TODO: this logic can be improved
-        // map model names to tokenizer keys
-        let tokenizer_key = if model_name.starts_with("claude") {
-            "claude"
-        } else {
-            "gpt-4o"
+    pub fn new() -> Self {
+        let mut counter = TokenCounter {
+            tokenizers: HashMap::new(),
         };
-
-        // Try to get the tokenizer and encode the text
-        if let Some(tokenizer) = self.tokenizers.get(tokenizer_key) {
-            if let Ok(encoding) = tokenizer.encode(text, false) {
-                return Some(encoding.len());
-            }
+        // Add default tokenizers
+        for tokenizer_key in [GPT_4O_TOKENIZER_KEY, CLAUDE_TOKENIZER_KEY] {
+            counter.load_tokenizer(tokenizer_key, None);
         }
+        counter
+    }
 
-        None
+    pub fn add_tokenizer(&mut self, tokenizer_key: &str, path: Option<PathBuf>) {
+        self.load_tokenizer(tokenizer_key, path);
+    }
+
+    fn model_to_tokenizer_key(model_name: Option<&str>) -> &str {
+        let model_name = model_name.unwrap_or("gpt-4o").to_lowercase();
+        if model_name.contains("claude") {
+            CLAUDE_TOKENIZER_KEY
+        } else if model_name.contains("qwen") {
+            QWEN_TOKENIZER_KEY
+        } else {
+            // default
+            GPT_4O_TOKENIZER_KEY
+        }
+    }
+
+    pub fn count_tokens(&self, text: &str, model_name: Option<&str>) -> usize {
+        let tokenizer_key = Self::model_to_tokenizer_key(model_name);
+        dbg!(&model_name, &tokenizer_key);
+        let tokenizer = self.tokenizers.get(tokenizer_key).expect("Tokenizer not found");
+        let encoding = tokenizer.encode(text, false).unwrap();
+        encoding.len()
     }
 }
 
@@ -62,42 +78,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_count_tokens() {
+    fn test_add_tokenizer_and_count_tokens() {
         let mut counter = TokenCounter::new();
-
-        // Use absolute path for test tokenizer
-        counter.add_tokenizer("claude", "Xenova--claude-tokenizer/tokenizer.json");
-
+        counter.add_tokenizer(QWEN_TOKENIZER_KEY, None);
         let text = "Hey there!";
-
-        // Add debug print
-        let count = counter.count_tokens("claude-3-5-sonnet-2", text);
+        let count = counter.count_tokens(text, Some("qwen2.5-ollama"));
         println!("Token count for '{}': {:?}", text, count);
 
-        assert!(count.is_some(), "Tokenizer should return a count");
-        assert_eq!(count.unwrap(), 3);
+        assert_eq!(count, 3);
     }
 
     // Update the default tokenizer test similarly
     #[test]
-    fn test_default_tokenizer() {
-        let mut counter = TokenCounter::new();
-
-        // Explicitly load the default tokenizer for testing
-        counter.add_tokenizer("gpt-4o", "Xenova--gpt-4o/tokenizer.json");
-
+    fn test_specific_claude_tokenizer() {
+        let counter = TokenCounter::new();
         let text = "Hello, how are you?";
-        let count = counter.count_tokens("gpt-4o-mini", text);
+        let count = counter.count_tokens(text, Some("claude-3-5-sonnet-2"));
 
         println!("Token count for '{}': {:?}", text, count);
-        assert!(count.is_some(), "Default tokenizer should return a count");
-        assert_eq!(count.unwrap(), 6);
+        assert_eq!(count, 6);
     }
 
     #[test]
-    fn test_unknown_model() {
+    fn test_default_gpt_4o_tokenizer() {
         let counter = TokenCounter::new();
-        let count = counter.count_tokens("unknown-model", "Hey there!");
-        assert_eq!(count.unwrap(), 3);
+        let count = counter.count_tokens("Hey there!", None);
+        assert_eq!(count, 3);
     }
 }
