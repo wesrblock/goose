@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use anyhow::Result;
 use bat::PrettyPrinter;
 use clap::Parser;
@@ -11,8 +10,8 @@ use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
-use goose::providers::types::message::Message;
 use goose::providers::factory;
+use goose::providers::types::message::Message;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
