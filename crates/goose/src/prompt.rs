@@ -1,47 +1,39 @@
 // prompt.rs
 
-use std::collections::HashMap;
 use std::fs;
 use tera::{Context, Tera, Error as TeraError};
 use std::path::PathBuf;
+use serde::Serialize;
 
-pub fn load_prompt(
+pub fn load_prompt<T: Serialize>(
     template: &str,
-    context_params: &HashMap<String, String>,
+    context_data: &T,
 ) -> Result<String, TeraError> {
-    // Create a Tera instance and add the template
     let mut tera = Tera::default();
     tera.add_raw_template("inline_template", template)?;
-
-    // Create a context and insert variables
-    let mut context = Context::new();
-    for (key, value) in context_params {
-        context.insert(key, value);
-    }
-
-    // Render the template
+    let context = Context::from_serialize(context_data)?;
     let rendered = tera.render("inline_template", &context)?;
     Ok(rendered)
 }
 
 
-pub fn load_prompt_file(
+pub fn load_prompt_file<T: Serialize>(
     template_file: impl Into<PathBuf>,
-    context_params: &HashMap<String, String>,
-) -> Result<String, TeraError> {
-    // Convert to PathBuf and read the template file content
+    context_data: &T,
+    ) -> Result<String, TeraError> {
     let file_path = template_file.into();
     let template_content = fs::read_to_string(file_path)
         .map_err(|e| TeraError::chain("Failed to read template file", e))?;
-
-    // Use the same function to render
-    load_prompt(&template_content, context_params)
+    load_prompt(&template_content, context_data)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
+    use std::collections::HashMap;
+    use crate::tool::Tool;
+    use serde_json::json;
 
     #[test]
     fn test_load_prompt() {
@@ -60,7 +52,6 @@ mod tests {
         let mut context = HashMap::new();
         context.insert("name".to_string(), "Alice".to_string());
         // 'age' is missing from context
-
         let result = load_prompt(template, &context);
         assert!(result.is_err());
     }
@@ -84,9 +75,58 @@ mod tests {
     #[test]
     fn test_load_prompt_file_missing_file() {
         let file_path = PathBuf::from("non_existent_template.txt");
-        let context = HashMap::new();
+        let context: HashMap<String, String> = HashMap::new(); // Add type annotation here
 
         let result = load_prompt_file(file_path, &context);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_prompt_with_tools() {
+        let template = "### Tool Descriptions\n{% for tool in tools %}\n{{tool.name}}: {{tool.description}}\n{% endfor %}";
+
+        let tools = vec![
+            Tool::new(
+                "calculator",
+                "Performs basic math operations",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "operation": {"type": "string"},
+                        "numbers": {"type": "array"}
+                    }
+                })
+            ),
+            Tool::new(
+                "weather",
+                "Gets weather information",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string"}
+                    }
+                })
+            ),
+        ];
+
+        let mut context = HashMap::new();
+        context.insert("tools".to_string(), tools);
+
+        let result = load_prompt(template, &context).unwrap();
+        let expected = "### Tool Descriptions\n\ncalculator: Performs basic math operations\n\nweather: Gets weather information\n";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_load_prompt_with_empty_tools() {
+        let template = "### Tool Descriptions\n{% for tool in tools %}\n{{tool.name}}: {{tool.description}}\n{% endfor %}";
+
+        let tools: Vec<Tool> = vec![];
+        let mut context = HashMap::new();
+        context.insert("tools".to_string(), tools);
+
+        let result = load_prompt(template, &context).unwrap();
+        let expected = "### Tool Descriptions\n";
+        assert_eq!(result, expected);
     }
 }
