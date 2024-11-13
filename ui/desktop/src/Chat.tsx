@@ -8,6 +8,8 @@ import { Card } from './components/ui/card'
 import { Input } from './components/ui/input'
 import { Button } from "./components/ui/button"
 import { ScrollArea } from "./components/ui/scroll-area"
+import ToolResult from './components/ui/tool-result'
+import ToolCall from './components/ui/tool-call'
 
 export default function Chat({ chats, setChats, selectedChatId, setSelectedChatId }) {
   const navigate = useNavigate()
@@ -77,9 +79,11 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
 
             {/* Main Content */}
             <ScrollArea className="flex-grow p-4 space-y-4">
+            
               {messages.map((message) => (
                 <div key={message.id} className={`p-3 rounded-lg ${message.role === 'user' ? 'bg-blue-100' : 'bg-gray-100'}`}>
                   <div className="font-semibold">{message.role === 'user' ? 'You' : 'Goose 🪿'}</div>
+                  {message.toolInvocations == null ? (
                   <ReactMarkdown
                     components={{
                       code({ node, className, children, ...props }) {
@@ -93,8 +97,44 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                   >
                     {message.content}
                   </ReactMarkdown>
+                  ) : 
+                  
+                  <div>
+                  {message.toolInvocations.map((toolInvocation) => {
+                    const { toolCallId, state } = toolInvocation;
+                    console.log("tool invocation", toolInvocation)
+                    if (state === 'result') {
+                      return (
+                        <div key={toolCallId}>
+                          <ToolResult 
+                            result={toolInvocation} 
+                            onSubmitInput={(input) => {
+                              handleInputChange({ target: { value: input } } as any);
+                              handleSubmit({ preventDefault: () => {} } as any);
+                            }}
+                          />
+                        </div>
+                      );
+                    }
+                    if (state === 'call') {
+                      return (
+                        <div key={toolCallId}>
+                          <ToolCall call={toolInvocation} />
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+
+                  
+                  
+                  }
+
                 </div>
               ))}
+
+              
             </ScrollArea>
 
             {/* Input Area */}
