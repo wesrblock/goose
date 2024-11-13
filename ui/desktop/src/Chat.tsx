@@ -35,7 +35,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   }
 
   const addChat = () => {
-    const newChatId = chats.length + 1;
+    const newChatId = chats[chats.length-1].id + 1;
     const newChat = {
       id: newChatId,
       title: `Chat ${newChatId}`,
@@ -48,7 +48,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   const removeChat = (chatId: number) => {
     const updatedChats = chats.filter((chat: any) => chat.id !== chatId);
     setChats(updatedChats);
-    navigateChat(1);
+    navigateChat(updatedChats[0].id);
   };
 
   return (
@@ -76,7 +76,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
               }}
               aria-label={`Close ${chat.title} chat`}
             >
-              <X className="w-3 h-3 text-gray-500" />
+              {chats.length > 1 && <X className="w-3 h-3 text-gray-500" />}
             </button>
           </div>
         ))}
