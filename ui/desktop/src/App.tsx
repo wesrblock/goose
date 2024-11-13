@@ -1,36 +1,30 @@
-import React, { useState } from 'react'
-import { HashRouter as Router, Route, Routes } from 'react-router-dom'
-import Home from './Home'
-import Chat from './Chat'
+import React, { useState } from 'react';
+import { Route, Routes, Navigate } from 'react-router-dom';
+import Chat from './Chat';
+
+export interface Chat {
+  id: number;
+  title: string;
+  messages: Array<{ id: number; role: string; content: string }>;
+}
 
 export default function App() {
-  const initialChats = [
-    { id: 1, title: 'Web app', messages: [] },
-    { id: 2, title: 'Python notebook', messages: [] },
-    { id: 3, title: 'GraphQL server', messages: [] },
+  const initialChats: Chat[] = [
+    { id: 1, title: 'Chat #1', messages: [] },
   ]
 
   const [chats, setChats] = useState(initialChats)
-  const [selectedChatId, setSelectedChatId] = useState(null)
-
-  const onSelectChat = (chatId: string) => {
-    setSelectedChatId(chatId)
-    if (chatId === 'new') {
-      const newChatId = chats.length + 1
-      setChats([...chats, { id: newChatId, title: `Chat ${newChatId}`, messages: [] }])
-      setSelectedChatId(newChatId)
-    }
-  }
+  const [selectedChatId, setSelectedChatId] = useState(1)
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-br from-pink-300 via-purple-300 to-indigo-400">
-      <div className="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1IiBoZWlnaHQ9IjUiPgo8cmVjdCB3aWR0aD0iNSIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIj48L3JlY3Q+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiNjY2MiPjwvcmVjdD4KPC9zdmc+')]"></div>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Home chats={chats} setChats={setChats} onSelectChat={onSelectChat} />} />
-          <Route path="/chat/:id" element={<Chat chats={chats} setChats={setChats} selectedChatId={selectedChatId} setSelectedChatId={setSelectedChatId} />} />
-        </Routes>
-      </Router>
+    <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-b from-white to-gray-50 p-4 flex flex-col">
+      <Routes>
+        <Route
+          path="/chat/:id"
+          element={<Chat chats={chats} setChats={setChats} selectedChatId={selectedChatId} setSelectedChatId={setSelectedChatId} />}
+        />
+        <Route path="*" element={<Navigate to="/chat/1" replace />} />
+      </Routes>
     </div>
-  )
+  );
 }
