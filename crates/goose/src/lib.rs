@@ -4,3 +4,4 @@ pub mod systems;
 pub mod tool;
 pub mod errors;
 pub mod developer;
+pub mod prompt;
