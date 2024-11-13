@@ -1,6 +1,6 @@
-use tokenizers::tokenizer::Tokenizer;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use tokenizers::tokenizer::Tokenizer;
 
 pub struct TokenCounter {
     tokenizers: HashMap<String, Tokenizer>,
@@ -10,10 +10,9 @@ const GPT_4O_TOKENIZER_KEY: &str = "Xenova--gpt-4o";
 const CLAUDE_TOKENIZER_KEY: &str = "Xenova--claude-tokenizer";
 const QWEN_TOKENIZER_KEY: &str = "Qwen--Qwen2.5-Coder-32B-Instruct";
 
-
 impl TokenCounter {
     // static method to get the tokenizer files directory
-     fn tokenizer_files_dir() -> PathBuf {
+    fn tokenizer_files_dir() -> PathBuf {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../../tokenizer_files");
         path
@@ -67,7 +66,10 @@ impl TokenCounter {
     pub fn count_tokens(&self, text: &str, model_name: Option<&str>) -> usize {
         let tokenizer_key = Self::model_to_tokenizer_key(model_name);
         dbg!(&model_name, &tokenizer_key);
-        let tokenizer = self.tokenizers.get(tokenizer_key).expect("Tokenizer not found");
+        let tokenizer = self
+            .tokenizers
+            .get(tokenizer_key)
+            .expect("Tokenizer not found");
         let encoding = tokenizer.encode(text, false).unwrap();
         encoding.len()
     }
