@@ -152,7 +152,7 @@ async fn chat_handler(
                             {
                                 let result = json!({
                                     "toolCallId": tool_data.request_id,
-                                    "result": tool_data.output
+                                    "result": tool_data.output.as_ref().unwrap(),
                                 });
                                 let _ = tx.send(format!("a:{}\n", result)).await;
                             }
