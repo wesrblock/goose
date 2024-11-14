@@ -1,6 +1,9 @@
+use include_dir::{include_dir, Dir};
 use std::collections::HashMap;
-use std::path::PathBuf;
 use tokenizers::tokenizer::Tokenizer;
+
+// Embed the tokenizer files directory
+static TOKENIZER_FILES: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../tokenizer_files");
 
 pub struct TokenCounter {
     tokenizers: HashMap<String, Tokenizer>,
@@ -11,22 +14,20 @@ const CLAUDE_TOKENIZER_KEY: &str = "Xenova--claude-tokenizer";
 const QWEN_TOKENIZER_KEY: &str = "Qwen--Qwen2.5-Coder-32B-Instruct";
 
 impl TokenCounter {
-    // static method to get the tokenizer files directory
-    fn tokenizer_files_dir() -> PathBuf {
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("../../tokenizer_files");
-        path
-    }
 
-    fn load_tokenizer(&mut self, tokenizer_key: &str, path: Option<PathBuf>) {
-        // if path is not provided, use the default path
-        let tokenizer_path = path.unwrap_or_else(|| {
-            Self::tokenizer_files_dir()
-                .join(tokenizer_key)
-                .join("tokenizer.json")
-        });
+    fn load_tokenizer(&mut self, tokenizer_key: &str) {
+        // Load from embedded tokenizer files. The tokenizer_key must match the directory name.
+        let tokenizer_path = format!("{}/tokenizer.json", tokenizer_key);
+        let file_content = TOKENIZER_FILES
+            .get_file(&tokenizer_path)
+            .map(|f| f.contents())
+            .ok_or_else(|| {
+                format!("Embedded tokenizer file not found: {}", tokenizer_path)
+            }).unwrap();
 
-        match Tokenizer::from_file(tokenizer_path) {
+        let tokenizer = Tokenizer::from_bytes(file_content);
+
+        match tokenizer {
             Ok(tokenizer) => {
                 self.tokenizers.insert(tokenizer_key.to_string(), tokenizer);
             }
@@ -42,13 +43,13 @@ impl TokenCounter {
         };
         // Add default tokenizers
         for tokenizer_key in [GPT_4O_TOKENIZER_KEY, CLAUDE_TOKENIZER_KEY] {
-            counter.load_tokenizer(tokenizer_key, None);
+            counter.load_tokenizer(tokenizer_key);
         }
         counter
     }
 
-    pub fn add_tokenizer(&mut self, tokenizer_key: &str, path: Option<PathBuf>) {
-        self.load_tokenizer(tokenizer_key, path);
+    pub fn add_tokenizer(&mut self, tokenizer_key: &str) {
+        self.load_tokenizer(tokenizer_key);
     }
 
     fn model_to_tokenizer_key(model_name: Option<&str>) -> &str {
@@ -82,7 +83,7 @@ mod tests {
     #[test]
     fn test_add_tokenizer_and_count_tokens() {
         let mut counter = TokenCounter::new();
-        counter.add_tokenizer(QWEN_TOKENIZER_KEY, None);
+        counter.add_tokenizer(QWEN_TOKENIZER_KEY);
         let text = "Hey there!";
         let count = counter.count_tokens(text, Some("qwen2.5-ollama"));
         println!("Token count for '{}': {:?}", text, count);
