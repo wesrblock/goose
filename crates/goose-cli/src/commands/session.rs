@@ -7,12 +7,12 @@ use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::types::message::Message;
 
-pub struct Session<'a> {
-    agent: &'a mut Agent,
+pub struct Session {
+    agent: Box<Agent>,
 }
 
-impl<'a> Session<'a> {
-    pub fn new(agent: &'a mut Agent) -> Self {
+impl Session {
+    pub fn new(agent: Box<Agent>) -> Self {
         Session { agent }
     }
 

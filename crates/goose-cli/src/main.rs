@@ -142,8 +142,8 @@ async fn main() -> Result<()> {
             };
             let provider =
                 factory::get_provider(provider_type, create_provider_config(&cli_temp)).unwrap();
-            let mut agent = Agent::new(provider, cli_temp.model.clone());
-            let mut session = Session::new(&mut agent);
+            let agent = Box::new(Agent::new(provider, cli_temp.model.clone()));
+            let mut session = Session::new(agent);
             let _ = session.start().await;
             return Ok(());
         }
