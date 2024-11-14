@@ -10,6 +10,7 @@ interface ToolResultProps {
     toolCallId?: string
     toolName?: string
     args?: any
+    input_todo?: any
   }
   onSubmitInput?: (input: string) => void
 }
@@ -39,15 +40,19 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
 
   if (!result) return null
 
-  let parsedResult: any = null
-  console.log("RESULT", result.result)
-  if (result.result) {
-    try {
-      parsedResult = result.result
-    } catch (error) {
-      console.log("not parsing", error)
-    }
-  }
+  console.log("ToolResult, result", JSON.stringify(result, null, 2 ))
+
+  /*
+  ToolResult, result {
+  "state": "result",
+  "args": {
+    "command": "ls"
+  },
+  "toolCallId": "call_6q9qZ251ROJtyH9c3uPwnJzr",
+  "toolName": "DeveloperSystem__bash",
+  "result": "ARCHITECTURE.md\nCHANGELOG.md\nCONTRIBUTING.md\nCargo.lock\nCargo.toml\nLICENSE\nREADME.md\ncrates\ndocs\ndownload_tokenizer_files.py\nprofiles.yaml\nproviders.yaml\ntarget\n"
+}
+  */
 
   const handleSubmit = () => {
     setSubmitted(true)
@@ -144,10 +149,10 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
     )
   }
 
-  if (parsedResult) {
+  if (result) {
     return (
       <div className="mt-2">
-        {parsedResult.output && (
+        {result.result && (
           <div className="font-mono text-sm bg-black rounded-b-md rounded-tr-md p-3">
             <div className="flex items-center space-x-2">
               <BoxIcon size={14} />
@@ -172,34 +177,17 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
                   }
                 }}
               >
-                {parsedResult.output}
+                {result.result}
               </ReactMarkdown>
             </div>
           </div>
         )}
 
-        {parsedResult.message && (
-          <div className="mt-2 flex items-center gap-2">
-            <BoxIcon size={14} />
-            <ReactMarkdown
-              components={{
-                code({ node, inline, className, children, ...props }) {
-                  return (
-                    <code className={`${className} ${inline ? 'bg-black bg-opacity-25 px-1 py-0.5 rounded' : ''}`} {...props}>
-                      {children}
-                    </code>
-                  )
-                }
-              }}
-            >
-              {parsedResult.message}
-            </ReactMarkdown>
-          </div>
-        )}
+=
         
-        {parsedResult.input && !submitted && (
+        {result.input_todo && !submitted && (
           <div className="mt-4 p-4 bg-gray-800 rounded-md">
-            {Object.entries(parsedResult.input.properties).map(([key, schema]) =>
+            {Object.entries(result.input_todo.properties).map(([key, schema]) =>
               renderSchemaInput(key, schema as JsonSchemaProperty)
             )}              
             <button

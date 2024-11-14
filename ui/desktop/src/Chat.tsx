@@ -105,7 +105,8 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                     {message.toolInvocations ? (
                       <div className="flex items-start gap-3">
                         {message.toolInvocations.map((toolInvocation) => {
-                          if (toolInvocation.state === 'call') {
+                          console.log(JSON.stringify(message.toolInvocations,null,2))
+                          if (toolInvocation.state === 'call') {                                                        
                             return (
                               <Card key={toolInvocation.toolCallId} className="p-4 space-y-2">
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -120,6 +121,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                             )
                           }
                           if (toolInvocation.state === 'result') {
+                            console.log("SHOWING RESULT")
                             return (
                               <div key={toolInvocation.toolCallId} className="space-y-2">
                                 <div className="bg-gray-300 text-black rounded-2xl p-4 max-w-[80%]">
