@@ -3,8 +3,7 @@ import { useChat } from 'ai/react'
 import { useNavigate } from 'react-router-dom'
 import { getApiUrl } from './config'
 import ReactMarkdown from 'react-markdown'
-import { X, Plus, MessageSquare, Send, FileText } from 'lucide-react'
-import { Avatar } from "./components/ui/avatar"
+import { X, Plus, Send, FileText } from 'lucide-react'
 import { Button } from "./components/ui/button"
 import { Card } from "./components/ui/card"
 import { Input } from "./components/ui/input"
@@ -50,61 +49,57 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-purple-100 to-blue-200 flex items-center justify-center p-0">
-      <Card className="w-[calc(100%-20px)] h-[calc(100vh-20px)] m-[10px] bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden">
-        <div className="flex flex-col h-full">
-          <div className="flex items-center bg-sky-100absolute opacity-80 text-[#5a5a5a] text-[10px] font-medium font-['Inter'] rounded-t-2xl overflow-x-auto">
-            {chats.map(chat => (
-              <div
-                key={chat.id}
-                className={`flex items-center min-w-[140px] max-w-[240px] h-8 px-3 mr-1 rounded-t-lg cursor-pointer transition-all ${
-                  selectedChatId === chat.id 
-                    ? 'bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] relative z-10' 
-                    : 'bg-sky-200 hover:bg-sky-300'
-                }`}
-                onClick={() => navigateChat(chat.id)}
-                onKeyDown={(e) => e.key === 'Enter' && navigateChat(chat.id)}
-                tabIndex={0}
-                role="tab"
-                aria-selected={selectedChatId === chat.id}
+    <div className="min-h-screen w-full bg-window-gradient flex flex-col items-center justify-center p-0">
+      <div className="flex items-center justify-start overflow-x-auto relative mt-10 w-full">
+        {chats.map((chat) => (
+          <div
+            key={chat.id}
+            className={`flex bg-tab items-center min-w-[140px] max-w-[240px] h-8 px-3 mr-1 rounded-t-lg cursor-pointer transition-all`}
+            onClick={() => navigateChat(chat.id)}
+            onKeyDown={(e) => e.key === "Enter" && navigateChat(chat.id)}
+            tabIndex={0}
+            role="tab"
+            aria-selected={selectedChatId === chat.id}
+          >
+            <span className="flex-grow truncate text-sm font-medium">{chat.title}</span>
+            {chats.length > 1 && (
+              <button
+                className="ml-2 p-1 rounded-full hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeChat(chat.id);
+                }}
+                aria-label={`Close ${chat.title} chat`}
               >
-                <span className="flex-grow truncate text-sm font-medium">{chat.title}</span>
-                {chats.length > 1 && (
-                  <button
-                    className="ml-2 p-1 rounded-full hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-400"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      removeChat(chat.id)
-                    }}
-                    aria-label={`Close ${chat.title} chat`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-            <button
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-transparent hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
-              onClick={addChat}
-              aria-label="New chat"
-            >
-              <Plus className="w-5 h-5 text-sky-600" />
-            </button>
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
+        ))}
+        <button
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-transparent hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
+          onClick={addChat}
+          aria-label="New chat"
+        >
+          <Plus className="w-5 h-5 text-sky-600" />
+        </button>
+      </div>
+
+      <Card className="w-[calc(100%-20px)] h-[calc(100vh-20px)] m-[10px] bg-card-gradient mt-0 backdrop-blur-sm border-none shadow-xl rounded-2xl rounded-t-none overflow-hidden">
+        <div className="flex flex-col h-full">
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
               {messages.map((message) => (
                 <div key={message.id}>
                   {message.role === 'user' ? (
                     <div className="flex justify-end mb-4">
-                      <div className="bg-indigo-100 text-indigo-800 rounded-2xl p-4 max-w-[80%]">
+                      <div className="bg-[#555FE7E5] text-white rounded-2xl p-4 max-w-[80%]">
                         <ReactMarkdown>{message.content}</ReactMarkdown>
                       </div>
                     </div>
                   ) : (
                     <div className="flex mb-4">
-                      <div className="bg-white text-gray-800 rounded-2xl p-4 max-w-[80%] shadow-sm">
-                        <Avatar className="h-8 w-8 mb-2">🪿</Avatar>
+                      <div className="bg-goose-bubble text-black rounded-2xl p-4 max-w-[80%]">
                         {message.toolInvocations ? (
                           <div className="flex items-start gap-3">
                             {message.toolInvocations.map((toolInvocation) => {
@@ -125,7 +120,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                               if (toolInvocation.state === 'result') {
                                 return (
                                   <div key={toolInvocation.toolCallId} className="space-y-2">
-                                    <div className="bg-gray-50 text-gray-800 rounded-2xl p-4 max-w-[80%]">
+                                    <div className="rounded-2xl p-4 max-w-[80%]">
                                       <ToolResult 
                                         result={toolInvocation}
                                         onSubmitInput={(input) => {
@@ -156,24 +151,22 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
               ))}
             </div>
           </ScrollArea>
-          <div className="p-4 border-t border-gray-200">
-            <form onSubmit={handleSubmit} className="relative">
-              <Input
-                placeholder="What should goose do?"
-                value={input}
-                onChange={handleInputChange}
-                className="pr-12 bg-white/50 border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-full"
-              />
-              <Button
-                type="submit"
-                size="icon"
-                variant="ghost"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-            </form>
-          </div>
+          <form onSubmit={handleSubmit} className="relative bg-white mb-0 h-{57px}">
+            <Input
+              placeholder="What should goose do?"
+              value={input}
+              onChange={handleInputChange}
+              className="pr-12 rounded-full border-none focus:outline-none focus:ring-0"
+            />
+            <Button
+              type="submit"
+              size="icon"
+              variant="ghost"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
+            >
+              <Send className="h-5 w-5" />
+            </Button>
+          </form>
         </div>
       </Card>
     </div>

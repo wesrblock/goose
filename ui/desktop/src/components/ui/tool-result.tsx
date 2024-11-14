@@ -96,7 +96,7 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
     }
 
     return (
-      <div key={key} className="mb-4">
+      <div key={key} className="w-full">
         <div className="text-white mb-2 flex items-center gap-2">
           <Icon size={16} />
           <span>{schema.title || key}</span>
