@@ -9,14 +9,14 @@ use console::style;
 use futures::StreamExt;
 use goose::providers::factory::ProviderType;
 
+use commands::configure::handle_configure;
+use commands::version::print_version;
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::factory;
 use goose::providers::types::message::Message;
-use commands::configure::{handle_configure, ConfigOptions};
-use commands::version::{print_version};
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -51,28 +51,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Configure the provider and default systems
-    Configure {
-        /// Optional provider name; prompted if not provided
-        #[arg(long)]
-        provider: Option<String>,
-
-        /// Optional host URL; prompted if not provided
-        #[arg(long)]
-        host: Option<String>,
-
-        /// Optional token; prompted if not provided
-        #[arg(long)]
-        token: Option<String>,
-
-        /// Optional processor; prompted if not provided
-        #[arg(long)]
-        processor: Option<String>,
-
-        /// Optional accelerator; prompted if not provided
-        #[arg(long)]
-        accelerator: Option<String>,
-    },
+    Configure,
     /// Start or resume sessions with an optional session name
     Session {
         /// Optional session name
@@ -96,23 +75,10 @@ async fn main() -> Result<()> {
         print_version();
         return Ok(());
     }
-    
+
     match cli.command {
-        Some(Command::Configure {
-            provider,
-            host,
-            token,
-            processor,
-            accelerator,
-        }) => {
-            let options = ConfigOptions {
-                provider,
-                host,
-                token,
-                processor,
-                accelerator,
-            };
-            let _ = handle_configure(options);
+        Some(Command::Configure) => {
+            let _ = handle_configure();
             return Ok(());
         }
         Some(Command::Session { session_name }) => {
@@ -129,7 +95,7 @@ async fn main() -> Result<()> {
             println!("No command provided");
         }
     }
-    
+
     let provider_type = match cli.provider {
         CliProviderVariant::OpenAi => ProviderType::OpenAi,
         CliProviderVariant::Databricks => ProviderType::Databricks,

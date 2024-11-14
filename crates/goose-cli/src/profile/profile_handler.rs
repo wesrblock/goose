@@ -8,7 +8,7 @@ use crate::profile::profile::Profile;
 // TODO: set to profile1.yaml temporarily to avoid overriting the existing config
 pub const PROFILE_CONFIG_PATH: &str = ".config/goose/profile1.yaml";
 
-pub fn save_profile(profiles: &[HashMap<&str, &Profile>]) -> Result<(), Box<dyn Error>> {
+fn save_profile(profiles: &[HashMap<&str, &Profile>]) -> Result<(), Box<dyn Error>> {
     let path = profile_path()?;
 
     if let Some(parent) = path.parent() {
