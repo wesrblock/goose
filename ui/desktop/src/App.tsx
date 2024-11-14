@@ -17,7 +17,7 @@ export default function App() {
   const [selectedChatId, setSelectedChatId] = useState(1)
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-b from-white to-gray-50 p-4 flex flex-col">
+    <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-b from-white to-gray-50 flex flex-col">
       <Routes>
         <Route
           path="/chat/:id"

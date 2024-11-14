@@ -3,8 +3,7 @@ import { useChat } from 'ai/react'
 import { useNavigate } from 'react-router-dom'
 import { getApiUrl } from './config'
 import ReactMarkdown from 'react-markdown'
-import { X, Plus, MessageSquare } from 'lucide-react'
-import { Send, FileText } from 'lucide-react'
+import { X, Plus, MessageSquare, Send, FileText } from 'lucide-react'
 import { Avatar } from "./components/ui/avatar"
 import { Button } from "./components/ui/button"
 import { Card } from "./components/ui/card"
@@ -22,7 +21,6 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
     initialMessages: chat.messages
   })
 
-  // Combine messages in the currently rendered chat with global chat state
   useEffect(() => {
     const updatedChats = [...chats]
     updatedChats.find((c) => c.id === selectedChatId).messages = messages
@@ -52,128 +50,132 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   };
 
   return (
-    <div className="flex flex-col h-full">
-     <div className="flex items-center bg-gray-200 p-1 rounded-t-lg overflow-x-auto">
-        {chats.map(chat => (
-          <div
-            key={chat.id}
-            className={`flex items-center min-w-[140px] max-w-[240px] h-9 px-4 mr-1 rounded-t-lg cursor-pointer transition-colors ${
-              selectedChatId === chat.id ? 'bg-white' : 'bg-gray-100 hover:bg-gray-300'
-            }`}
-            onClick={() => navigateChat(chat.id)}
-            onKeyDown={(e) => e.key === 'Enter' && navigateChat(chat.id)}
-            tabIndex={0}
-            role="tab"
-            aria-selected={selectedChatId === chat.id}
-          >
-            <MessageSquare className="w-4 h-4 mr-2 text-gray-500" />
-            <span className="flex-grow truncate text-sm">{chat.title}</span>
+    <div className="min-h-screen w-full bg-gradient-to-br from-purple-100 to-blue-200 flex items-center justify-center p-0">
+      <Card className="w-[calc(100%-20px)] h-[calc(100vh-20px)] m-[10px] bg-white/80 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden">
+        <div className="flex flex-col h-full">
+          <div className="flex items-center bg-sky-100absolute opacity-80 text-[#5a5a5a] text-[10px] font-medium font-['Inter'] rounded-t-2xl overflow-x-auto">
+            {chats.map(chat => (
+              <div
+                key={chat.id}
+                className={`flex items-center min-w-[140px] max-w-[240px] h-8 px-3 mr-1 rounded-t-lg cursor-pointer transition-all ${
+                  selectedChatId === chat.id 
+                    ? 'bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] relative z-10' 
+                    : 'bg-sky-200 hover:bg-sky-300'
+                }`}
+                onClick={() => navigateChat(chat.id)}
+                onKeyDown={(e) => e.key === 'Enter' && navigateChat(chat.id)}
+                tabIndex={0}
+                role="tab"
+                aria-selected={selectedChatId === chat.id}
+              >
+                <span className="flex-grow truncate text-sm font-medium">{chat.title}</span>
+                {chats.length > 1 && (
+                  <button
+                    className="ml-2 p-1 rounded-full hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeChat(chat.id)
+                    }}
+                    aria-label={`Close ${chat.title} chat`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            ))}
             <button
-              className="ml-2 p-1 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400"
-              onClick={(e) => {
-                e.stopPropagation()
-                removeChat(chat.id)
-              }}
-              aria-label={`Close ${chat.title} chat`}
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-transparent hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
+              onClick={addChat}
+              aria-label="New chat"
             >
-              {chats.length > 1 && <X className="w-3 h-3 text-gray-500" />}
+              <Plus className="w-5 h-5 text-sky-600" />
             </button>
           </div>
-        ))}
-        <button
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-transparent hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
-          onClick={addChat}
-          aria-label="New chat"
-        >
-          <Plus className="w-5 h-5 text-gray-700" />
-        </button>
-      </div>
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <div key={message.id}>
-              {message.role === 'user' ? (
-                <div className="flex justify-end mb-4">
-                  <div className="bg-[#6366F1] text-white rounded-2xl p-4 max-w-[80%]">
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex mb-4">
-                  <div className="bg-gray-300 text-black rounded-2xl p-4 max-w-[80%]">
-                    <Avatar className="h-8 w-8 mt-1">🪿</Avatar>
-                    {message.toolInvocations ? (
-                      <div className="flex items-start gap-3">
-                        {message.toolInvocations.map((toolInvocation) => {
-                          console.log(JSON.stringify(message.toolInvocations,null,2))
-                          if (toolInvocation.state === 'call') {                                                        
-                            return (
-                              <Card key={toolInvocation.toolCallId} className="p-4 space-y-2">
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <FileText className="h-4 w-4" />
-                                  A file
-                                  <span className="text-xs">Link from clipboard</span>
-                                </div>
-                                <div className="font-mono text-sm whitespace-pre-wrap">
-                                  <ToolCall call={toolInvocation} />
-                                </div>
-                              </Card>
-                            )
-                          }
-                          if (toolInvocation.state === 'result') {
-                            console.log("SHOWING RESULT")
-                            return (
-                              <div key={toolInvocation.toolCallId} className="space-y-2">
-                                <div className="bg-gray-300 text-black rounded-2xl p-4 max-w-[80%]">
-                                  <ToolResult 
-                                    result={toolInvocation}
-                                    onSubmitInput={(input) => {
-                                      handleInputChange({ target: { value: input } })
-                                      handleSubmit({ preventDefault: () => {} })
-                                    }}
-                                  />
-                                </div>
-                                <Button
-                                  variant="secondary"
-                                  className="w-full text-indigo-600"
-                                >
-                                  Take flight with this direction
-                                </Button>
-                              </div>
-                            )
-                          }
-                          return null
-                        })}
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div key={message.id}>
+                  {message.role === 'user' ? (
+                    <div className="flex justify-end mb-4">
+                      <div className="bg-indigo-100 text-indigo-800 rounded-2xl p-4 max-w-[80%]">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
                       </div>
-                    ) : (
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex mb-4">
+                      <div className="bg-white text-gray-800 rounded-2xl p-4 max-w-[80%] shadow-sm">
+                        <Avatar className="h-8 w-8 mb-2">🪿</Avatar>
+                        {message.toolInvocations ? (
+                          <div className="flex items-start gap-3">
+                            {message.toolInvocations.map((toolInvocation) => {
+                              if (toolInvocation.state === 'call') {                                                        
+                                return (
+                                  <Card key={toolInvocation.toolCallId} className="p-4 space-y-2 bg-gray-50">
+                                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                                      <FileText className="h-4 w-4" />
+                                      A file
+                                      <span className="text-xs">Link from clipboard</span>
+                                    </div>
+                                    <div className="font-mono text-sm whitespace-pre-wrap">
+                                      <ToolCall call={toolInvocation} />
+                                    </div>
+                                  </Card>
+                                )
+                              }
+                              if (toolInvocation.state === 'result') {
+                                return (
+                                  <div key={toolInvocation.toolCallId} className="space-y-2">
+                                    <div className="bg-gray-50 text-gray-800 rounded-2xl p-4 max-w-[80%]">
+                                      <ToolResult 
+                                        result={toolInvocation}
+                                        onSubmitInput={(input) => {
+                                          handleInputChange({ target: { value: input } })
+                                          handleSubmit({ preventDefault: () => {} })
+                                        }}
+                                      />
+                                    </div>
+                                    <Button
+                                      variant="secondary"
+                                      className="w-full text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
+                                    >
+                                      Take flight with this direction
+                                    </Button>
+                                  </div>
+                                )
+                              }
+                              return null
+                            })}
+                          </div>
+                        ) : (
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
+          </ScrollArea>
+          <div className="p-4 border-t border-gray-200">
+            <form onSubmit={handleSubmit} className="relative">
+              <Input
+                placeholder="What should goose do?"
+                value={input}
+                onChange={handleInputChange}
+                className="pr-12 bg-white/50 border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-full"
+              />
+              <Button
+                type="submit"
+                size="icon"
+                variant="ghost"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </form>
+          </div>
         </div>
-      </ScrollArea>
-
-      <div className="p-4 border-t">
-        <form onSubmit={handleSubmit} className="relative">
-          <Input
-            placeholder="What next?"
-            value={input}
-            onChange={handleInputChange}
-            className="pr-12"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            variant="ghost"
-            className="absolute right-2 top-1/2 -translate-y-1/2"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </div>
+      </Card>
     </div>
   )
 }
