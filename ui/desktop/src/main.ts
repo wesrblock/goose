@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { spawn } from 'child_process';
