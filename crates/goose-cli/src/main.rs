@@ -7,7 +7,6 @@ use cliclack::{input, spinner};
 use console::style;
 use futures::StreamExt;
 
-use goose::providers::factory::ProviderType;
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;

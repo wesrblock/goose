@@ -18,7 +18,6 @@ pub enum AgentError {
 
     #[error("Invalid tool name format: {0}")]
     InvalidToolName(String),
-
 }
 
 pub type AgentResult<T> = Result<T, AgentError>;
