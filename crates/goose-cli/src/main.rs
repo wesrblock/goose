@@ -1,22 +1,22 @@
-mod commands;
+mod commands {
+    pub mod configure;
+    pub mod session;
+    pub mod version;
+}
 
 use anyhow::Result;
-use bat::PrettyPrinter;
 use clap::{Parser, Subcommand};
-use cliclack::{input, spinner};
-use console::style;
-use futures::StreamExt;
+use cliclack::input;
 
-use goose::providers::factory::ProviderType;
 use goose::agent::Agent;
-use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::factory;
-use goose::providers::types::message::Message;
+use goose::providers::factory::ProviderType;
 
 use commands::configure::{handle_configure, ConfigOptions};
-use commands::version::{print_version};
+use commands::session::Session;
+use commands::version::print_version;
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -96,7 +96,7 @@ async fn main() -> Result<()> {
         print_version();
         return Ok(());
     }
-    
+
     match cli.command {
         Some(Command::Configure {
             provider,
@@ -116,10 +116,35 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(Command::Session { session_name }) => {
-            let session_name = session_name.unwrap_or_else(|| {
-                input("Session name:").placeholder("").interact().unwrap()
-            });
+            let session_name = session_name
+                .unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
             println!("Session name: {}", session_name);
+
+            // TODO: If no config exists, prompt the user through creating one.
+            // TODO: Load the config from the file... Hard coding config for now.
+            let provider_variant = CliProviderVariant::OpenAi;
+
+            let provider_type = match provider_variant {
+                CliProviderVariant::OpenAi => ProviderType::OpenAi,
+                CliProviderVariant::Databricks => ProviderType::Databricks,
+            };
+            // TODO: use values already unloaded from cli for create_provider_config.
+            // Also seems odd to have the cli prepping the provider rather than having that done in the agent?
+            let processor = "gpt-4o-mini";
+            let cli_temp = Cli {
+                provider: provider_variant,
+                api_key: None,
+                databricks_host: None,
+                databricks_token: None,
+                model: processor.to_string(),
+                version: false,
+                command: None,
+            };
+            let provider =
+                factory::get_provider(provider_type, create_provider_config(&cli_temp)).unwrap();
+            let mut agent = Agent::new(provider, cli_temp.model.clone());
+            let mut session = Session::new(&mut agent);
+            let _ = session.start().await;
             return Ok(());
         }
         Some(Command::Run) => {
@@ -129,65 +154,7 @@ async fn main() -> Result<()> {
             println!("No command provided");
         }
     }
-    
-    let provider_type = match cli.provider {
-        CliProviderVariant::OpenAi => ProviderType::OpenAi,
-        CliProviderVariant::Databricks => ProviderType::Databricks,
-    };
-
-    println!(
-        "Example goose CLI {}",
-        style("- type \"exit\" to end the session").dim()
-    );
-    println!("\n");
-
-    let system = Box::new(DeveloperSystem::new());
-    let provider = factory::get_provider(provider_type, create_provider_config(&cli)).unwrap();
-    let mut agent = Agent::new(provider, cli.model.clone());
-    agent.add_system(system);
-    println!("Connected the developer system");
-
-    let mut messages = Vec::new();
-
-    loop {
-        let message_text: String = input("Message:").placeholder("").multiline().interact()?;
-        if message_text.trim().eq_ignore_ascii_case("exit") {
-            break;
-        }
-        messages.push(Message::user(&message_text).unwrap());
-
-        let spin = spinner();
-        spin.start("awaiting reply");
-
-        // Process the stream of messages
-        let mut stream = agent.reply(&messages);
-        while let Some(response) = stream.next().await {
-            match response {
-                Ok(message) => {
-                    messages.push(message.clone());
-                    for content in &message.content {
-                        render(&content.summary()).await;
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    break;
-                }
-            }
-        }
-        spin.stop("");
-
-        println!("\n");
-    }
     Ok(())
-}
-
-async fn render(content: &str) {
-    PrettyPrinter::new()
-        .input_from_bytes(content.as_bytes())
-        .language("markdown")
-        .print()
-        .unwrap();
 }
 
 fn create_provider_config(cli: &Cli) -> ProviderConfig {
