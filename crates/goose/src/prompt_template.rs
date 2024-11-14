@@ -1,15 +1,11 @@
-// prompt.rs
-
+use include_dir::{include_dir, Dir};
 use serde::Serialize;
-use std::fs;
 use std::path::PathBuf;
 use tera::{Context, Error as TeraError, Tera};
 
-/// Get the path to the prompts directory
-fn prompts_dir() -> PathBuf {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    PathBuf::from(manifest_dir).join("src").join("prompts")
-}
+// The prompts directory needs to be embedded in the binary (so it works when distributed)
+static PROMPTS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/prompts");
+
 
 pub fn load_prompt<T: Serialize>(template: &str, context_data: &T) -> Result<String, TeraError> {
     let mut tera = Tera::default();
@@ -24,15 +20,17 @@ pub fn load_prompt_file<T: Serialize>(
     context_data: &T,
 ) -> Result<String, TeraError> {
     let template_path = template_file.into();
-    // if the template_file doesn't exist, try to load it from the prompts directory
-    let file_path = if !template_path.exists() {
-        prompts_dir().join(template_path)
+
+    // Get the file content from the embedded directory
+    let template_content = if let Some(file) = PROMPTS_DIR.get_file(template_path.to_str().unwrap()) {
+        String::from_utf8_lossy(file.contents()).into_owned()
     } else {
-        template_path
+        return Err(TeraError::chain("Failed to find template file", std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Template file not found in embedded directory"
+        )));
     };
 
-    let template_content = fs::read_to_string(file_path)
-        .map_err(|e| TeraError::chain("Failed to read template file", e))?;
     load_prompt(&template_content, context_data)
 }
 
@@ -42,7 +40,6 @@ mod tests {
     use crate::tool::Tool;
     use serde_json::json;
     use std::collections::HashMap;
-    use std::fs;
 
     #[test]
     fn test_load_prompt() {
@@ -67,18 +64,13 @@ mod tests {
 
     #[test]
     fn test_load_prompt_file() {
-        let template_content = "Hello, {{ name }}!";
-        let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("test_template.txt");
-        fs::write(&file_path, template_content).unwrap();
-
+        // since we are embedding the prompts directory, the file path needs to be relative to the prompts directory
+        let file_path = PathBuf::from("mock.md");
         let mut context = HashMap::new();
-        context.insert("name".to_string(), "Bob".to_string());
-
+        context.insert("name".to_string(), "Alice".to_string());
+        context.insert("age".to_string(), 30.to_string());
         let result = load_prompt_file(file_path, &context).unwrap();
-        assert_eq!(result, "Hello, Bob!");
-
-        temp_dir.close().unwrap();
+        assert_eq!(result, "This prompt is only used for testing.\n\nHello, Alice! You are 30 years old.\n");
     }
 
     #[test]
