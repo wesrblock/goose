@@ -54,6 +54,7 @@ pub enum ProviderSettings {
 
 impl ProviderSettings {
     // Get the provider type
+    #[allow(dead_code)]
     pub fn provider_type(&self) -> ProviderType {
         match self {
             ProviderSettings::OpenAi { .. } => ProviderType::OpenAi,

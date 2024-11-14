@@ -1,20 +1,25 @@
+mod commands;
+
 use anyhow::Result;
 use bat::PrettyPrinter;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use cliclack::{input, spinner};
 use console::style;
 use futures::StreamExt;
-use goose::providers::factory::ProviderType;
 
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::factory;
+use goose::providers::factory::ProviderType;
 use goose::providers::types::message::Message;
 
+use commands::configure::{handle_configure, ConfigOptions};
+use commands::version::print_version;
+
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author, about, long_about = None)]
 struct Cli {
     /// Provider option (openai or databricks)
     #[arg(short, long, default_value = "open-ai")]
@@ -44,6 +49,45 @@ struct Cli {
     /// Maximum tokens to generate
     #[arg(long)]
     max_tokens: Option<i32>,
+
+    #[arg(short = 'v', long = "version")]
+    version: bool,
+
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Configure the provider and default systems
+    Configure {
+        /// Optional provider name; prompted if not provided
+        #[arg(long)]
+        provider: Option<String>,
+
+        /// Optional host URL; prompted if not provided
+        #[arg(long)]
+        host: Option<String>,
+
+        /// Optional token; prompted if not provided
+        #[arg(long)]
+        token: Option<String>,
+
+        /// Optional processor; prompted if not provided
+        #[arg(long)]
+        processor: Option<String>,
+
+        /// Optional accelerator; prompted if not provided
+        #[arg(long)]
+        accelerator: Option<String>,
+    },
+    /// Start or resume sessions with an optional session name
+    Session {
+        /// Optional session name
+        session_name: Option<String>,
+    },
+    /// Run the main application
+    Run,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -55,6 +99,43 @@ enum CliProviderVariant {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    if cli.version {
+        print_version();
+        return Ok(());
+    }
+
+    match cli.command {
+        Some(Command::Configure {
+            provider,
+            host,
+            token,
+            processor,
+            accelerator,
+        }) => {
+            let options = ConfigOptions {
+                provider,
+                host,
+                token,
+                processor,
+                accelerator,
+            };
+            let _ = handle_configure(options);
+            return Ok(());
+        }
+        Some(Command::Session { session_name }) => {
+            let session_name = session_name
+                .unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
+            println!("Session name: {}", session_name);
+            return Ok(());
+        }
+        Some(Command::Run) => {
+            println!("Running the main application");
+        }
+        None => {
+            println!("No command provided");
+        }
+    }
 
     let provider_type = match cli.provider {
         CliProviderVariant::OpenAi => ProviderType::OpenAi,

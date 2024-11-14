@@ -88,9 +88,7 @@ fn convert_message(value: &Value) -> Option<Message> {
         } else if let Some(array) = content.as_array() {
             array
                 .iter()
-                .filter_map(|item| {
-                    item.get("text").and_then(|t| t.as_str()).map(Content::text)
-                })
+                .filter_map(|item| item.get("text").and_then(|t| t.as_str()).map(Content::text))
                 .collect()
         } else {
             return None;
@@ -169,9 +167,7 @@ async fn chat_handler(
                                                 "toolName": call.name,
                                                 "args": call.parameters
                                             });
-                                            let _ = tx
-                                                .send(format!("9:{}\n", tool_call))
-                                                .await;
+                                            let _ = tx.send(format!("9:{}\n", tool_call)).await;
                                         }
                                     }
                                     _ => {
