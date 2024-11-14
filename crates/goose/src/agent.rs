@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use crate::errors::{AgentError, AgentResult};
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
-use crate::providers::types::content::Content;
+use crate::providers::types::content::{Content, ToolResponse};
 use crate::providers::types::message::{Message, Role};
 use crate::systems::System;
 use crate::tool::{Tool, ToolCall};
@@ -92,17 +92,18 @@ impl Agent {
     }
 
     /// Dispatch a single tool call to the appropriate system
-    async fn dispatch_tool_call(&self, tool_call: ToolCall) -> AgentResult<Value> {
+    async fn dispatch_tool_call(&self, tool_call: AgentResult<ToolCall>) -> AgentResult<Value> {
+        let call = tool_call?;
         let system = self
-            .get_system_for_tool(&tool_call.name)
-            .ok_or_else(|| AgentError::ToolNotFound(tool_call.name.clone()))?;
+            .get_system_for_tool(&call.name)
+            .ok_or_else(|| AgentError::ToolNotFound(call.name.clone()))?;
 
-        let tool_name = tool_call
+        let tool_name = call
             .name
             .split("__")
             .nth(1)
-            .ok_or_else(|| AgentError::InvalidToolName(tool_call.name.clone()))?;
-        let system_tool_call = ToolCall::new(tool_name, tool_call.parameters);
+            .ok_or_else(|| AgentError::InvalidToolName(call.name.clone()))?;
+        let system_tool_call = ToolCall::new(tool_name, call.parameters);
 
         system.call(system_tool_call).await
     }
@@ -232,15 +233,9 @@ impl Agent {
                     // Handle all tool calls in the response
                     let mut content = Vec::new();
                     for tool_request in response.tool_request() {
-                        let output = match &tool_request.call {
-                            Ok(call) => match self.dispatch_tool_call(call.clone()).await {
-                                Ok(value) => value,
-                                Err(e) => json!({ "error": e.to_string() }),
-                            },
-                            Err(e) => json!({ "error": format!("Invalid parameters: {}", e) }),
-                        };
+                        let output = self.dispatch_tool_call(tool_request.call).await;
 
-                        content.push(Content::tool_response(&tool_request.id, output));
+                        content.push(Content::ToolResponse(ToolResponse {request_id: tool_request.id, output}));
                     }
 
                     // Create and add the tool response message

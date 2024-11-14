@@ -148,7 +148,9 @@ impl DeveloperSystem {
             let mut cwd = self.cwd.lock().unwrap();
             *cwd = new_cwd.clone();
         }
-        outputs.push(format!("Changed directory to: {}", new_cwd.display()));
+        if working_dir != "." {
+            outputs.push(format!("Changed directory to: {}", new_cwd.display()));
+        }
 
         // Source a file
         if let Some(source) = source_path {
@@ -242,7 +244,7 @@ impl DeveloperSystem {
             outputs.push(output_str);
         }
 
-        Ok(json!({ "result": outputs.join("\n") }))
+        Ok(json!(outputs.join("\n")))
     }
 
     // Implement text_editor tool functionality
