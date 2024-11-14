@@ -3,13 +3,19 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-use goose::tool::{Tool, ToolCall};
 use goose::errors::{AgentError, AgentResult};
 use goose::systems::System;
+use goose::tool::{Tool, ToolCall};
 
 /// A simple system that echoes input back to the caller
 pub struct EchoSystem {
     tools: Vec<Tool>,
+}
+
+impl Default for EchoSystem {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EchoSystem {

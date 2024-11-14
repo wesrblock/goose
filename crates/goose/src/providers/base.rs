@@ -30,15 +30,12 @@ use async_trait::async_trait;
 /// Base trait for AI providers (OpenAI, Anthropic, etc)
 #[async_trait]
 pub trait Provider: Send + Sync {
-    /// Generate the next message using the specified model and other parameters
+    /// Generate the next message using the configured model and other parameters
     async fn complete(
         &self,
-        model: &str,
         system: &str,
         messages: &[Message],
         tools: &[Tool],
-        temperature: Option<f32>,
-        max_tokens: Option<i32>,
     ) -> Result<(Message, Usage)>;
 }
 

@@ -13,10 +13,11 @@ use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::factory;
+use goose::providers::factory::ProviderType;
 use goose::providers::types::message::Message;
 
 use commands::configure::{handle_configure, ConfigOptions};
-use commands::version::{print_version};
+use commands::version::print_version;
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -41,6 +42,14 @@ struct Cli {
     /// Model to use
     #[arg(short, long, default_value = "gpt-4o")]
     model: String,
+
+    /// Temperature (0.0 to 1.0)
+    #[arg(short, long)]
+    temperature: Option<f32>,
+
+    /// Maximum tokens to generate
+    #[arg(long)]
+    max_tokens: Option<i32>,
 
     #[arg(short = 'v', long = "version")]
     version: bool,
@@ -96,7 +105,7 @@ async fn main() -> Result<()> {
         print_version();
         return Ok(());
     }
-    
+
     match cli.command {
         Some(Command::Configure {
             provider,
@@ -116,9 +125,8 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(Command::Session { session_name }) => {
-            let session_name = session_name.unwrap_or_else(|| {
-                input("Session name:").placeholder("").interact().unwrap()
-            });
+            let session_name = session_name
+                .unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
             println!("Session name: {}", session_name);
             return Ok(());
         }
@@ -129,7 +137,7 @@ async fn main() -> Result<()> {
             println!("No command provided");
         }
     }
-    
+
     let provider_type = match cli.provider {
         CliProviderVariant::OpenAi => ProviderType::OpenAi,
         CliProviderVariant::Databricks => ProviderType::Databricks,
@@ -143,7 +151,7 @@ async fn main() -> Result<()> {
 
     let system = Box::new(DeveloperSystem::new());
     let provider = factory::get_provider(provider_type, create_provider_config(&cli)).unwrap();
-    let mut agent = Agent::new(provider, cli.model.clone());
+    let mut agent = Agent::new(provider);
     agent.add_system(system);
     println!("Connected the developer system");
 
@@ -197,6 +205,9 @@ fn create_provider_config(cli: &Cli) -> ProviderConfig {
             api_key: cli.api_key.clone().unwrap_or_else(|| {
                 std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
             }),
+            model: cli.model.clone(),
+            temperature: cli.temperature,
+            max_tokens: cli.max_tokens,
         }),
         CliProviderVariant::Databricks => ProviderConfig::Databricks(DatabricksProviderConfig {
             host: cli.databricks_host.clone().unwrap_or_else(|| {
@@ -205,6 +216,9 @@ fn create_provider_config(cli: &Cli) -> ProviderConfig {
             token: cli.databricks_token.clone().unwrap_or_else(|| {
                 std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")
             }),
+            model: cli.model.clone(),
+            temperature: cli.temperature,
+            max_tokens: cli.max_tokens,
         }),
     }
 }

@@ -51,7 +51,7 @@ impl ToolResponse {
     pub fn new<S: Into<String>>(request_id: S, output: Value) -> Self {
         Self {
             request_id: request_id.into(),
-            output: Ok(output.into()),
+            output: Ok(output),
         }
     }
 }
@@ -123,14 +123,14 @@ impl Content {
                     call.name,
                     serde_json::to_string(&call.parameters).unwrap_or_default()
                 ),
-                Err(err) => format!("content:tool_use:error\nerror:{}", err.to_string()),
+                Err(err) => format!("content:tool_use:error\nerror:{}", err),
             },
             Content::ToolResponse(t) => match &t.output {
                 Ok(value) => format!(
                     "content:tool_result\noutput:{}",
                     serde_json::to_string(&value).unwrap_or("".to_string())
                 ),
-                Err(err) => format!("content:tool_result:error\nerror:{}", err.to_string()),
+                Err(err) => format!("content:tool_result:error\nerror:{}", err),
             },
         }
     }
