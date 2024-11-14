@@ -50,7 +50,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
 
   return (
     <div className="min-h-screen w-full bg-window-gradient flex flex-col items-center justify-center p-0">
-      <div className="flex items-center justify-start overflow-x-auto relative mt-10 w-full">
+      <div className="flex items-center justify-start overflow-x-auto relative p-[10px] pb-0 w-full">
         {chats.map((chat) => (
           <div
             key={chat.id}
@@ -85,7 +85,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
         </button>
       </div>
 
-      <Card className="w-[calc(100%-20px)] h-[calc(100vh-20px)] m-[10px] bg-card-gradient mt-0 backdrop-blur-sm border-none shadow-xl rounded-2xl rounded-t-none overflow-hidden">
+      <Card className="w-[calc(100%-20px)] h-[calc(100vh-20px)] m-[10px] bg-card-gradient mt-0 backdrop-blur-sm border-none shadow-xl rounded-2xl rounded-tl-none overflow-hidden">
         <div className="flex flex-col h-full">
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
