@@ -8,7 +8,7 @@ use crate::profile::profile::Profile;
 // TODO: set to profile1.yaml temporarily to avoid overriting the existing config
 pub const PROFILE_CONFIG_PATH: &str = ".config/goose/profile1.yaml";
 
-fn save_profile(profiles: &[HashMap<&str, &Profile>]) -> Result<(), Box<dyn Error>> {
+fn save_profiles_to_file(profiles: &HashMap<String, Profile>) -> Result<(), Box<dyn Error>> {
     let path = profile_path()?;
 
     if let Some(parent) = path.parent() {
@@ -27,9 +27,31 @@ pub fn profile_path() -> Result<PathBuf, Box<dyn Error>> {
     Ok(path)
 }
 
-pub fn create_profile(name: &str, profile: &Profile) -> Result<(), Box<dyn Error>> {
-    let mut profile_map = HashMap::new();
-    profile_map.insert(name, profile);
-    save_profile(&[profile_map])?;
+pub fn save_profile(profile_name: &str, new_profile: Profile) -> Result<(), Box<dyn Error>> {
+    let mut profiles = load_profiles().unwrap();
+    profiles.insert(profile_name.to_string(), new_profile);
+    let _ = save_profiles_to_file(&profiles);
     Ok(())
+}
+
+fn profile_file_exists() -> bool {
+    profile_path().unwrap().exists()
+}
+pub fn load_profiles() -> Result<HashMap<String, Profile>, Box<dyn Error>> {
+    let path = profile_path()?;
+    if !path.exists() {
+        return Ok(HashMap::new());
+    }
+    let file = File::open(&path)?;
+    let profiles: HashMap<String, Profile> = serde_yaml::from_reader(file)?;
+    Ok(profiles)
+}
+
+pub fn find_existing_profile(profile_name: &str) -> Option<Profile> {
+    if profile_file_exists() {
+        let profiles = load_profiles().unwrap();
+        profiles.get(profile_name).cloned()
+    } else {
+        None
+    }
 }

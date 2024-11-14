@@ -51,7 +51,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    Configure,
+    Configure {
+        profile_name: Option<String>,
+    },
     /// Start or resume sessions with an optional session name
     Session {
         /// Optional session name
@@ -77,8 +79,8 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
-        Some(Command::Configure) => {
-            let _ = handle_configure();
+        Some(Command::Configure {profile_name}) => {
+            let _ = handle_configure(profile_name);
             return Ok(());
         }
         Some(Command::Session { session_name }) => {

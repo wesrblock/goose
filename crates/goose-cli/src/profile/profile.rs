@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Profile {
     pub provider: String,
     pub processor: String,
@@ -10,6 +11,7 @@ pub struct Profile {
 }
 
 #[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Toolkit {
     pub name: String,
     pub requires: std::collections::HashMap<String, String>,
