@@ -381,6 +381,7 @@ mod tests {
         assert!(!is_question_ask("this ?thing? will go ahead now"));
         assert!(!is_question_ask("The ?optional? parameter is required"));
         assert!(!is_question_ask("Using ?wildcards? in the search"));
+        assert!(!is_question_ask("I'll help you implement this plan. Let's start by examining the relevant code and then make the necessary changes."));
     }
 
     #[test]
