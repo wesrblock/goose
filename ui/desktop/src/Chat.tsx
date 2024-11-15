@@ -25,6 +25,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
     api: getApiUrl("/reply"),
     initialMessages: chat.messages
   })
+
   const useChatData = { messages, input, handleInputChange, handleSubmit };
 
   useEffect(() => {
