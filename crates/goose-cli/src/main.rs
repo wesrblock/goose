@@ -120,7 +120,7 @@ async fn main() -> Result<()> {
 
     let system = Box::new(DeveloperSystem::new());
     let provider = factory::get_provider(provider_type, create_provider_config(&cli)).unwrap();
-    let mut agent = Agent::new(provider, cli.model.clone());
+    let mut agent = Agent::new(provider);
     agent.add_system(system);
     println!("Connected the developer system");
 

@@ -16,15 +16,21 @@ pub fn select_provider_lists() -> Vec<(&'static str, String, &'static str)> {
         }).collect()
 }
 
-pub fn set_provider_config(provider_name: &str) -> ProviderConfig {
+pub fn set_provider_config(provider_name: &str, processor: String) -> ProviderConfig {
     match provider_name.to_lowercase().as_str() {
         PROVIDER_OPEN_AI => ProviderConfig::OpenAi(OpenAiProviderConfig {
             host: "https://api.openai.com".to_string(),
             api_key: get_env_value_or_input("OPENAI_API_KEY", "Please enter your OpenAI API key:"),
+            model: processor,
+            temperature: None,
+            max_tokens: None,
         }),
         PROVIDER_DATABRICKS => ProviderConfig::Databricks(DatabricksProviderConfig {
             host: get_env_value_or_input("DATABRICKS_HOST", "Please enter your Databricks host:"),
-            token: get_env_value_or_input("DATABRICKS_TOKEN", "Please enter your Databricks token:")
+            token: get_env_value_or_input("DATABRICKS_TOKEN", "Please enter your Databricks token:"),
+            model: processor,
+            temperature: None,
+            max_tokens: None,
         }),
         _ => panic!("Invalid provider name"),
     }
