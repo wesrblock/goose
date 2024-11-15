@@ -19,11 +19,12 @@ impl<'a> Session<'a> {
     }
 
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.prompt.render("Starting session...\n");
+        self.prompt.render(raw_message("Starting session...\n"));
 
         let system = Box::new(DeveloperSystem::new());
         self.agent.add_system(system);
-        self.prompt.render("Connected the developer system\n");
+        self.prompt
+            .render(raw_message("Connected the developer system\n"));
 
         let mut messages = Vec::new();
 
@@ -46,9 +47,7 @@ impl<'a> Session<'a> {
                 match response {
                     Ok(message) => {
                         messages.push(message.clone());
-                        for content in &message.content {
-                            self.prompt.render(content.summary().as_str());
-                        }
+                        self.prompt.render(Box::new(message.clone()));
                     }
                     Err(e) => {
                         // TODO: Handle error display through prompt
@@ -59,8 +58,13 @@ impl<'a> Session<'a> {
             }
             self.prompt.hide_busy();
 
-            self.prompt.render("\n");
+            self.prompt.render(raw_message("\n"));
         }
+        self.prompt.close();
         Ok(())
     }
+}
+
+fn raw_message(content: &str) -> Box<Message> {
+    Box::new(Message::assistant(content).unwrap())
 }

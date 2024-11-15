@@ -3,12 +3,14 @@ use std::io::{self, Write};
 use anyhow::Result;
 use bat::PrettyPrinter;
 use cliclack::{input, spinner};
+use goose::providers::types::message::Message;
 
 pub trait Prompt {
-    fn render(&self, content: &str);
-    fn get_input(&self) -> Result<Input>;
+    fn render(&mut self, message: Box<Message>);
+    fn get_input(&mut self) -> Result<Input>;
     fn show_busy(&self);
     fn hide_busy(&self);
+    fn close(&self);
 }
 
 pub struct Input {
@@ -32,7 +34,8 @@ impl CliclackPrompt {
 }
 
 impl Prompt for CliclackPrompt {
-    fn render(&self, content: &str) {
+    fn render(&mut self, message: Box<Message>) {
+        let content = message.summary();
         PrettyPrinter::new()
             .input_from_bytes(content.as_bytes())
             .language("markdown")
@@ -49,7 +52,7 @@ impl Prompt for CliclackPrompt {
         self.spinner.stop("");
     }
 
-    fn get_input(&self) -> Result<Input> {
+    fn get_input(&mut self) -> Result<Input> {
         let message_text: String = input("Message:").placeholder("").multiline().interact()?;
         if message_text.trim().eq_ignore_ascii_case("exit") {
             return Ok(Input {
@@ -62,5 +65,9 @@ impl Prompt for CliclackPrompt {
                 content: Some(message_text.trim().to_string()),
             });
         }
+    }
+
+    fn close(&self) {
+        // No cleanup required
     }
 }
