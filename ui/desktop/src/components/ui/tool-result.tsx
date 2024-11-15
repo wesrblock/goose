@@ -40,7 +40,7 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
 
   if (!result) return null
 
-  console.log("ToolResult, result", JSON.stringify(result, null, 2 ))
+  //console.log("ToolResult, result", JSON.stringify(result, null, 2 ))
 
   /*
   ToolResult, result {

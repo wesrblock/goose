@@ -5,7 +5,7 @@
         "content": [
           {
             "type": "text",
-            "text": "Hello! Please list the files in the current directory."
+            "text": "Hello! ping www.apple.com 10 times."
           }
         ]
       }

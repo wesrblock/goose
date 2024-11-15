@@ -103,7 +103,8 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                         {message.toolInvocations ? (
                           <div className="flex items-start gap-3">
                             {message.toolInvocations.map((toolInvocation) => {
-                              if (toolInvocation.state === 'call') {                                                        
+                              if (toolInvocation.state === 'call') {
+                                console.log("tool is called", JSON.stringify(toolInvocation, null, 2))                                                        
                                 return (
                                   <Card key={toolInvocation.toolCallId} className="p-4 space-y-2 bg-gray-50">
                                     <div className="flex items-center gap-2 text-sm text-gray-600">
