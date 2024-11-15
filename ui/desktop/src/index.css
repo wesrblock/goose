@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-.inter-app {
+.inter-app-type {
   color: rgba(0, 0, 0, 0.90);
   font-family: Inter;
   font-size: 12px;
@@ -16,3 +16,16 @@
     --radius: 0.5rem;
   }
 }
+
+@layer components {
+  .ask-goose-type {
+    color: #000;
+    font-family: "Square Sans Mono";
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 1.6px;
+  }
+}
+

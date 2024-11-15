@@ -10,6 +10,7 @@ import { Input } from "./components/ui/input"
 import { ScrollArea } from "./components/ui/scroll-area"
 import ToolResult from './components/ui/tool-result'
 import ToolCall from './components/ui/tool-call'
+import GooseSplashLogo from './components/ui/goose-splash-logo'
 
 export default function Chat({ chats, setChats, selectedChatId, setSelectedChatId }) {
   const navigate = useNavigate()
@@ -141,29 +142,38 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
         <div className="flex flex-col h-full">
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
-              {messages.map((message) => (
-                <div key={message.id}>
-                  {message.role === 'user' ? (
-                    <div className="flex justify-end mb-4">
-                      <div className="bg-[#555FE7E5] text-white rounded-2xl p-4 max-w-[80%]">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex mb-4">
-                      <div className="bg-goose-bubble text-black rounded-2xl p-4 max-w-[80%]">
-                        {message.toolInvocations ? (
-                          <div className="space-y-4">
-                            {message.toolInvocations.map(renderToolInvocation)}
-                          </div>
-                        ) : (
-                          <ReactMarkdown>{message.content}</ReactMarkdown>
-                        )}
-                      </div>
-                    </div>
-                  )}
+              {messages.length === 0 ? (
+                <div className="flex items-center justify-center h-screen">
+                  <div className="flex items-center space-x-4">
+                    <GooseSplashLogo />
+                    <span className="ask-goose-type ml-[8px]">ask<br />goose</span>
+                  </div>
                 </div>
-              ))}
+              ) : (
+                messages.map((message) => (
+                  <div key={message.id}>
+                    {message.role === 'user' ? (
+                      <div className="flex justify-end mb-4">
+                        <div className="bg-[#555FE7E5] text-white rounded-2xl p-4 max-w-[80%]">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex mb-4">
+                        <div className="bg-goose-bubble text-black rounded-2xl p-4 max-w-[80%]">
+                          {message.toolInvocations ? (
+                            <div className="space-y-4">
+                              {message.toolInvocations.map(renderToolInvocation)}
+                            </div>
+                          ) : (
+                            <ReactMarkdown>{message.content}</ReactMarkdown>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </ScrollArea>
           <form onSubmit={handleSubmit} className="relative bg-white mb-0 h-{57px}">
