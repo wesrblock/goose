@@ -1,13 +1,13 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from "framer-motion";
 import { BoxIcon, GPSIcon } from "./icons";
 import ReactMarkdown from 'react-markdown';
 
 interface ToolCallProps {
   call: {
-    state: 'call'
+    state: 'call' | 'result'
     toolCallId: string
     toolName: string
     args: Record<string, any>
@@ -64,9 +64,51 @@ const convertArgsToMarkdown = (args: Record<string, any>): string => {
 };
 
 export default function ToolCall({ call }: ToolCallProps) {
-  if (!call || call.state !== 'call') return null;
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  if (!call) return null;
 
   const markdownContent = convertArgsToMarkdown(call.args);
+
+  if (call.state === 'result') {
+    return (
+      <div className="my-4 flex flex-col gap-2 w-full">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex flex-row items-center gap-2 text-sm text-zinc-400 hover:text-zinc-300 transition-colors"
+        >
+          <BoxIcon size={14} />
+          <span>Tool Result</span>
+          <span className="text-zinc-500">{call.toolCallId}</span>
+          <span className="ml-2">{isExpanded ? '▼' : '▶'}</span>
+        </button>
+        
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="mt-2 font-mono text-sm text-green-400 bg-black bg-opacity-50 rounded-md p-3 overflow-x-auto"
+          >
+            <ReactMarkdown
+              components={{
+                code({ node, inline, className, children, ...props }) {
+                  return (
+                    <code className={`${className} ${inline ? 'bg-black bg-opacity-25 px-1 py-0.5 rounded' : ''}`} {...props}>
+                      {children}
+                    </code>
+                  )
+                }
+              }}
+            >
+              {markdownContent}
+            </ReactMarkdown>
+          </motion.div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="my-4 flex flex-col gap-4 w-full">
