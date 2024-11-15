@@ -22,6 +22,9 @@ async-trait = "0.1"
 async-stream = "0.3"
 strum = "0.26"
 strum_macros = "0.26"
+tera = "1.20.0"
+tokenizers = "0.20.3"
+include_dir = "0.7.4"
 
 [dev-dependencies]
 wiremock = "0.6.0"

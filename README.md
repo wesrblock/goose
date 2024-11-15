@@ -32,6 +32,13 @@ Goose is your on-machine developer agent, working for you, on your terms
 </p>
 
 
+## Building
+
+```sh
+uv run download_tokenizer_files.py
+cargo build
+```
+
 ## Running the CLI
 
 #### OpenAI provider (default):
@@ -48,4 +55,16 @@ export DATABRICKS_HOST=...
 export DATABRICKS_TOKEN=...
 
 cargo run --bin goose -- --provider databricks --model claude-3-5-sonnet-2
+```
+
+
+## Troubleshooting
+
+#### Compiling `tokenizers` library
+
+`tokenizers` depends on `esaxx-rs` which failed to compile because 'cstdint' file
+was not found. The following fixed it:
+```
+export CXXFLAGS="-isystem $(xcrun --show-sdk-path)/usr/include/c++/v1"
+cargo check
 ```

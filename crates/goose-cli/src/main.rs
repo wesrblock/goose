@@ -43,6 +43,14 @@ struct Cli {
     #[arg(short, long, default_value = "gpt-4o")]
     model: String,
 
+    /// Temperature (0.0 to 1.0)
+    #[arg(short, long)]
+    temperature: Option<f32>,
+
+    /// Maximum tokens to generate
+    #[arg(long)]
+    max_tokens: Option<i32>,
+
     #[arg(short = 'v', long = "version")]
     version: bool,
 
@@ -166,6 +174,9 @@ fn create_provider_config(cli: &Cli) -> ProviderConfig {
             api_key: cli.api_key.clone().unwrap_or_else(|| {
                 std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
             }),
+            model: cli.model.clone(),
+            temperature: cli.temperature,
+            max_tokens: cli.max_tokens,
         }),
         CliProviderVariant::Databricks => ProviderConfig::Databricks(DatabricksProviderConfig {
             host: cli.databricks_host.clone().unwrap_or_else(|| {
@@ -174,6 +185,9 @@ fn create_provider_config(cli: &Cli) -> ProviderConfig {
             token: cli.databricks_token.clone().unwrap_or_else(|| {
                 std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")
             }),
+            model: cli.model.clone(),
+            temperature: cli.temperature,
+            max_tokens: cli.max_tokens,
         }),
     }
 }
