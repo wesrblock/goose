@@ -19,6 +19,7 @@ export default {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
         tab: '#E9F7FA',
+        'user-bubble': 'rgba(85, 95, 231, 0.90);',
         'goose-bubble': 'rgba(0, 0, 0, 0.12);'
       },
       borderRadius: {
