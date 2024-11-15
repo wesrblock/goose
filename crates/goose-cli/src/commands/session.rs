@@ -9,12 +9,14 @@ use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::factory;
 use goose::providers::factory::ProviderType;
 
+use crate::prompt::CliclackPrompt;
+
 use super::configure::ConfigOptions;
 
-pub fn build_session(
+pub fn build_session<'a>(
     session_name: Option<String>,
     config_options: Box<ConfigOptions>,
-) -> Box<Session> {
+) -> Box<Session<'a>> {
     // TODO: Use session_name.
     let session_name =
         session_name.unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
@@ -50,8 +52,9 @@ pub fn build_session(
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_type, create_provider_config(&cli_temp)).unwrap();
     let agent = Box::new(Agent::new(provider, cli_temp.model.clone()));
+    let prompt = Box::new(CliclackPrompt::new());
 
-    Box::new(Session::new(agent))
+    Box::new(Session::new(agent, prompt))
 }
 
 fn create_provider_config(cli: &Cli) -> ProviderConfig {

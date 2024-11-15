@@ -1,39 +1,44 @@
 use anyhow::Result;
-use bat::PrettyPrinter;
-use cliclack::{input, spinner};
 use futures::StreamExt;
+
+use crate::prompt::InputType;
+use crate::prompt::Prompt;
 
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::types::message::Message;
 
-pub struct Session {
+pub struct Session<'a> {
     agent: Box<Agent>,
+    prompt: Box<dyn Prompt + 'a>,
 }
 
-impl Session {
-    pub fn new(agent: Box<Agent>) -> Self {
-        Session { agent }
+impl<'a> Session<'a> {
+    pub fn new(agent: Box<Agent>, prompt: Box<impl Prompt + 'a>) -> Self {
+        Session { agent, prompt }
     }
 
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Starting session...");
+        self.prompt.render("Starting session...\n");
 
         let system = Box::new(DeveloperSystem::new());
         self.agent.add_system(system);
-        println!("Connected the developer system");
+        self.prompt.render("Connected the developer system\n");
 
         let mut messages = Vec::new();
 
         loop {
-            let message_text: String = input("Message:").placeholder("").multiline().interact()?;
-            if message_text.trim().eq_ignore_ascii_case("exit") {
-                break;
+            let input = self.prompt.get_input().unwrap();
+            match input.input_type {
+                InputType::Exit => break,
+                InputType::Message => {
+                    if let Some(content) = &input.content {
+                        messages.push(Message::user(content).unwrap());
+                    }
+                }
             }
-            messages.push(Message::user(&message_text).unwrap());
 
-            let spin = spinner();
-            spin.start("awaiting reply");
+            self.prompt.show_busy();
 
             // Process the stream of messages
             let mut stream = self.agent.reply(&messages);
@@ -42,28 +47,20 @@ impl Session {
                     Ok(message) => {
                         messages.push(message.clone());
                         for content in &message.content {
-                            render(&content.summary()).await;
+                            self.prompt.render(content.summary().as_str());
                         }
                     }
                     Err(e) => {
+                        // TODO: Handle error display through prompt
                         eprintln!("Error: {}", e);
                         break;
                     }
                 }
             }
-            spin.stop("");
+            self.prompt.hide_busy();
 
-            println!("\n");
+            self.prompt.render("\n");
         }
         Ok(())
     }
-}
-
-// TODO: async???
-async fn render(content: &str) {
-    PrettyPrinter::new()
-        .input_from_bytes(content.as_bytes())
-        .language("markdown")
-        .print()
-        .unwrap();
 }

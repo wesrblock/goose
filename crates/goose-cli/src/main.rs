@@ -3,6 +3,7 @@ mod commands {
     pub mod session;
     pub mod version;
 }
+mod prompt;
 mod session;
 
 use anyhow::Result;
