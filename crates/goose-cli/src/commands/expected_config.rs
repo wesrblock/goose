@@ -1,6 +1,4 @@
 // This is a temporary file to simulate some configuration data from the backend
-pub const DEFAULT_MODERATOR: &str = "synopsis";
-pub const DEFAULT_TOOLKIT_NAME : &str = "synopsis";
 pub const DEFAULT_PROVIDER_NAME : &str = "openai";
 
 pub struct RecommendedModels {
