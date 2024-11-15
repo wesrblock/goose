@@ -5,8 +5,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use crate::profile::profile::Profile;
 
-// TODO: set to profile1.yaml temporarily to avoid overriting the existing config
-pub const PROFILE_CONFIG_PATH: &str = ".config/goose/profile1.yaml";
+// TODO: set to profile-1.0.yaml temporarily to avoid overriting the existing config
+pub const PROFILE_CONFIG_PATH: &str = ".config/goose/profile-1.0.yaml";
 
 fn save_profiles_to_file(profiles: &HashMap<String, Profile>) -> Result<(), Box<dyn Error>> {
     let path = profile_path()?;
