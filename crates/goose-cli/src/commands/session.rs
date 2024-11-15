@@ -48,10 +48,12 @@ pub fn build_session<'a>(
         model: model,
         version: false,
         command: None,
+        temperature: None,
+        max_tokens: None,
     };
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_type, create_provider_config(&cli_temp)).unwrap();
-    let agent = Box::new(Agent::new(provider, cli_temp.model.clone()));
+    let agent = Box::new(Agent::new(provider));
     let prompt = Box::new(CliclackPrompt::new());
 
     Box::new(Session::new(agent, prompt))
@@ -64,6 +66,9 @@ fn create_provider_config(cli: &Cli) -> ProviderConfig {
             api_key: cli.api_key.clone().unwrap_or_else(|| {
                 std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
             }),
+            model: cli.model.clone(),
+            temperature: cli.temperature,
+            max_tokens: cli.max_tokens,
         }),
         CliProviderVariant::Databricks => ProviderConfig::Databricks(DatabricksProviderConfig {
             host: cli.databricks_host.clone().unwrap_or_else(|| {
@@ -72,6 +77,9 @@ fn create_provider_config(cli: &Cli) -> ProviderConfig {
             token: cli.databricks_token.clone().unwrap_or_else(|| {
                 std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")
             }),
+            model: cli.model.clone(),
+            temperature: cli.temperature,
+            max_tokens: cli.max_tokens,
         }),
     }
 }

@@ -1,7 +1,7 @@
 use uuid::Uuid;
 
 pub fn create_object_id(prefix: &str) -> String {
-    format!("{}_{}", prefix, Uuid::new_v4().simple().to_string())
+    format!("{}_{}", prefix, Uuid::new_v4().simple())
 }
 
 #[cfg(test)]

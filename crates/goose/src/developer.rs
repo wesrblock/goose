@@ -18,6 +18,12 @@ pub struct DeveloperSystem {
     file_history: Mutex<HashMap<PathBuf, Vec<String>>>, // Moved file_history here
 }
 
+impl Default for DeveloperSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeveloperSystem {
     pub fn new() -> Self {
         // TODO i suggest we make working_dir required, we're seeing abs paths are more clear
@@ -142,7 +148,9 @@ impl DeveloperSystem {
             let mut cwd = self.cwd.lock().unwrap();
             *cwd = new_cwd.clone();
         }
-        outputs.push(format!("Changed directory to: {}", new_cwd.display()));
+        if working_dir != "." {
+            outputs.push(format!("Changed directory to: {}", new_cwd.display()));
+        }
 
         // Source a file
         if let Some(source) = source_path {
@@ -236,7 +244,7 @@ impl DeveloperSystem {
             outputs.push(output_str);
         }
 
-        Ok(json!({ "result": outputs.join("\n") }))
+        Ok(json!(outputs.join("\n")))
     }
 
     // Implement text_editor tool functionality
@@ -476,10 +484,7 @@ impl DeveloperSystem {
         } else {
             String::new()
         };
-        history
-            .entry(path.clone())
-            .or_insert_with(Vec::new)
-            .push(content);
+        history.entry(path.clone()).or_default().push(content);
         Ok(())
     }
 }

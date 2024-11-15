@@ -32,6 +32,13 @@ Goose is your on-machine developer agent, working for you, on your terms
 </p>
 
 
+## Building
+
+```sh
+uv run download_tokenizer_files.py
+cargo build
+```
+
 ## Running the CLI
 
 #### OpenAI provider (default):

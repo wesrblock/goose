@@ -26,12 +26,9 @@ impl MockProvider {
 impl Provider for MockProvider {
     async fn complete(
         &self,
-        _model: &str,
         _system_prompt: &str,
         _messages: &[Message],
         _tools: &[Tool],
-        _temperature: Option<f32>,
-        _max_tokens: Option<i32>,
     ) -> Result<(Message, Usage)> {
         let mut responses = self.responses.lock().unwrap();
         if responses.is_empty() {

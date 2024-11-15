@@ -37,6 +37,14 @@ struct Cli {
     #[arg(short, long, default_value = "gpt-4o")]
     model: String,
 
+    /// Temperature (0.0 to 1.0)
+    #[arg(short, long)]
+    temperature: Option<f32>,
+
+    /// Maximum tokens to generate
+    #[arg(long)]
+    max_tokens: Option<i32>,
+
     #[arg(short = 'v', long = "version")]
     version: bool,
 
