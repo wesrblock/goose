@@ -179,7 +179,10 @@ async fn chat_handler(
                                             let jsonld = agent.complete_simple(&task).await;    
                                             match jsonld {
                                                 Ok(message) => {
-                                                    println!("Received message: {:?}", message);
+                                                    println!("Received message: {:?}", message.text());
+                                                    if let Err(e) = tx.send(format!("0:\"JSON_LD::{:?}\"\n", message.text())).await {
+                                                        tracing::error!("Error sending message through channel: {}", e);
+                                                    }
                                                 }, 
                                                 Err(_e) => {
                                                     println!("Unable to talk to LLM")
