@@ -19,7 +19,6 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
     let existing_profile_result = get_existing_profile(&profile_name);
     let existing_profile = existing_profile_result.as_ref();
 
-    // let provider_name = get_input("Enter provider name:", DEFAULT_PROVIDER_NAME)?;
     let provider_name = select_provider(existing_profile);
     let recommended_models = get_recommended_models(&provider_name);
     let processor = set_processor(existing_profile, &recommended_models)?;
