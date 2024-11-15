@@ -100,7 +100,9 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    match cli.command {
+    match cli.command.or(Some(Command::Session {
+        session_name: (None),
+    })) {
         Some(Command::Configure {
             provider,
             host,
