@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Some(Command::Configure {profile_name}) => {
-            let _ = handle_configure(profile_name);
+            let _ = handle_configure(profile_name).await;
             return Ok(());
         }
         Some(Command::Session { session_name }) => {
