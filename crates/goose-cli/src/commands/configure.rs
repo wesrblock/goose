@@ -16,9 +16,9 @@ pub struct ConfigOptions {
     pub accelerator: Option<String>,
 }
 
-pub fn handle_configure(options: ConfigOptions) -> Result<(), Box<dyn Error>> {
+pub fn handle_configure(options: ConfigOptions) -> Result<Box<ConfigOptions>, Box<dyn Error>> {
     ctrlc::set_handler(move || {}).expect("setting Ctrl-C handler");
-    
+
     cliclack::clear_screen()?;
 
     cliclack::intro(style(" create-app ").on_cyan().black())?;
@@ -39,16 +39,12 @@ pub fn handle_configure(options: ConfigOptions) -> Result<(), Box<dyn Error>> {
         Ok(path) => println!("\nConfiguration saved to: {:?}", path),
         Err(e) => eprintln!("Failed to save configuration: {}", e),
     }
-    Ok(())
+    Ok(Box::new(final_config))
 }
 
 // Helper function to prompt the user
 fn prompt(value: Option<String>, message: &str) -> String {
-    value.unwrap_or_else(|| {
-        input(message)
-            .interact()
-            .expect("Failed to get input")
-    })
+    value.unwrap_or_else(|| input(message).interact().expect("Failed to get input"))
 }
 
 fn save_to_yaml(config: &ConfigOptions) -> Result<PathBuf, Box<dyn Error>> {
@@ -62,7 +58,7 @@ fn save_to_yaml(config: &ConfigOptions) -> Result<PathBuf, Box<dyn Error>> {
 
     // Ensure the ~/.config/goose directory exists
     if let Some(parent) = path.parent() {
-        create_dir_all(parent)?;  // Create the directory if it doesn't exist
+        create_dir_all(parent)?; // Create the directory if it doesn't exist
     }
 
     // Serialize the configuration to YAML and save it to the file

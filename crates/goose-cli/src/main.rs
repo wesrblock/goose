@@ -110,7 +110,17 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         Some(Command::Session { session_name }) => {
-            let mut session = build_session(session_name);
+            // TODO: If no profile is provided then dynamically prepare it
+            let options = ConfigOptions {
+                provider: None,
+                host: None,
+                token: None,
+                processor: None,
+                accelerator: None,
+            };
+            // let config_options = handle_configure(options).unwrap();
+            let config_options = Box::new(options);
+            let mut session = build_session(session_name, config_options);
             let _ = session.start().await;
             return Ok(());
         }

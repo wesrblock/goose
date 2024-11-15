@@ -9,28 +9,41 @@ use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::factory;
 use goose::providers::factory::ProviderType;
 
-pub fn build_session(session_name: Option<String>) -> Box<Session> {
+use super::configure::ConfigOptions;
+
+pub fn build_session(
+    session_name: Option<String>,
+    config_options: Box<ConfigOptions>,
+) -> Box<Session> {
     // TODO: Use session_name.
     let session_name =
         session_name.unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
     println!("TODO: Use session name: {}", session_name);
 
-    // TODO: If no config exists, prompt the user through creating one.
-    // TODO: Load the config from the file... Hard coding config for now.
-    let provider_variant = CliProviderVariant::OpenAi;
-
-    let provider_type = match provider_variant {
-        CliProviderVariant::OpenAi => ProviderType::OpenAi,
-        CliProviderVariant::Databricks => ProviderType::Databricks,
+    // TODO: Config should be passed through from main... Hard coding config for now if missing for iterating.
+    let model = config_options
+        .accelerator
+        .unwrap_or_else(|| "gpt-4o".to_string());
+    let provider_type = match config_options.provider.as_deref() {
+        Some("open-ai") => ProviderType::OpenAi,
+        Some("databricks") => ProviderType::Databricks,
+        _ => {
+            println!("No provider specified, defaulting to OpenAI");
+            ProviderType::OpenAi
+        } // _ => panic!("Unknown provider type"),
     };
-    // TODO: use values already unloaded from cli for create_provider_config rather than passing cli.
-    let processor = "gpt-4o-mini";
+    let provider_variant = match provider_type {
+        ProviderType::OpenAi => CliProviderVariant::OpenAi,
+        ProviderType::Databricks => CliProviderVariant::Databricks,
+    };
+
+    // TODO: Load from config instead of hard coding.
     let cli_temp = Cli {
         provider: provider_variant,
         api_key: None,
         databricks_host: None,
         databricks_token: None,
-        model: processor.to_string(),
+        model: model,
         version: false,
         command: None,
     };
