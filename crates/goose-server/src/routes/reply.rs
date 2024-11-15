@@ -174,15 +174,18 @@ async fn chat_handler(
                                     }
                                     _ => {
                                         let text = content.summary();
-                                        let jsonld = agent.complete_simple(&text).await;    
-                                        match jsonld {
-                                            Ok(message) => {
-                                                println!("Received message: {:?}", message);
-                                            }, 
-                                            Err(_e) => {
-                                                println!("Unable to talk to LLM")
-                                            }
-                                        }                                    
+                                        if is_question_ask(&text) {
+                                            let task = format!("I need you to convert this question or ask, plan etc to well formed jsonld and return it as jsonld: {}", text);
+                                            let jsonld = agent.complete_simple(&task).await;    
+                                            match jsonld {
+                                                Ok(message) => {
+                                                    println!("Received message: {:?}", message);
+                                                }, 
+                                                Err(_e) => {
+                                                    println!("Unable to talk to LLM")
+                                                }
+                                            }                                    
+                                        }
                                         // Split text by newlines and send each line separately
                                         for line in text.lines() {
                                             let escaped_line = line.replace('\"', "\\\"");
