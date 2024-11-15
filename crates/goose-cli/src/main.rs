@@ -1,5 +1,6 @@
 mod commands;
 mod profile;
+mod inputs;
 
 use anyhow::Result;
 use bat::PrettyPrinter;
