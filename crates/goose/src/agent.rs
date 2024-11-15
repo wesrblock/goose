@@ -53,6 +53,23 @@ pub struct Agent {
 }
 
 impl Agent {
+    /// Performs a simple completion with just a message and system prompt, without tools.
+    /// Returns the provider's response.
+    pub async fn complete_simple(&self, message: &str) -> AgentResult<Message> {
+        let system_prompt = "test".to_string();
+        let messages = vec![Message::new(
+            Role::User,
+            vec![Content::text(message)],
+        ).map_err(|e| AgentError::Internal(e.to_string()))?];
+        
+        let (response, _) = self.provider
+            .complete(&system_prompt, &messages, &[])
+            .await
+            .map_err(|e| AgentError::Internal(e.to_string()))?;
+            
+        Ok(response)
+    }
+
     /// Create a new Agent with the specified provider
     pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
@@ -312,6 +329,17 @@ mod tests {
                 _ => Err(AgentError::ToolNotFound(tool_call.name)),
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_complete_simple() -> Result<()> {
+        let response = Message::new(Role::Assistant, vec![Content::text("Simple response")])?;
+        let provider = MockProvider::new(vec![response.clone()]);
+        let agent = Agent::new(Box::new(provider));
+
+        let result = agent.complete_simple("Test message").await?;
+        assert_eq!(result, response);
+        Ok(())
     }
 
     #[tokio::test]
