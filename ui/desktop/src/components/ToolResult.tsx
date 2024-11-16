@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import { BoxIcon, GPSIcon, InvoiceIcon } from './icons'
+import { BoxIcon, GPSIcon } from './ui/icons'
 
 interface ToolResultProps {
   result: {
@@ -39,20 +39,6 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
   const [submitted, setSubmitted] = useState(false)
 
   if (!result) return null
-
-  //console.log("ToolResult, result", JSON.stringify(result, null, 2 ))
-
-  /*
-  ToolResult, result {
-  "state": "result",
-  "args": {
-    "command": "ls"
-  },
-  "toolCallId": "call_6q9qZ251ROJtyH9c3uPwnJzr",
-  "toolName": "DeveloperSystem__bash",
-  "result": "ARCHITECTURE.md\nCHANGELOG.md\nCONTRIBUTING.md\nCargo.lock\nCargo.toml\nLICENSE\nREADME.md\ncrates\ndocs\ndownload_tokenizer_files.py\nprofiles.yaml\nproviders.yaml\ntarget\n"
-}
-  */
 
   const handleSubmit = () => {
     setSubmitted(true)
@@ -163,17 +149,24 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
               <ReactMarkdown
                 components={{
                   code({ node, inline, className, children, ...props }) {
+                    {console.log(children)}
                     return (
                       <code className={`${className} ${inline ? 'bg-black bg-opacity-25 px-1 py-0.5 rounded' : ''}`} {...props}>
-                        {children}
+                        {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
                       </code>
                     )
                   },
                   pre({ children }) {
-                    return <div className="whitespace-pre overflow-x-auto">{children}</div>
+                    {console.log(children)}
+                    return <div className="whitespace-pre overflow-x-auto">
+                      {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
+                    </div>
                   },
                   p({ children }) {
-                    return <div className="whitespace-pre-wrap">{children}</div>
+                    {console.log(children)}
+                    return <div className="whitespace-pre-wrap">
+                      {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
+                    </div>
                   }
                 }}
               >
@@ -184,7 +177,7 @@ export default function ToolResult({ result, onSubmitInput }: ToolResultProps) {
         )}
 
 =
-        
+
         {result.input_todo && !submitted && (
           <div className="mt-4 p-4 bg-gray-800 rounded-md">
             {Object.entries(result.input_todo.properties).map(([key, schema]) =>

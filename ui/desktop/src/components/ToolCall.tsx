@@ -1,8 +1,6 @@
-"use client";
-
 import React, { useState } from 'react';
 import { motion } from "framer-motion";
-import { BoxIcon, GPSIcon } from "./icons";
+import { BoxIcon, GPSIcon } from "./ui/icons";
 import ReactMarkdown from 'react-markdown';
 
 interface ToolCallProps {
