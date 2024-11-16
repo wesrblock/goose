@@ -25,11 +25,19 @@ pub enum InputType {
 
 pub struct CliclackPrompt {
     spinner: cliclack::ProgressBar,
+    input_mode: InputMode,
 }
 
+enum InputMode {
+    Singleline,
+    Multiline,
+}
 impl CliclackPrompt {
     pub fn new() -> Self {
-        CliclackPrompt { spinner: spinner() }
+        CliclackPrompt {
+            spinner: spinner(),
+            input_mode: InputMode::Multiline,
+        }
     }
 }
 
@@ -53,16 +61,29 @@ impl Prompt for CliclackPrompt {
     }
 
     fn get_input(&mut self) -> Result<Input> {
-        let message_text: String = input("Message:").placeholder("").multiline().interact()?;
-        if message_text.trim().eq_ignore_ascii_case("exit") {
+        let mut input = input("Talk to Goose:L").placeholder("");
+        match self.input_mode {
+            InputMode::Multiline => input = input.multiline(),
+            InputMode::Singleline => (),
+        }
+        let mut message_text: String = input.interact()?;
+        message_text = message_text.trim().to_string();
+
+        if message_text.eq_ignore_ascii_case("exit") {
             return Ok(Input {
                 input_type: InputType::Exit,
                 content: None,
             });
+        } else if message_text.eq_ignore_ascii_case("/m") {
+            self.input_mode = InputMode::Multiline;
+            return self.get_input();
+        } else if message_text.eq_ignore_ascii_case("/s") {
+            self.input_mode = InputMode::Singleline;
+            return self.get_input();
         } else {
             return Ok(Input {
                 input_type: InputType::Message,
-                content: Some(message_text.trim().to_string()),
+                content: Some(message_text.to_string()),
             });
         }
     }
