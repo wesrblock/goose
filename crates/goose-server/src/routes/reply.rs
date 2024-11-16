@@ -180,7 +180,10 @@ async fn chat_handler(
                                             match jsonld {
                                                 Ok(message) => {
                                                     println!("Received message: {:?}", message.text());
-                                                    if let Err(e) = tx.send(format!("0:\"JSON_LD::{:?}\"\n", message.text())).await {
+                                                    let json_data = json!([{
+                                                        "json-ld": message.text()
+                                                    }]);
+                                                    if let Err(e) = tx.send(format!("2:{}\n", json_data)).await {
                                                         tracing::error!("Error sending message through channel: {}", e);
                                                     }
                                                 }, 
