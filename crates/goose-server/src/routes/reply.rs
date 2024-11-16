@@ -149,12 +149,19 @@ async fn chat_handler(
                         Role::User => {
                             // Handle tool results if present
                             if let Some(Content::ToolResponse(tool_data)) = message.content.first() {
-                                
-                                let result = json!({
-                                    "toolCallId": tool_data.request_id,
-                                    "result": tool_data.output.as_ref().unwrap(),
-                                });
-                                let _ = tx.send(format!("a:{}\n", result)).await;
+                                match tool_data.output.as_ref() {
+                                    Ok(tool_data_output) => {
+                                        let result = json!({
+                                            "toolCallId": tool_data.request_id,
+                                            "result": tool_data_output,
+                                        });
+                                        let _ = tx.send(format!("a:{}\n", result)).await;
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("Error handling tool data output: {}", e);
+                                        break;
+                                    }
+                                }
                             }
                         }
                         Role::Assistant => {
