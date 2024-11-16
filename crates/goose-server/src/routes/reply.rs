@@ -175,7 +175,11 @@ async fn chat_handler(
                                     _ => {
                                         let text = content.summary();
                                         if is_question_ask(&text) {
-                                            let task = format!("I need you to convert this question or ask, plan etc to well formed jsonld and return it as jsonld: {}", text);
+                                            print!("\n\n\n-------\n\n\n{}\n\n\n-------\n\n\n", &text);
+                                            let task = format!("Following is some questions and information to present to the user. There may be lists of options of different kinds. 
+                                            Present it in jsonld format strictly in the response: 
+                                            ### Content: {}
+                                            ### jsonld:\n", text);
                                             let jsonld = agent.complete_simple(&task).await;    
                                             match jsonld {
                                                 Ok(message) => {
