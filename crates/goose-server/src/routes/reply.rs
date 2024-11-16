@@ -183,11 +183,9 @@ async fn chat_handler(
                                             let jsonld = agent.complete_simple(&task).await;    
                                             match jsonld {
                                                 Ok(message) => {
-                                                    println!("Received message: {:?}", message.text());
-                                                    let json_data = json!([{
-                                                        "json-ld": message.text()
-                                                    }]);
-                                                    if let Err(e) = tx.send(format!("2:{}\n", json_data)).await {
+                                                    let clean_json = clean_jsonld_markdown(&message.text());
+                                                    println!("Received message: {}", clean_json);
+                                                    if let Err(e) = tx.send(format!("2:{}\n", clean_json)).await {
                                                         tracing::error!("Error sending message through channel: {}", e);
                                                     }
                                                 }, 
@@ -238,6 +236,17 @@ pub fn routes(state: AppState) -> Router {
         .with_state(state)
 }
 
+
+fn clean_jsonld_markdown(content: &str) -> String {
+    content
+        .trim() // Remove leading/trailing whitespace
+        .trim_start_matches("```jsonld") // Remove opening markdown
+        .trim_end_matches("```") // Remove closing markdown
+        .trim() // Remove any remaining whitespace
+        .to_string()
+        .replace("\n", " ")
+}
+
 /// Determines if a given text is likely to be a question or request for confirmation.
 /// 
 /// This function uses multiple heuristics to detect questions:
@@ -254,6 +263,21 @@ pub fn routes(state: AppState) -> Router {
 /// # Returns
 /// 
 /// Returns true if the text appears to be a question or confirmation request
+/// Cleans markdown-wrapped JSON-LD content by removing markdown code block markers
+/// and any extra whitespace.
+///
+/// # Arguments
+/// * `content` - A string containing JSON-LD content potentially wrapped in markdown code blocks
+///
+/// # Returns
+/// A String containing clean JSON-LD content with markdown markers removed
+///
+/// # Example
+/// ```
+/// let markdown_json = "```jsonld\n{\"key\": \"value\"}\n```";
+/// let clean_json = clean_jsonld_markdown(markdown_json);
+/// assert_eq!(clean_json, "{\"key\": \"value\"}");
+/// ```
 pub fn is_question_ask(text: &str) -> bool {
     let text = text.trim().to_lowercase();
     
@@ -334,6 +358,32 @@ pub fn is_question_ask(text: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_clean_jsonld_markdown() {
+        // Test basic markdown removal
+        assert_eq!(
+            clean_jsonld_markdown("```jsonld\n{\"key\": \"value\"}\n```"),
+            "{\"key\": \"value\"}"
+        );
+
+        // Test with extra whitespace
+        assert_eq!(
+            clean_jsonld_markdown("  ```jsonld  \n  {\"key\": \"value\"}  \n  ```  "),
+            "{\"key\": \"value\"}"
+        );
+
+        // Test with no markdown wrapping
+        assert_eq!(
+            clean_jsonld_markdown("{\"key\": \"value\"}"),
+            "{\"key\": \"value\"}"
+        );
+
+        // Test with empty content
+        assert_eq!(clean_jsonld_markdown(""), "");
+
+        // Test with only whitespace
+        assert_eq!(clean_jsonld_markdown("   "), "");
+    }
     use super::*;
 
     #[test]
