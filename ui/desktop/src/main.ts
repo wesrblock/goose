@@ -1,11 +1,37 @@
 import 'dotenv/config';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Tray, Menu } from 'electron';
 import path from 'node:path';
 import { spawn } from 'child_process';
 import started from "electron-squirrel-startup";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
+
+let tray: Tray | null = null;
+
+const createTray = () => {
+  const isDev = process.env.NODE_ENV === 'development';
+  let iconPath;
+  
+  if (isDev) {
+    iconPath = path.join(process.cwd(), 'src', 'bin', 'goose.png');
+  } else {
+    iconPath = path.join(process.resourcesPath, 'bin', 'goose.png');
+  }
+
+  tray = new Tray(iconPath);
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Show Window', click: () => {
+      const win = BrowserWindow.getAllWindows()[0];
+      if (win) win.show();
+    }},
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() }
+  ]);
+  
+  tray.setToolTip('Goose Dev');
+  tray.setContextMenu(contextMenu);
+};
 
 // Start the goosed binary
 const startGoosed = () => {
@@ -84,6 +110,7 @@ app.whenReady().then(() => {
     console.log('Skipping embedded server startup (disabled by configuration)');
   }
   createWindow();
+  createTray();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
