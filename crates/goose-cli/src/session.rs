@@ -45,15 +45,33 @@ impl<'a> Session<'a> {
 
             // Process the stream of messages
             let mut stream = self.agent.reply(&messages);
-            while let Some(response) = stream.next().await {
-                match response {
-                    Ok(message) => {
-                        messages.push(message.clone());
-                        self.prompt.render(Box::new(message.clone()));
+            loop {
+                tokio::select! {
+                    response = stream.next() => {
+                        match response {
+                            Some(Ok(message)) => {
+                                messages.push(message.clone());
+                                self.prompt.render(Box::new(message.clone()));
+                            }
+                            Some(Err(e)) => {
+                                // TODO: Handle error display through prompt
+                                eprintln!("Error: {}", e);
+                                break;
+                            }
+                            None => break,
+                        }
                     }
-                    Err(e) => {
-                        // TODO: Handle error display through prompt
-                        eprintln!("Error: {}", e);
+                    _ = tokio::signal::ctrl_c() => {
+                        drop(stream);
+                        // Pop all 'messages' from the assistant and the most recent user message. Resets the interaction to before the interrupted user request.
+                        while let Some(message) = messages.pop() {
+                            if message.role == goose::providers::types::message::Role::User {
+                                break;
+                            }
+                            // else drop any assistant messages.
+                        }
+
+                        self.prompt.render(raw_message(" Interrupt: Resetting conversation to before the last sent message...\n"));
                         break;
                     }
                 }
