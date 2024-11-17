@@ -8,6 +8,7 @@ import started from "electron-squirrel-startup";
 if (started) app.quit();
 
 let tray: Tray | null = null;
+let isQuitting = false;
 
 // Function to show the main window
 const showWindow = () => {
@@ -32,7 +33,10 @@ const createTray = () => {
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show Window', click: showWindow },
     { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() }
+    { label: 'Quit', click: () => {
+      isQuitting = true;
+      app.quit();
+    }}
   ]);
   
   tray.setToolTip('Goose Dev');
@@ -104,7 +108,7 @@ const createWindow = () => {
 
   // Handle window close button - hide instead of quit
   mainWindow.on('close', (event) => {
-    if (!app.isQuitting) {
+    if (!isQuitting) {
       event.preventDefault();
       mainWindow.hide();
     }
