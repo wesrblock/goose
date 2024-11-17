@@ -2,7 +2,9 @@ use super::{
     base::Provider, configs::ProviderConfig, databricks::DatabricksProvider, openai::OpenAiProvider,
 };
 use anyhow::Error;
+use strum_macros::{EnumIter};
 
+#[derive(EnumIter, Debug)]
 pub enum ProviderType {
     OpenAi,
     Databricks,
