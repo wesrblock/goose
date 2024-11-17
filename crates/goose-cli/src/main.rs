@@ -1,4 +1,6 @@
 mod commands;
+mod profile;
+mod inputs;
 
 use anyhow::Result;
 use bat::PrettyPrinter;
@@ -6,17 +8,16 @@ use clap::{Parser, Subcommand};
 use cliclack::{input, spinner};
 use console::style;
 use futures::StreamExt;
+use goose::providers::factory::ProviderType;
 
+use commands::configure::handle_configure;
+use commands::version::print_version;
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
 use goose::providers::factory;
-use goose::providers::factory::ProviderType;
 use goose::providers::types::message::Message;
-
-use commands::configure::{handle_configure, ConfigOptions};
-use commands::version::print_version;
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -59,27 +60,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Configure the provider and default systems
     Configure {
-        /// Optional provider name; prompted if not provided
-        #[arg(long)]
-        provider: Option<String>,
-
-        /// Optional host URL; prompted if not provided
-        #[arg(long)]
-        host: Option<String>,
-
-        /// Optional token; prompted if not provided
-        #[arg(long)]
-        token: Option<String>,
-
-        /// Optional processor; prompted if not provided
-        #[arg(long)]
-        processor: Option<String>,
-
-        /// Optional accelerator; prompted if not provided
-        #[arg(long)]
-        accelerator: Option<String>,
+        profile_name: Option<String>,
     },
     /// Start or resume sessions with an optional session name
     Session {
@@ -106,26 +88,14 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
-        Some(Command::Configure {
-            provider,
-            host,
-            token,
-            processor,
-            accelerator,
-        }) => {
-            let options = ConfigOptions {
-                provider,
-                host,
-                token,
-                processor,
-                accelerator,
-            };
-            let _ = handle_configure(options);
+        Some(Command::Configure {profile_name}) => {
+            let _ = handle_configure(profile_name).await;
             return Ok(());
         }
         Some(Command::Session { session_name }) => {
-            let session_name = session_name
-                .unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
+            let session_name = session_name.unwrap_or_else(|| {
+                input("Session name:").placeholder("").interact().unwrap()
+            });
             println!("Session name: {}", session_name);
             return Ok(());
         }
