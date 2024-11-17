@@ -1,23 +1,24 @@
-mod commands;
-mod profile;
+mod commands {
+    pub mod configure;
+    pub mod expected_config;
+    pub mod session;
+    pub mod version;
+}
 mod inputs;
+mod profile;
+mod prompt;
+mod session;
 
 use anyhow::Result;
-use bat::PrettyPrinter;
 use clap::{Parser, Subcommand};
-use cliclack::{input, spinner};
-use console::style;
-use futures::StreamExt;
-use goose::providers::factory::ProviderType;
 
+use crate::profile::provider_helper::PROVIDER_OPEN_AI;
 use commands::configure::handle_configure;
+use commands::expected_config::get_recommended_models;
+use commands::session::build_session;
 use commands::version::print_version;
-use goose::agent::Agent;
-use goose::developer::DeveloperSystem;
-use goose::providers::configs::OpenAiProviderConfig;
-use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
-use goose::providers::factory;
-use goose::providers::types::message::Message;
+use profile::profile::Profile;
+use profile::profile_handler::load_profiles;
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -88,15 +89,25 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
-        Some(Command::Configure {profile_name}) => {
+        Some(Command::Configure { profile_name }) => {
             let _ = handle_configure(profile_name).await;
             return Ok(());
         }
         Some(Command::Session { session_name }) => {
-            let session_name = session_name.unwrap_or_else(|| {
-                input("Session name:").placeholder("").interact().unwrap()
-            });
-            println!("Session name: {}", session_name);
+            // TODO: Choose profile from cli or load a default named profile.
+            let profiles = load_profiles().unwrap();
+            let profile = if profiles.is_empty() {
+                let recommended_models = get_recommended_models(PROVIDER_OPEN_AI);
+                Profile {
+                    provider: PROVIDER_OPEN_AI.to_string(),
+                    processor: recommended_models.processor.to_string(),
+                    accelerator: recommended_models.accelerator.to_string(),
+                }
+            } else {
+                profiles.values().next().unwrap().clone()
+            };
+            let mut session = build_session(session_name, Box::new(profile.clone()));
+            let _ = session.start().await;
             return Ok(());
         }
         Some(Command::Run) => {
@@ -106,88 +117,5 @@ async fn main() -> Result<()> {
             println!("No command provided");
         }
     }
-
-    let provider_type = match cli.provider {
-        CliProviderVariant::OpenAi => ProviderType::OpenAi,
-        CliProviderVariant::Databricks => ProviderType::Databricks,
-    };
-
-    println!(
-        "Example goose CLI {}",
-        style("- type \"exit\" to end the session").dim()
-    );
-    println!("\n");
-
-    let system = Box::new(DeveloperSystem::new());
-    let provider = factory::get_provider(provider_type, create_provider_config(&cli)).unwrap();
-    let mut agent = Agent::new(provider);
-    agent.add_system(system);
-    println!("Connected the developer system");
-
-    let mut messages = Vec::new();
-
-    loop {
-        let message_text: String = input("Message:").placeholder("").multiline().interact()?;
-        if message_text.trim().eq_ignore_ascii_case("exit") {
-            break;
-        }
-        messages.push(Message::user(&message_text).unwrap());
-
-        let spin = spinner();
-        spin.start("awaiting reply");
-
-        // Process the stream of messages
-        let mut stream = agent.reply(&messages);
-        while let Some(response) = stream.next().await {
-            match response {
-                Ok(message) => {
-                    messages.push(message.clone());
-                    for content in &message.content {
-                        render(&content.summary()).await;
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    break;
-                }
-            }
-        }
-        spin.stop("");
-
-        println!("\n");
-    }
     Ok(())
-}
-
-async fn render(content: &str) {
-    PrettyPrinter::new()
-        .input_from_bytes(content.as_bytes())
-        .language("markdown")
-        .print()
-        .unwrap();
-}
-
-fn create_provider_config(cli: &Cli) -> ProviderConfig {
-    match cli.provider {
-        CliProviderVariant::OpenAi => ProviderConfig::OpenAi(OpenAiProviderConfig {
-            host: "https://api.openai.com".to_string(),
-            api_key: cli.api_key.clone().unwrap_or_else(|| {
-                std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set")
-            }),
-            model: cli.model.clone(),
-            temperature: cli.temperature,
-            max_tokens: cli.max_tokens,
-        }),
-        CliProviderVariant::Databricks => ProviderConfig::Databricks(DatabricksProviderConfig {
-            host: cli.databricks_host.clone().unwrap_or_else(|| {
-                std::env::var("DATABRICKS_HOST").expect("DATABRICKS_HOST must be set")
-            }),
-            token: cli.databricks_token.clone().unwrap_or_else(|| {
-                std::env::var("DATABRICKS_TOKEN").expect("DATABRICKS_TOKEN must be set")
-            }),
-            model: cli.model.clone(),
-            temperature: cli.temperature,
-            max_tokens: cli.max_tokens,
-        }),
-    }
 }
