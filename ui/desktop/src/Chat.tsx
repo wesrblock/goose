@@ -13,16 +13,37 @@ import Tabs from './components/Tabs'
 export interface Chat {
   id: number;
   title: string;
+  initialQuery?: String;
   messages: Array<{ id: string; role: any; content: string }>;
 }
 
 export default function Chat({ chats, setChats, selectedChatId, setSelectedChatId } : { chats: Chat[], setChats: any, selectedChatId: number, setSelectedChatId: any }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  const { messages, input, handleInputChange, handleSubmit, append } = useChat({
+  const { messages, input, setInput, handleInputChange, handleSubmit, append } = useChat({
     api: getApiUrl("/reply"),
     initialMessages: chat.messages
   })
+
+  // TODO: Handle initial query submission by directly calling handleSubmit
+  useEffect(() => {
+    if (chat?.initialQuery && messages.length === 0) {
+      setInput(chat.initialQuery as string);
+      // Use setTimeout to ensure the input value is set before simulating the button click
+      setTimeout(() => {
+        const submitButton = document.querySelector(
+          'button[type="submit"]'
+        ) as HTMLButtonElement;
+        if (submitButton) {
+          console.log("Triggering button click...");
+          submitButton.click(); // Simulate the button click
+        } else {
+          console.error("Submit button not found!");
+        }
+      }, 200);
+    }
+  }, [chat?.initialQuery, messages.length]);
+  
 
   useEffect(() => {
     const updatedChats = [...chats]

@@ -1,15 +1,37 @@
 import React, { useState } from 'react';
-import { Route, Routes, Navigate } from 'react-router-dom';
+import { Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import Chat from './Chat';
+import SpotlightInput from './SpotlightInput';
 
 export default function App() {
   const initialChats = [
     { id: 1, title: 'Chat 1', messages: [] },
   ]
 
-  const [chats, setChats] = useState(initialChats)
-  const [selectedChatId, setSelectedChatId] = useState(1)
+  // Get URL search params once for both use cases
+  const searchParams = new URLSearchParams(window.location.search);
+  const initialQuery = searchParams.get('initialQuery');
+  const isSpotlight = searchParams.get('window') === 'spotlight';
 
+  const [chats, setChats] = useState(() => {
+    if (initialQuery) {
+      return [{ 
+        id: 1, 
+        title: initialQuery,
+        initialQuery:  initialQuery,
+        messages: [] 
+      }];
+    }
+    return initialChats;
+  });
+  const [selectedChatId, setSelectedChatId] = useState(1);
+  
+  // If this is the spotlight window, only render the SpotlightInput
+  if (isSpotlight) {
+    return <SpotlightInput />;
+  }
+
+  // Otherwise render the main app with all routes
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-b from-white to-gray-50 flex flex-col">
       <Routes>
