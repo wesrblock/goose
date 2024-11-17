@@ -24,7 +24,9 @@ impl<'a> Session<'a> {
         let system = Box::new(DeveloperSystem::new());
         self.agent.add_system(system);
         self.prompt
-            .render(raw_message("Connected the developer system\n"));
+            .render(raw_message("Connected the developer system.\n"));
+
+        self.prompt.goose_ready();
 
         let mut messages = Vec::new();
 
@@ -57,8 +59,6 @@ impl<'a> Session<'a> {
                 }
             }
             self.prompt.hide_busy();
-
-            self.prompt.render(raw_message("\n"));
         }
         self.prompt.close();
         Ok(())

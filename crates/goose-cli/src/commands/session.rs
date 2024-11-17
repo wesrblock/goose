@@ -1,8 +1,6 @@
 use crate::session::Session;
 use crate::{Cli, CliProviderVariant};
 
-use cliclack::input;
-
 use goose::agent::Agent;
 use goose::providers::configs::OpenAiProviderConfig;
 use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
@@ -14,13 +12,12 @@ use crate::prompt::CliclackPrompt;
 use super::configure::ConfigOptions;
 
 pub fn build_session<'a>(
-    session_name: Option<String>,
+    _session_name: Option<String>,
     config_options: Box<ConfigOptions>,
 ) -> Box<Session<'a>> {
     // TODO: Use session_name.
-    let session_name =
-        session_name.unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
-    println!("TODO: Use session name: {}", session_name);
+    // let session_name =
+    // session_name.unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
 
     // TODO: Config should be passed through from main... Hard coding config for now if missing for iterating.
     let model = config_options
@@ -30,7 +27,7 @@ pub fn build_session<'a>(
         Some("open-ai") => ProviderType::OpenAi,
         Some("databricks") => ProviderType::Databricks,
         _ => {
-            println!("No provider specified, defaulting to OpenAI");
+            println!("No provider specified, defaulting to OpenAI\n");
             ProviderType::OpenAi
         } // _ => panic!("Unknown provider type"),
     };

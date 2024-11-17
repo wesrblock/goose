@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 
 use anyhow::Result;
+use bat::WrappingMode;
 use cliclack::{input, spinner};
 use goose::providers::types::message::Message;
 
@@ -10,6 +11,25 @@ pub trait Prompt {
     fn show_busy(&self);
     fn hide_busy(&self);
     fn close(&self);
+    fn goose_ready(&self) {
+        self.draw_goose();
+    }
+
+    fn draw_goose(&self) {
+        println!(
+            r#"
+        __
+       ( 0)>
+       ||
+       ||
+     __||_
+  <=/     \=>
+    \_____/
+     |  |
+     ^  ^
+    "#
+        );
+    }
 }
 
 pub struct Input {
@@ -37,6 +57,7 @@ enum InputMode {
     Singleline,
     Multiline,
 }
+
 impl CliclackPrompt {
     pub fn new() -> Self {
         // // Load highlighting assets
@@ -62,20 +83,94 @@ impl CliclackPrompt {
     }
 }
 
+fn print_tool_request(content: &str, theme: &str, tool_name: &str) {
+    bat::PrettyPrinter::new()
+        .input(
+            bat::Input::from_bytes(content.as_bytes()).name(format!("Tool Request: {}", tool_name)),
+        )
+        .theme(theme)
+        .language("JSON")
+        .grid(true)
+        .header(true)
+        .wrapping_mode(WrappingMode::Character)
+        .print()
+        .unwrap();
+}
+
+fn print_tool_response(content: &str, theme: &str, language: &str) {
+    bat::PrettyPrinter::new()
+        .input(bat::Input::from_bytes(content.as_bytes()).name("Tool Response:"))
+        .theme(theme)
+        .language(language)
+        .grid(true)
+        .header(true)
+        .wrapping_mode(WrappingMode::Character)
+        .print()
+        .unwrap();
+}
+
+fn print(content: &str, theme: &str) {
+    bat::PrettyPrinter::new()
+        .input(bat::Input::from_bytes(content.as_bytes()))
+        .theme(theme)
+        .language("Markdown")
+        .wrapping_mode(WrappingMode::Character)
+        .print()
+        .unwrap();
+}
+
+fn print_newline() {
+    println!();
+}
+
 impl Prompt for CliclackPrompt {
     fn render(&mut self, message: Box<Message>) {
-        let content = message.summary();
-
         let theme = match self.theme {
             Theme::Light => "GitHub",
             Theme::Dark => "zenburn",
         };
-        bat::PrettyPrinter::new()
-            .input_from_bytes(content.as_bytes())
-            .theme(theme)
-            .language("Markdown")
-            .print()
-            .unwrap();
+
+        // Currently tool usages seem to be coming back as User messages, is that right?
+        // if message.role == goose::providers::types::message::Role::Assistant
+
+        for message_content in &message.content {
+            match message_content {
+                goose::providers::types::content::Content::Text(text) => print(&text.text, theme),
+                goose::providers::types::content::Content::ToolRequest(tool_request) => {
+                    match &tool_request.call {
+                        Ok(call) => {
+                            print_tool_request(
+                                &serde_json::to_string_pretty(&call.parameters).unwrap(),
+                                theme,
+                                &call.name,
+                            );
+                        }
+                        Err(e) => print(&e.to_string(), theme),
+                    }
+                }
+                goose::providers::types::content::Content::ToolResponse(tool_response) => {
+                    match &tool_response.output {
+                        Ok(output) => {
+                            let output_value = serde_json::to_string_pretty(output).unwrap();
+
+                            // For pure text responses, strip the quotes and replace escaped newlines. Eg. bash responses
+                            let unquoted = output_value.trim_matches('"');
+                            let formatted = unquoted.replace("\\n", "\n");
+
+                            let language = if formatted.starts_with("{") {
+                                "JSON"
+                            } else {
+                                "Markdown"
+                            };
+                            print_tool_response(&formatted, theme, language);
+                        }
+                        Err(e) => print(&e.to_string(), theme),
+                    }
+                }
+            }
+        }
+
+        print_newline();
         io::stdout().flush().expect("Failed to flush stdout");
     }
 
