@@ -6,12 +6,15 @@ import ReactMarkdown from 'react-markdown'
 
 export default function ToolInvocation({ toolInvocation }) {
   return (
-    <div key={toolInvocation.toolCallId} className="w-full text-tool space-y-4 transition-all duration-300">
+    <div key={toolInvocation.toolCallId} className="w-full h-full text-tool space-y-4 transition-all duration-300">
       <ToolCall call={toolInvocation} />
       {toolInvocation.state === 'result' && <ToolResult result={toolInvocation} />}
     </div>
   )
 }
+
+
+
 
 interface ToolCallProps {
   call: {
@@ -31,13 +34,16 @@ function ToolCall({ call }: ToolCallProps) {
       </div>
 
       {call.args && (
-        <pre className="mt-1 text-tool-result-green">
+        <pre className="mt-1 text-tool-result-green whitespace-pre-wrap">
           {JSON.stringify(call.args, null, 2)}
         </pre>
       )}
     </Card>
   )
 }
+
+
+
 
 interface ResultItem {
   text?: string
@@ -59,7 +65,7 @@ interface ToolResultProps {
 }
 
 function ToolResult({ result }: ToolResultProps) {
-  console.log('result', result)
+  console.log('ToolResult', result)
   if (!result || !result.result) return null
 
   return (    
@@ -123,6 +129,9 @@ function ToolResult({ result }: ToolResultProps) {
     </Card>
   )
 }
+
+
+
 
 interface ToolResponseFormProps {
   result: {
