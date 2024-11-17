@@ -2,19 +2,16 @@ use crate::profile::profile::Profile;
 use crate::profile::provider_helper::set_provider_config;
 use crate::session::Session;
 
-use cliclack::input;
-
 use goose::agent::Agent;
 use goose::providers::factory;
 use goose::providers::factory::ProviderType;
 
 use crate::prompt::CliclackPrompt;
 
-pub fn build_session<'a>(session_name: Option<String>, profile: Box<Profile>) -> Box<Session<'a>> {
+pub fn build_session<'a>(_session_name: Option<String>, profile: Box<Profile>) -> Box<Session<'a>> {
     // TODO: Use session_name.
-    let session_name =
-        session_name.unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
-    println!("TODO: Use session name: {}", session_name);
+    // let session_name =
+    // session_name.unwrap_or_else(|| input("Session name:").placeholder("").interact().unwrap());
 
     // TODO: Reconsider fn name as we are just using the fn to ask the user if env vars are not set
     let provider_config = set_provider_config(&profile.provider, profile.processor.clone());
