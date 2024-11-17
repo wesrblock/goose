@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { app, BrowserWindow, Tray, Menu } from 'electron';
+import { app, BrowserWindow, Tray, Menu, globalShortcut } from 'electron';
 import path from 'node:path';
 import { spawn } from 'child_process';
 import started from "electron-squirrel-startup";
@@ -8,6 +8,15 @@ import started from "electron-squirrel-startup";
 if (started) app.quit();
 
 let tray: Tray | null = null;
+
+// Function to show the main window
+const showWindow = () => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) {
+    win.show();
+    win.focus();
+  }
+};
 
 const createTray = () => {
   const isDev = process.env.NODE_ENV === 'development';
@@ -21,10 +30,7 @@ const createTray = () => {
 
   tray = new Tray(iconPath);
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show Window', click: () => {
-      const win = BrowserWindow.getAllWindows()[0];
-      if (win) win.show();
-    }},
+    { label: 'Show Window', click: showWindow },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() }
   ]);
@@ -95,6 +101,15 @@ const createWindow = () => {
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
+
+  // Handle window close button - hide instead of quit
+  mainWindow.on('close', (event) => {
+    if (!app.isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+    return false;
+  });
 };
 
 // This method will be called when Electron has finished
@@ -111,6 +126,9 @@ app.whenReady().then(() => {
   }
   createWindow();
   createTray();
+
+  // Register global shortcut
+  globalShortcut.register('CommandOrControl+Shift+G', showWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
