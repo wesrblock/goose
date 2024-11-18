@@ -15,7 +15,15 @@ export default function App() {
 
   const [chats, setChats] = useState(() => {
     if (initialQuery) {
-      return [{ id: 1, title: initialQuery, messages: [{ role: 'user', content: initialQuery }] }];
+      return [{ 
+        id: 1, 
+        title: initialQuery, 
+        messages: [{ 
+          id: `init-${Date.now()}`, 
+          role: 'user', 
+          content: initialQuery 
+        }] 
+      }];
     }
     return initialChats;
   });

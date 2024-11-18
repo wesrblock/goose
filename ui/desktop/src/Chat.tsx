@@ -108,9 +108,9 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                 messages.map((message) => (
                   <div key={message.id}>
                     {message.role === 'user' ? (
-                      <UserMessage message={message} />
+                      <UserMessage key={`user-${message.id}`} message={message} />
                     ) : (
-                      <GooseMessage message={message} useChatData={useChatData} />
+                      <GooseMessage key={`goose-${message.id}`} message={message} useChatData={useChatData} />
                     )}
                   </div>
                 ))
