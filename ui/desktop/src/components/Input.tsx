@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from './ui/button'
-import { Send } from 'lucide-react'
+import Send from './ui/Send'
 
 export default function Input({ handleSubmit, handleInputChange, input }) {
   return (
@@ -10,7 +10,7 @@ export default function Input({ handleSubmit, handleInputChange, input }) {
         placeholder="What should goose do?"
         value={input}
         onChange={handleInputChange}
-        className="w-full outline-none border-none focus:ring-0 bg-transparent p-0" 
+        className="w-full outline-none border-none focus:ring-0 bg-transparent p-0 text-14"
       />  
       <Button
         type="submit"
@@ -18,7 +18,7 @@ export default function Input({ handleSubmit, handleInputChange, input }) {
         variant="ghost"
         className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
       >
-        <Send className="h-5 w-5" />
+        <Send className="h-[24px] w-24px;" size={24} />
       </Button>
     </form>
   );
