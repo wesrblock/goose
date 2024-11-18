@@ -18,7 +18,7 @@ export default function Input({ handleSubmit, handleInputChange, input }) {
         variant="ghost"
         className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
       >
-        <Send className="h-[24px] w-24px;" size={24} />
+        <Send size={24} />
       </Button>
     </form>
   );
