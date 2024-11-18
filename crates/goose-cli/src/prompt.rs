@@ -191,7 +191,8 @@ impl Prompt for CliclackPrompt {
         let mut message_text: String = input.interact()?;
         message_text = message_text.trim().to_string();
 
-        if message_text.eq_ignore_ascii_case("exit") {
+        if message_text.eq_ignore_ascii_case("/exit") || message_text.eq_ignore_ascii_case("/quit")
+        {
             return Ok(Input {
                 input_type: InputType::Exit,
                 content: None,
@@ -221,6 +222,7 @@ impl Prompt for CliclackPrompt {
             println!("/s - Switch to singleline input mode");
             println!("/t - Toggle Light/Dark theme");
             println!("/? - Display this help message");
+            println!("Ctrl+C - Interrupt goose (resets the interaction to before the interrupted user request)");
             return self.get_input();
         } else {
             return Ok(Input {
