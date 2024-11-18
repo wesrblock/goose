@@ -132,7 +132,7 @@ app.whenReady().then(() => {
   createTray();
 
   // Register global shortcut
-  globalShortcut.register('CommandOrControl+Shift+G', showWindow);
+  globalShortcut.register('Control+Alt+Command+G', showWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
