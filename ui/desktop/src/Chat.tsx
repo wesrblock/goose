@@ -2,13 +2,13 @@ import React, { useEffect } from 'react'
 import { useChat } from 'ai/react'
 import { useNavigate } from 'react-router-dom'
 import { getApiUrl } from './config'
-import { X, Plus, Send } from 'lucide-react'
-import { Button } from './components/ui/button'
+import { X, Plus } from 'lucide-react'
 import { Card } from './components/ui/card'
 import { ScrollArea } from './components/ui/scroll-area'
 import GooseSplashLogo from './components/GooseSplashLogo'
 import GooseMessage from './components/GooseMessage'
 import UserMessage from './components/UserMessage'
+import Input from './components/Input'
 
 export interface Chat {
   id: number;
@@ -115,23 +115,8 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
             <div className="block h-10" />
           </ScrollArea>
         )}
-        <form onSubmit={handleSubmit} className="flex relative bg-white h-[57px] px-[16px] rounded-b-2xl">
-          <input 
-            type="text" 
-            placeholder="What should goose do?"
-            value={input}
-            onChange={handleInputChange}
-            className="w-full outline-none border-none focus:ring-0 bg-transparent p-0" 
-          />  
-          <Button
-            type="submit"
-            size="icon"
-            variant="ghost"
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
-          >
-            <Send className="h-5 w-5" />
-          </Button>
-        </form>
+
+        <Input handleSubmit={handleSubmit} handleInputChange={handleInputChange} input={input} />
       </Card>
     </div>
   )
