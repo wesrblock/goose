@@ -12,13 +12,9 @@ mod session;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use crate::profile::provider_helper::PROVIDER_OPEN_AI;
 use commands::configure::handle_configure;
-use commands::expected_config::get_recommended_models;
 use commands::session::build_session;
 use commands::version::print_version;
-use profile::profile::Profile;
-use profile::profile_handler::load_profiles;
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -66,8 +62,8 @@ enum Command {
     },
     /// Start or resume sessions with an optional session name
     Session {
-        /// Optional session name
-        session_name: Option<String>,
+        session: Option<String>,
+        profile: Option<String>,
     },
     /// Run the main application
     Run,
@@ -93,20 +89,8 @@ async fn main() -> Result<()> {
             let _ = handle_configure(profile_name).await;
             return Ok(());
         }
-        Some(Command::Session { session_name }) => {
-            // TODO: Choose profile from cli or load a default named profile.
-            let profiles = load_profiles().unwrap();
-            let profile = if profiles.is_empty() {
-                let recommended_models = get_recommended_models(PROVIDER_OPEN_AI);
-                Profile {
-                    provider: PROVIDER_OPEN_AI.to_string(),
-                    processor: recommended_models.processor.to_string(),
-                    accelerator: recommended_models.accelerator.to_string(),
-                }
-            } else {
-                profiles.values().next().unwrap().clone()
-            };
-            let mut session = build_session(session_name, Box::new(profile.clone()));
+        Some(Command::Session { session, profile }) => {
+            let mut session = build_session(session, profile);
             let _ = session.start().await;
             return Ok(());
         }
