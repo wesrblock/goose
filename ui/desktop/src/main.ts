@@ -45,15 +45,12 @@ const createSpotlightWindow = () => {
   );
 
   // Load spotlight window content
+  const spotlightParams = '?window=spotlight#/spotlight';
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    spotlightWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?window=spotlight#/spotlight`);
+    spotlightWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${spotlightParams}`);
   } else {
     spotlightWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-      { 
-        hash: 'spotlight',
-        search: 'window=spotlight'
-      }
+      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html${spotlightParams}`)
     );
   }
 
@@ -141,7 +138,7 @@ const startGoosed = () => {
   });
 };
 
-const createWindow = () => {
+const createWindow = (query?: string) => {
   const mainWindow = new BrowserWindow({
     frame: false,
     width: 1024,
@@ -152,10 +149,14 @@ const createWindow = () => {
   });
 
   // and load the index.html of the app.
+  const queryParam = query ? `?initialQuery=${encodeURIComponent(query)}` : '';
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    mainWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${queryParam}`);
   } else {
-    mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
+    mainWindow.loadFile(
+      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+      { search: queryParam.slice(1) }
+    );
   }
 
   console.log(MAIN_WINDOW_VITE_NAME);
@@ -175,6 +176,20 @@ const createWindow = () => {
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
+// Import ipcMain at the top
+import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain } from 'electron';
+
+// Add IPC handler for hiding windows
+ipcMain.on('hide-window', () => {
+  if (spotlightWindow) {
+    spotlightWindow.hide();
+  }
+});
+
+ipcMain.on('create-chat-window', (_, query) => {
+  createWindow(query);
+});
+
 app.whenReady().then(() => {
   // Get the server startup configuration
   const shouldStartServer = (import.meta.env.VITE_START_EMBEDDED_SERVER || 'yes').toLowerCase() === 'yes';

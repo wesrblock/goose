@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 
+declare global {
+  interface Window {
+    electron: {
+      hideWindow: () => void;
+      createChatWindow: (query: string) => void;
+    };
+  }
+}
+
 export default function SpotlightInput() {
   const [query, setQuery] = useState('');
 
@@ -13,9 +22,14 @@ export default function SpotlightInput() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle the query submission here
-    console.log('Submitted query:', query);
-    setQuery('');
+    if (query.trim()) {
+      // Create a new chat window with the query
+      window.electron.createChatWindow(query);
+      // Clear the input
+      setQuery('');
+      // Hide the spotlight window
+      window.electron.hideWindow();
+    }
   };
 
   return (

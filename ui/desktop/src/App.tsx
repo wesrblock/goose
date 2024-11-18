@@ -8,13 +8,19 @@ export default function App() {
     { id: 1, title: 'Chat 1', messages: [] },
   ]
 
-  const [chats, setChats] = useState(initialChats)
-  const [selectedChatId, setSelectedChatId] = useState(1)
-  
-  // Check if this is the spotlight window
+  // Get URL search params once for both use cases
   const searchParams = new URLSearchParams(window.location.search);
+  const initialQuery = searchParams.get('initialQuery');
   const isSpotlight = searchParams.get('window') === 'spotlight';
 
+  const [chats, setChats] = useState(() => {
+    if (initialQuery) {
+      return [{ id: 1, title: initialQuery, messages: [{ role: 'user', content: initialQuery }] }];
+    }
+    return initialChats;
+  });
+  const [selectedChatId, setSelectedChatId] = useState(1);
+  
   // If this is the spotlight window, only render the SpotlightInput
   if (isSpotlight) {
     return <SpotlightInput />;
