@@ -33,7 +33,7 @@ export default function SpotlightInput() {
   };
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-transparent">
+    <div className="h-screen w-screen flex items-center justify-center bg-transparent overflow-hidden">
       <form 
         onSubmit={handleSubmit}
         className="w-[600px] bg-black/80 backdrop-blur-lg rounded-lg shadow-lg p-4"
