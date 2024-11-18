@@ -5,7 +5,6 @@ import { getApiUrl } from './config'
 import { X, Plus, Send } from 'lucide-react'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
-import { Input } from './components/ui/input'
 import { ScrollArea } from './components/ui/scroll-area'
 import GooseSplashLogo from './components/GooseSplashLogo'
 import GooseMessage from './components/GooseMessage'
@@ -57,8 +56,8 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   };
 
   return (
-    <div className="min-h-screen w-full bg-window-gradient flex flex-col items-center justify-center p-0">
-      <div className="flex items-center justify-start overflow-x-auto relative p-[10px] pb-0 w-full">
+    <div className="flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
+      <div className="flex flex-0 items-center justify-start relative pb-0 w-full">
         {chats.map((chat) => (
           <div
             key={chat.id}
@@ -77,7 +76,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                   e.stopPropagation();
                   removeChat(chat.id);
                 }}
-                aria-label={`Close ${chat.title} chat`}
+                aria-label={`Close chat ${chat.id}`}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -93,47 +92,46 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
         </button>
       </div>
 
-      <Card className="w-[calc(100%-20px)] h-[calc(100vh-20px)] m-[10px] bg-card-gradient mt-0 backdrop-blur-sm border-none shadow-xl rounded-2xl rounded-tl-none overflow-hidden">
-        <div className="flex flex-col h-full">
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
-              {messages.length === 0 ? (
-                <div className="flex items-center justify-center h-screen">
-                  <div className="flex items-center space-x-4">
-                    <GooseSplashLogo />
-                    <span className="ask-goose-type ml-[8px]">ask<br />goose</span>
-                  </div>
-                </div>
-              ) : (
-                messages.map((message) => (
-                  <div key={message.id}>
-                    {message.role === 'user' ? (
-                      <UserMessage message={message} />
-                    ) : (
-                      <GooseMessage message={message} useChatData={useChatData} />
-                    )}
-                  </div>
-                ))
-              )}
+      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl rounded-tl-none">
+        {messages.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="flex items-center">
+              <GooseSplashLogo />
+              <span className="ask-goose-type ml-[8px]">ask<br />goose</span>
             </div>
+          </div>
+        ) : (
+          <ScrollArea className="flex-1 px-[10px]">
+            <div className="block h-10" />
+            {messages.map((message) => (
+              <div key={message.id}>
+                {message.role === 'user' ? (
+                  <UserMessage message={message} />
+                ) : (
+                  <GooseMessage message={message} useChatData={useChatData} />
+                )}
+              </div>
+            ))}
+            <div className="block h-10" />
           </ScrollArea>
-          <form onSubmit={handleSubmit} className="relative bg-white mb-0 h-{57px}">
-            <Input
-              placeholder="What should goose do?"
-              value={input}
-              onChange={handleInputChange}
-              className="pr-12 rounded-full border-none focus:outline-none focus:ring-0"
-            />
-            <Button
-              type="submit"
-              size="icon"
-              variant="ghost"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-          </form>
-        </div>
+        )}
+        <form onSubmit={handleSubmit} className="flex relative bg-white h-[57px] px-[16px] rounded-b-2xl">
+          <input 
+            type="text" 
+            placeholder="What should goose do?"
+            value={input}
+            onChange={handleInputChange}
+            className="w-full outline-none border-none focus:ring-0 bg-transparent p-0" 
+          />  
+          <Button
+            type="submit"
+            size="icon"
+            variant="ghost"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100"
+          >
+            <Send className="h-5 w-5" />
+          </Button>
+        </form>
       </Card>
     </div>
   )

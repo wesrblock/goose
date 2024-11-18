@@ -7,9 +7,12 @@ export default {
   ],
   theme: {
     extend: {
+      spacing: {
+        '10': '10px'
+      },
       margin: {
         '10': '10px',
-        '50': '50px',
+        '50': '50px'
       },
       backgroundImage: {
         'card-gradient': 'linear-gradient(28.59deg, rgba(255, 255, 255, 0.9) 5.64%, rgba(226, 245, 251, 0.9) 94.49%);',
