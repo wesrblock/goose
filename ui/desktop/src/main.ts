@@ -74,7 +74,26 @@ const showWindow = () => {
     return;
   }
 
-  windows.forEach((win) => {
+  // Define the initial offset values
+  const initialOffsetX = 30;
+  const initialOffsetY = 30;
+
+  // Iterate over all windows
+  windows.forEach((win, index) => {
+    const currentBounds = win.getBounds(); // Get the current window bounds (position and size)
+    
+    // Calculate the new position with an incremental offset
+    const newX = currentBounds.x + initialOffsetX * index;
+    const newY = currentBounds.y + initialOffsetY * index;
+
+    // Set the new bounds with the calculated position
+    win.setBounds({
+      x: newX,
+      y: newY,
+      width: currentBounds.width,
+      height: currentBounds.height,
+    });
+
     if (!win.isVisible()) {
       win.show();
     }
