@@ -65,13 +65,21 @@ const createSpotlightWindow = () => {
   });
 };
 
+
 const showWindow = () => {
-  // TODO show a list of windows
-  const win = BrowserWindow.getAllWindows()[0];
-  if (win) {
-    win.show();
-    win.focus();
+  const windows = BrowserWindow.getAllWindows();
+
+  if (windows.length === 0) {
+    console.log("No windows are currently open.");
+    return;
   }
+
+  windows.forEach((win) => {
+    if (!win.isVisible()) {
+      win.show();
+    }
+    win.focus();
+  });
 };
 
 const createTray = () => {
