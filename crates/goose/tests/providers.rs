@@ -11,6 +11,8 @@ use goose::{
         factory::get_provider,
     },
 };
+use goose::providers::configs::OllamaProviderConfig;
+use goose::providers::ollama::{OLLAMA_HOST, OLLAMA_MODEL};
 
 /// Generic test harness for any Provider implementation
 struct ProviderTester {
@@ -144,6 +146,26 @@ async fn test_databricks_provider() -> Result<()> {
         host: std::env::var("DATABRICKS_HOST")?,
         token: std::env::var("DATABRICKS_TOKEN")?,
         model: std::env::var("DATABRICKS_MODEL")?,
+        temperature: None,
+        max_tokens: None,
+    });
+
+    let tester = ProviderTester::new(config)?;
+    tester.run_test_suite().await?;
+
+    Ok(())
+}
+
+// Integration tests that run against a real Ollama server
+#[tokio::test]
+async fn test_ollama_provider() -> Result<()> {
+    load_env();
+
+   let config = ProviderConfig::Ollama(OllamaProviderConfig {
+        host: std::env::var("OLLAMA_HOST")
+            .unwrap_or_else(|_| String::from(OLLAMA_HOST)),
+        model: std::env::var("OLLAMA_MODEL")
+            .unwrap_or_else(|_| String::from(OLLAMA_MODEL)),
         temperature: None,
         max_tokens: None,
     });
