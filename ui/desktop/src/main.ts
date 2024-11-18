@@ -66,6 +66,7 @@ const createSpotlightWindow = () => {
 };
 
 const showWindow = () => {
+  // TODO show a list of windows
   const win = BrowserWindow.getAllWindows()[0];
   if (win) {
     win.show();
@@ -200,8 +201,9 @@ app.whenReady().then(() => {
   } else {
     console.log('Skipping embedded server startup (disabled by configuration)');
   }
-  createWindow();
+  //createWindow();
   createTray();
+  createSpotlightWindow();
 
   // Register global shortcut
   globalShortcut.register('Control+Alt+Command+G', createSpotlightWindow);

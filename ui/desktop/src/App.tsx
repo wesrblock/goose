@@ -17,12 +17,9 @@ export default function App() {
     if (initialQuery) {
       return [{ 
         id: 1, 
-        title: initialQuery, 
-        messages: [{ 
-          id: `init-${Date.now()}`, 
-          role: 'user', 
-          content: initialQuery 
-        }] 
+        title: initialQuery,
+        initialQuery:  initialQuery,
+        messages: [] 
       }];
     }
     return initialChats;

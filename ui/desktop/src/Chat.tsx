@@ -14,6 +14,7 @@ import UserMessage from './components/UserMessage'
 export interface Chat {
   id: number;
   title: string;
+  initialQuery?: String;
   messages: Array<{ id: string; role: any; content: string }>;
 }
 
@@ -21,10 +22,23 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   const navigate = useNavigate()
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  const { messages, input, handleInputChange, handleSubmit } = useChat({
+  console.log("messages", chat.messages);
+
+  const { messages, input, handleInputChange, handleSubmit, setInput } = useChat({
     api: getApiUrl("/reply"),
     initialMessages: chat.messages
   })
+
+  // Handle initial query submission by directly calling handleSubmit
+  useEffect(() => {
+    if (chat.initialQuery && messages.length === 0) {
+      setInput(chat.initialQuery as string);
+      // Use setTimeout to ensure the input value is set before submitting
+      setTimeout(() => {
+        handleSubmit(new Event('submit'));
+      }, 0);
+    }
+  }, []);
 
   const useChatData = { messages, input, handleInputChange, handleSubmit };
 
