@@ -11,6 +11,63 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 // Function to show the main window
+let spotlightWindow: BrowserWindow | null = null;
+
+const createSpotlightWindow = () => {
+  // If window exists, just show it
+  if (spotlightWindow) {
+    spotlightWindow.show();
+    spotlightWindow.focus();
+    return;
+  }
+
+  // Create new spotlight window
+  spotlightWindow = new BrowserWindow({
+    width: 600,
+    height: 60,
+    frame: false,
+    transparent: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+    },
+    skipTaskbar: true,
+    alwaysOnTop: true,
+  });
+
+  // Center on screen
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+  const windowBounds = spotlightWindow.getBounds();
+  spotlightWindow.setPosition(
+    Math.round(width / 2 - windowBounds.width / 2),
+    Math.round(height / 3 - windowBounds.height / 2)
+  );
+
+  // Load spotlight window content
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    spotlightWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?window=spotlight#/spotlight`);
+  } else {
+    spotlightWindow.loadFile(
+      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+      { 
+        hash: 'spotlight',
+        search: 'window=spotlight'
+      }
+    );
+  }
+
+  // Hide window when it loses focus
+  spotlightWindow.on('blur', () => {
+    spotlightWindow?.hide();
+  });
+
+  // Cleanup on close
+  spotlightWindow.on('closed', () => {
+    spotlightWindow = null;
+  });
+};
+
 const showWindow = () => {
   const win = BrowserWindow.getAllWindows()[0];
   if (win) {
@@ -132,7 +189,7 @@ app.whenReady().then(() => {
   createTray();
 
   // Register global shortcut
-  globalShortcut.register('Control+Alt+Command+G', showWindow);
+  globalShortcut.register('Control+Alt+Command+G', createSpotlightWindow);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
