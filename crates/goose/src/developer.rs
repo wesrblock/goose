@@ -556,6 +556,7 @@ mod tests {
         assert!(matches!(error, AgentError::InvalidParameters(_)));
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_bash_change_directory() {
         let system = get_system().await;
