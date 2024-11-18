@@ -8,6 +8,7 @@ mod inputs;
 mod profile;
 mod prompt;
 mod session;
+mod systems;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -102,6 +103,7 @@ async fn main() -> Result<()> {
                     provider: PROVIDER_OPEN_AI.to_string(),
                     processor: recommended_models.processor.to_string(),
                     accelerator: recommended_models.accelerator.to_string(),
+                    additional_systems: Vec::new(),
                 }
             } else {
                 profiles.values().next().unwrap().clone()
