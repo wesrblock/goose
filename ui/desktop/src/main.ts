@@ -50,7 +50,8 @@ const startGoosed = () => {
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
-    frame: false,
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 16, y: 18 },
     width: 1024,
     height: 768,
     webPreferences: {

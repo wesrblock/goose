@@ -1,70 +1,99 @@
-use cliclack::input;
+use crate::commands::expected_config::{get_recommended_models, RecommendedModels};
+use crate::inputs::inputs::get_user_input;
+use crate::profile::profile::Profile;
+use crate::profile::profile_handler::{find_existing_profile, profile_path, save_profile};
+use crate::profile::provider_helper::{
+    get_provider_type, select_provider_lists, set_provider_config, PROVIDER_OPEN_AI,
+};
+use cliclack::spinner;
 use console::style;
-use ctrlc;
-use serde::{Deserialize, Serialize};
+use goose::providers::configs::ProviderConfig;
+use goose::providers::factory;
+use goose::providers::types::message::Message;
 use std::error::Error;
-use std::fs::{create_dir_all, File};
-use std::io::Write;
-use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize)]
-pub struct ConfigOptions {
-    pub provider: Option<String>,
-    pub host: Option<String>,
-    pub token: Option<String>,
-    pub processor: Option<String>,
-    pub accelerator: Option<String>,
-}
+pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(), Box<dyn Error>> {
+    cliclack::intro(style(" configure-goose ").on_cyan().black())?;
+    println!("We are helping you configure your Goose CLI profile.");
+    let profile_name = provided_profile_name
+        .unwrap_or_else(|| get_user_input("Enter profile name:", "default").unwrap());
+    let existing_profile_result = get_existing_profile(&profile_name);
+    let existing_profile = existing_profile_result.as_ref();
 
-pub fn handle_configure(options: ConfigOptions) -> Result<(), Box<dyn Error>> {
-    ctrlc::set_handler(move || {}).expect("setting Ctrl-C handler");
-
-    cliclack::clear_screen()?;
-
-    cliclack::intro(style(" create-app ").on_cyan().black())?;
-    let provider = prompt(options.provider, "Enter provider name:");
-    let host = prompt(options.host, "Enter host URL:");
-    let token = prompt(options.token, "Enter token:");
-    let processor = prompt(options.processor, "Enter processor:");
-    let accelerator = prompt(options.accelerator, "Enter accelerator:");
-
-    let final_config = ConfigOptions {
-        provider: Some(provider),
-        host: Some(host),
-        token: Some(token),
-        processor: Some(processor),
-        accelerator: Some(accelerator),
+    let provider_name = select_provider(existing_profile);
+    let recommended_models = get_recommended_models(&provider_name);
+    let processor = set_processor(existing_profile, &recommended_models)?;
+    let accelerator = set_accelerator(existing_profile, &recommended_models)?;
+    let provider_config = set_provider_config(&provider_name, processor.clone());
+    let profile = Profile {
+        provider: provider_name.to_string(),
+        processor: processor.clone(),
+        accelerator,
     };
-    match save_to_yaml(&final_config) {
-        Ok(path) => println!("\nConfiguration saved to: {:?}", path),
-        Err(e) => eprintln!("Failed to save configuration: {}", e),
+    match save_profile(profile_name.as_str(), profile) {
+        Ok(()) => println!("\nProfile saved to: {:?}", profile_path()?),
+        Err(e) => println!("Failed to save profile: {}", e),
     }
+    check_configuration(provider_name, provider_config).await?;
     Ok(())
 }
 
-// Helper function to prompt the user
-fn prompt(value: Option<String>, message: &str) -> String {
-    value.unwrap_or_else(|| input(message).interact().expect("Failed to get input"))
+async fn check_configuration(
+    provider_name: &str,
+    provider_config: ProviderConfig,
+) -> Result<(), Box<dyn Error>> {
+    let spin = spinner();
+    spin.start("Now let's check your configuration...");
+    let provider =
+        factory::get_provider(get_provider_type(provider_name), provider_config).unwrap();
+    let message = Message::user("Please give a nice welcome messsage (one sentence) and let them know they are all set to use this agent ").unwrap();
+    let result = provider.complete(
+                                   "You are an AI agent called Goose. You use tools of connected systems to solve problems.",
+                                   &[message], &[]).await?;
+    spin.stop(result.0.text());
+    Ok(())
 }
 
-fn save_to_yaml(config: &ConfigOptions) -> Result<PathBuf, Box<dyn Error>> {
-    // Locate the config directory
-    let mut path = dirs::home_dir().ok_or("Failed to find home directory")?;
-    path.push(".config");
-    path.push("goose");
-
-    // TODO: set to profile1.yaml temporarily to avoid overriting the existing config
-    path.push("profile1.yaml");
-
-    // Ensure the ~/.config/goose directory exists
-    if let Some(parent) = path.parent() {
-        create_dir_all(parent)?; // Create the directory if it doesn't exist
+fn get_existing_profile(profile_name: &String) -> Option<Profile> {
+    let existing_profile_result = find_existing_profile(profile_name.as_str());
+    if existing_profile_result.is_some() {
+        println!("Profile already exists. We are going to overwriting the existing profile...");
+    } else {
+        println!("We are creating a new profile...");
     }
+    existing_profile_result
+}
 
-    // Serialize the configuration to YAML and save it to the file
-    let yaml_string = serde_yaml::to_string(config)?;
-    let mut file = File::create(&path)?;
-    file.write_all(yaml_string.as_bytes())?;
+fn set_processor(
+    existing_profile: Option<&Profile>,
+    recommended_models: &RecommendedModels,
+) -> Result<String, Box<dyn Error>> {
+    let default_processor_value = existing_profile
+        .map_or(recommended_models.processor, |profile| {
+            profile.processor.as_str()
+        });
+    let processor = get_user_input("Enter processor:", default_processor_value)?;
+    Ok(processor)
+}
 
-    Ok(path)
+fn set_accelerator(
+    existing_profile: Option<&Profile>,
+    recommended_models: &RecommendedModels,
+) -> Result<String, Box<dyn Error>> {
+    let default_accelerator_value = existing_profile
+        .map_or(recommended_models.accelerator, |profile| {
+            profile.accelerator.as_str()
+        });
+    let processor = get_user_input("Enter accelerator:", default_accelerator_value)?;
+    Ok(processor)
+}
+
+fn select_provider(existing_profile: Option<&Profile>) -> &str {
+    let default_value =
+        existing_profile.map_or(PROVIDER_OPEN_AI, |profile| profile.provider.as_str());
+    cliclack::select("Select provider:")
+        .initial_value(default_value)
+        .items(&select_provider_lists())
+        .interact()
+        .unwrap()
 }
