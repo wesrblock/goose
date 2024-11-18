@@ -29,7 +29,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
   };
 
   return (
-    <div className="flex flex-0 items-center justify-start relative pb-0 w-full">
+    <div className="flex flex-0 items-center justify-start relative pb-0 w-full ml-[145px]">
       {chats.map((chat) => (
         <div
           key={chat.id}
