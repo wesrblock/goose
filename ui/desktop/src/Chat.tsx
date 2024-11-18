@@ -24,8 +24,6 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
     initialMessages: chat.messages
   })
 
-  const useChatData = { messages, input, handleInputChange, handleSubmit };
-
   useEffect(() => {
     const updatedChats = [...chats]
     updatedChats.find((c) => c.id === selectedChatId).messages = messages
@@ -55,7 +53,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                 {message.role === 'user' ? (
                   <UserMessage message={message} />
                 ) : (
-                  <GooseMessage message={message} useChatData={useChatData} />
+                  <GooseMessage message={message} />
                 )}
               </div>
             ))}

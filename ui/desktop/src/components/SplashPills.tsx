@@ -22,7 +22,7 @@ export default function SplashPills({ append }) {
     <div className="grid grid-cols-2 gap-4">
       <SplashPill content="Migrate code to react" append={append} />
       <SplashPill content="Scaffold an API for data retention" append={append} />
-      <SplashPill content="Summarize files in my CWD" append={append} />
+      <SplashPill content="List files in my CWD" append={append} />
       <SplashPill content="Find all markdown files" append={append} />
     </div>
   )
