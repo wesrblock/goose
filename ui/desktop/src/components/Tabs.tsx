@@ -1,6 +1,8 @@
 import React from 'react';
-import { X, Plus } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+
+import Plus from './ui/Plus';
 
 export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChats }) {
   const navigate = useNavigate()
@@ -53,12 +55,8 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
           )}
         </div>
       ))}
-      <button
-        className="flex items-center justify-center w-8 h-8 rounded-full bg-transparent hover:bg-sky-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
-        onClick={addChat}
-        aria-label="New chat"
-      >
-        <Plus className="w-5 h-5 text-sky-600" />
+      <button onClick={addChat} aria-label="New chat">
+        <Plus size={18} />
       </button>
     </div>
   );
