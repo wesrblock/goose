@@ -33,7 +33,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
       {chats.map((chat) => (
         <div
           key={chat.id}
-          className={`flex bg-tab items-center min-w-[140px] max-w-[240px] h-8 px-3 mr-1 rounded-t-lg cursor-pointer transition-all`}
+          className={`flex bg-tab items-center min-w-[140px] max-w-[240px] h-[32px] px-3 mr-1 rounded-t-lg cursor-pointer transition-all`}
           onClick={() => navigateChat(chat.id)}
           onKeyDown={(e) => e.key === "Enter" && navigateChat(chat.id)}
           tabIndex={0}

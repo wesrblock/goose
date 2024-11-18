@@ -8,7 +8,9 @@ export default {
   theme: {
     extend: {
       spacing: {
-        '10': '10px'
+        '8': '8px',
+        '10': '10px',
+        '16': '16px',
       },
       margin: {
         '10': '10px',
@@ -25,6 +27,9 @@ export default {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
         tab: '#E9F7FA',
+
+        'splash-pills': 'rgba(255, 255, 255, 0.60)',
+        'splash-pills-text': 'rgba(0, 0, 0, 0.60)',
 
         'tool-bold': 'rgba(0, 0, 0, 0.65);',
         'tool': 'rgba(0, 0, 0, 0.50);',

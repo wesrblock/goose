@@ -4,6 +4,7 @@ import { getApiUrl } from './config'
 import { Card } from './components/ui/card'
 import { ScrollArea } from './components/ui/scroll-area'
 import GooseSplashLogo from './components/GooseSplashLogo'
+import SplashPills from './components/SplashPills'
 import GooseMessage from './components/GooseMessage'
 import UserMessage from './components/UserMessage'
 import Input from './components/Input'
@@ -18,7 +19,7 @@ export interface Chat {
 export default function Chat({ chats, setChats, selectedChatId, setSelectedChatId } : { chats: Chat[], setChats: any, selectedChatId: number, setSelectedChatId: any }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  const { messages, input, handleInputChange, handleSubmit } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, append } = useChat({
     api: getApiUrl("/reply"),
     initialMessages: chat.messages
   })
@@ -37,10 +38,13 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
 
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl rounded-tl-none">
         {messages.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="flex items-center">
+          <div className="h-full flex flex-col items-center justify-center">
+            <div className="flex flex-1 items-center">
               <GooseSplashLogo />
               <span className="ask-goose-type ml-[8px]">ask<br />goose</span>
+            </div>
+            <div className="flex items-center">
+              <SplashPills append={append} />
             </div>
           </div>
         ) : (
