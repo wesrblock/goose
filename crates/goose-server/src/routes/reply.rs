@@ -288,10 +288,66 @@ fn clean_jsonld_markdown(content: &str) -> String {
 /// # Returns
 /// 
 /// Returns true if the text appears to be a question or confirmation request
+/// Checks if the text appears to be a greeting or help message.
+/// 
+/// # Arguments
+/// 
+/// * `text` - The text to analyze
+/// 
+/// # Returns
+/// 
+/// Returns true if the text appears to be a greeting or help message
+fn is_greeting_message(text: &str) -> bool {
+    let text = text.trim().to_lowercase();
+    
+    // Common greeting/help keywords
+    let greeting_keywords = ["ready", "assist", "help", "today"];
+    let keyword_count = greeting_keywords.iter()
+        .filter(|&&keyword| text.contains(keyword))
+        .count();
+    
+    // Common help phrases that might end with question marks
+    let help_phrases = [
+        "how can i help",
+        "how may i help",
+        "how can i assist",
+        "what can i do for you",
+        "how may i assist",
+        "what can i do",
+        "i'm here",
+        "i am here"
+    ];
+    
+    // Check for common help phrases first
+    if help_phrases.iter().any(|&phrase| text.contains(phrase)) {
+        return true;
+    }
+    
+    // Check if it's a short help message
+    if text.len() < 100 {
+        // Check for keyword combinations
+        if keyword_count >= 2 {
+            return true;
+        }
+        
+        // Check for specific patterns
+        if text.contains("ready") && (text.contains("help") || text.contains("assist")) {
+            return true;
+        }
+    }
+    
+    false
+}
+
 pub fn is_question_ask(text: &str) -> bool {
     let text = text.trim().to_lowercase();
     
     if text.is_empty() || text == "?" {
+        return false;
+    }
+    
+    // First check if it's a greeting message
+    if is_greeting_message(&text) {
         return false;
     }
 
@@ -415,6 +471,25 @@ pub fn is_question_ask(text: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn test_greeting_messages() {
+        // Test common help/greeting messages
+        assert!(is_greeting_message("How can I help you today?"));
+        assert!(is_greeting_message("I'm ready to assist you!"));
+        assert!(is_greeting_message("I'm here and ready to help you."));
+        assert!(is_greeting_message("What can I do for you today?"));
+        assert!(is_greeting_message("How may I assist you?"));
+        assert!(is_greeting_message("I'm just a program, so I don't have feelings, but I'm here and ready to assist you with any tasks or questions you have! How can I help you today?"));
+        
+        // Test messages that shouldn't be detected as greetings
+        assert!(!is_greeting_message("Can you help me with this error?"));
+        assert!(!is_greeting_message("I need assistance with a bug."));
+        assert!(!is_greeting_message("This code is ready for review."));
+        assert!(!is_greeting_message("A very long message that happens to contain the words ready and assist but is clearly not a greeting because it's too long and contains technical details about implementation."));
+    }
+
     #[test]
     fn test_clean_jsonld_markdown() {
         // Test basic markdown removal
@@ -441,7 +516,6 @@ mod tests {
         // Test with only whitespace
         assert_eq!(clean_jsonld_markdown("   "), "");
     }
-    use super::*;
 
     #[test]
     fn test_question_marks() {

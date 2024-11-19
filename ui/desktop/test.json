@@ -5,8 +5,8 @@
         "content": [
           {
             "type": "text",
-            "text": "How are you today?",
-            "_text": "I want you to create a file on the desktop, a random name, but check with me first, give me a choice of 3 please, and a random number. Always ask first"
+            "_text": "How are you today?",
+            "text": "I want you to create a file on the desktop, a random name, but check with me first, give me a choice of 3 please, and a random number. Always ask first"
           }
         ]
       }
