@@ -3,13 +3,13 @@ use crate::inputs::inputs::get_user_input;
 use crate::profile::profile::Profile;
 use crate::profile::profile_handler::{find_existing_profile, profile_path, save_profile};
 use crate::profile::provider_helper::{
-    get_provider_type, select_provider_lists, set_provider_config, PROVIDER_OPEN_AI,
+    select_provider_lists, set_provider_config, PROVIDER_OPEN_AI,
 };
 use cliclack::spinner;
 use console::style;
 use goose::providers::configs::ProviderConfig;
 use goose::providers::factory;
-use goose::models::message::{Message, MessageContent};
+use goose::models::message::Message;
 use std::error::Error;
 
 pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(), Box<dyn Error>> {
@@ -37,12 +37,11 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
         Ok(()) => println!("\nProfile saved to: {:?}", profile_path()?),
         Err(e) => println!("Failed to save profile: {}", e),
     }
-    check_configuration(provider_name, provider_config).await?;
+    check_configuration(provider_config).await?;
     Ok(())
 }
 
 async fn check_configuration(
-    provider_name: &str,
     provider_config: ProviderConfig,
 ) -> Result<(), Box<dyn Error>> {
     let spin = spinner();
