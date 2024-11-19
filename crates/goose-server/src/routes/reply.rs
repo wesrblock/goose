@@ -27,6 +27,19 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::sync::mpsc;
+
+/// Returns the reply schema as a string.
+/// 
+/// This function uses the `include_str!` macro to load the schema at compile time,
+/// ensuring the schema is always available and avoiding runtime file operations.
+/// 
+/// # Returns
+/// 
+/// A string containing the JSON schema for reply messages.
+pub fn get_reply_schema() -> &'static str {
+    include_str!("reply.schema.json")
+}
+
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::state::AppState;
@@ -176,20 +189,21 @@ async fn chat_handler(
                                         let text = content.summary();
                                         if is_question_ask(&text) {
                                             print!("\n\n\n-------\n\n\n{}\n\n\n-------\n\n\n", &text);
+                                            let schema = get_reply_schema();
                                             let task = format!(r#"Analyze the following text and generate a JSON-LD response based on these rules:
 
-1. If the text is a conversation flow question (like "Would you like me to continue?" or "Anything else?"), respond with this structure:
-   {{"@type": "ConversationFlow", "status": "complete", "waitingForUser": true}}
+1. If the text is a conversation flow question indicating nothing else to be done eg:
+"I'm here and ready to assist you with any tasks or questions you have! How can I help you today?", respond with this structure:
+   {{"status": "complete", "waitingForUser": true}}
 
-2. For all other questions or information, create a simple JSON-LD structure that represents the key information:
-   - Use clear, semantic types
-   - Include only relevant information
-   - Keep the structure flat when possible
-   - Avoid nested arrays unless absolutely necessary
+2. For all other questions or presentation of rich information, create json that conforms to the JSON schema provided, based on what is being asked in the content.
+### Schema:
+{}
 
-Content to analyze: {}
+### Content:
+{}
 
-Generate ONLY the JSON-LD, no markdown formatting or explanation:"#, text);
+Generate ONLY the JSON, no markdown formatting or explanation:"#, schema, text);
                                             let jsonld = agent.complete_simple(&task).await;    
                                             match jsonld {
                                                 Ok(message) => {
