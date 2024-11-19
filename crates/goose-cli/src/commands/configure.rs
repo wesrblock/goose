@@ -3,13 +3,13 @@ use crate::inputs::inputs::get_user_input;
 use crate::profile::profile::Profile;
 use crate::profile::profile_handler::{find_existing_profile, profile_path, save_profile};
 use crate::profile::provider_helper::{
-    get_provider_type, select_provider_lists, set_provider_config, PROVIDER_OPEN_AI,
+    select_provider_lists, set_provider_config, PROVIDER_OPEN_AI,
 };
 use cliclack::spinner;
 use console::style;
 use goose::providers::configs::ProviderConfig;
 use goose::providers::factory;
-use goose::providers::types::message::Message;
+use goose::models::message::Message;
 use std::error::Error;
 
 pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(), Box<dyn Error>> {
@@ -37,23 +37,23 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
         Ok(()) => println!("\nProfile saved to: {:?}", profile_path()?),
         Err(e) => println!("Failed to save profile: {}", e),
     }
-    check_configuration(provider_name, provider_config).await?;
+    check_configuration(provider_config).await?;
     Ok(())
 }
 
 async fn check_configuration(
-    provider_name: &str,
     provider_config: ProviderConfig,
 ) -> Result<(), Box<dyn Error>> {
     let spin = spinner();
     spin.start("Now let's check your configuration...");
-    let provider =
-        factory::get_provider(get_provider_type(provider_name), provider_config).unwrap();
-    let message = Message::user("Please give a nice welcome message (one sentence) and let them know they are all set to use this agent ").unwrap();
+    let provider = factory::get_provider(provider_config).unwrap();
+    let message = Message::user().with_text("Please give a nice welcome messsage (one sentence) and let them know they are all set to use this agent");
     let result = provider.complete(
                                    "You are an AI agent called Goose. You use tools of connected systems to solve problems.",
                                    &[message], &[]).await?;
-    spin.stop(result.0.text());
+    spin.stop(result.0.content.first()
+        .and_then(|c| c.as_text())
+        .unwrap_or("No response"));
     Ok(())
 }
 

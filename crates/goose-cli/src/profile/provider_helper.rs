@@ -35,11 +35,3 @@ pub fn set_provider_config(provider_name: &str, processor: String) -> ProviderCo
         _ => panic!("Invalid provider name"),
     }
 }
-
-pub fn get_provider_type(provider_name: &str) -> ProviderType {
-    match provider_name.to_lowercase().as_str() {
-        PROVIDER_OPEN_AI => ProviderType::OpenAi,
-        PROVIDER_DATABRICKS => ProviderType::Databricks,
-        _ => panic!("Invalid provider name"),
-    }
-}

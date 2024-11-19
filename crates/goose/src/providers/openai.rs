@@ -7,12 +7,12 @@ use std::time::Duration;
 
 use super::base::{Provider, Usage};
 use super::configs::OpenAiProviderConfig;
-use super::types::message::Message;
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
     tools_to_openai_spec,
 };
-use crate::tool::Tool;
+use crate::models::message::Message;
+use crate::models::tool::Tool;
 
 pub struct OpenAiProvider {
     client: Client,
@@ -160,6 +160,7 @@ impl Provider for OpenAiProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::message::MessageContent;
     use serde_json::json;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -210,7 +211,7 @@ mod tests {
         let (_, provider) = _setup_mock_server(response_body).await;
 
         // Prepare input messages
-        let messages = vec![Message::user("Hello?")?];
+        let messages = vec![Message::user().with_text("Hello?")];
 
         // Call the complete method
         let (message, usage) = provider
@@ -218,7 +219,11 @@ mod tests {
             .await?;
 
         // Assert the response
-        assert_eq!(message.text(), "Hello! How can I assist you today?");
+        if let MessageContent::Text(text) = &message.content[0] {
+            assert_eq!(text.text, "Hello! How can I assist you today?");
+        } else {
+            panic!("Expected Text content");
+        }
         assert_eq!(usage.input_tokens, Some(12));
         assert_eq!(usage.output_tokens, Some(15));
         assert_eq!(usage.total_tokens, Some(27));
@@ -258,7 +263,7 @@ mod tests {
         let (_, provider) = _setup_mock_server(response_body).await;
 
         // Input messages
-        let messages = vec![Message::user("What's the weather in San Francisco?")?];
+        let messages = vec![Message::user().with_text("What's the weather in San Francisco?")];
 
         // Define the tool using builder pattern
         let tool = Tool::new(
@@ -282,17 +287,16 @@ mod tests {
             .await?;
 
         // Assert the response
-        let tool_requests = message.tool_request();
-        assert_eq!(tool_requests.len(), 1);
-        let Ok(tool_call) = &tool_requests[0].call else {
-            panic!("should be tool call")
-        };
-
-        assert_eq!(tool_call.name, "get_weather");
-        assert_eq!(
-            tool_call.parameters,
-            json!({"location": "San Francisco, CA"})
-        );
+        if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
+            let tool_call = tool_request.tool_call.as_ref().unwrap();
+            assert_eq!(tool_call.name, "get_weather");
+            assert_eq!(
+                tool_call.arguments,
+                json!({"location": "San Francisco, CA"})
+            );
+        } else {
+            panic!("Expected ToolCall content");
+        }
 
         assert_eq!(usage.input_tokens, Some(20));
         assert_eq!(usage.output_tokens, Some(15));

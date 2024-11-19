@@ -4,7 +4,6 @@ use crate::session::Session;
 
 use goose::agent::Agent;
 use goose::providers::factory;
-use goose::providers::factory::ProviderType;
 
 use crate::prompt::CliclackPrompt;
 use rand::{distributions::Alphanumeric, Rng};
@@ -24,8 +23,7 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
         set_provider_config(&loaded_profile.provider, loaded_profile.processor.clone());
 
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
-    let provider =
-        factory::get_provider(to_provider_type(&loaded_profile.provider), provider_config).unwrap();
+    let provider = factory::get_provider(provider_config).unwrap();
     let agent = Box::new(Agent::new(provider));
     let prompt = Box::new(CliclackPrompt::new());
 
@@ -69,12 +67,4 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
         }
     };
     loaded_profile
-}
-
-fn to_provider_type(provider_name: &str) -> ProviderType {
-    match provider_name.to_lowercase().as_str() {
-        "openai" => ProviderType::OpenAi,
-        "databricks" => ProviderType::Databricks,
-        _ => panic!("Invalid provider name"),
-    }
 }

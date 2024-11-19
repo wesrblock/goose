@@ -4,7 +4,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::errors::AgentResult;
-use crate::tool::{Tool, ToolCall};
+use crate::models::content::Content;
+use crate::models::tool::{Tool, ToolCall};
 
 /// Core trait that defines a system that can be operated by an AI agent
 #[async_trait]
@@ -25,5 +26,5 @@ pub trait System: Send + Sync {
     async fn status(&self) -> AnyhowResult<HashMap<String, Value>>;
 
     /// Call a tool with the given parameters
-    async fn call(&self, tool_call: ToolCall) -> AgentResult<Value>;
+    async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>>;
 }

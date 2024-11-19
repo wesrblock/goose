@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use anyhow::Result;
 use bat::WrappingMode;
 use cliclack::{input, spinner};
-use goose::providers::types::message::Message;
+use goose::models::message::{Message, MessageContent};
 
 pub trait Prompt {
     fn render(&mut self, message: Box<Message>);
@@ -135,12 +135,12 @@ impl Prompt for CliclackPrompt {
 
         for message_content in &message.content {
             match message_content {
-                goose::providers::types::content::Content::Text(text) => print(&text.text, theme),
-                goose::providers::types::content::Content::ToolRequest(tool_request) => {
-                    match &tool_request.call {
+                MessageContent::Text(text) => print(&text.text, theme),
+                MessageContent::ToolRequest(tool_request) => {
+                    match &tool_request.tool_call {
                         Ok(call) => {
                             print_tool_request(
-                                &serde_json::to_string_pretty(&call.parameters).unwrap(),
+                                &serde_json::to_string_pretty(&call.arguments).unwrap(),
                                 theme,
                                 &call.name,
                             );
@@ -148,8 +148,8 @@ impl Prompt for CliclackPrompt {
                         Err(e) => print(&e.to_string(), theme),
                     }
                 }
-                goose::providers::types::content::Content::ToolResponse(tool_response) => {
-                    match &tool_response.output {
+                MessageContent::ToolResponse(tool_response) => {
+                    match &tool_response.tool_result {
                         Ok(output) => {
                             let output_value = serde_json::to_string_pretty(output).unwrap();
 
@@ -166,6 +166,9 @@ impl Prompt for CliclackPrompt {
                         }
                         Err(e) => print(&e.to_string(), theme),
                     }
+                },
+                MessageContent::Image(image) => {
+                    println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
                 }
             }
         }

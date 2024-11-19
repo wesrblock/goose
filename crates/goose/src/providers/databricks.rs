@@ -6,12 +6,12 @@ use std::time::Duration;
 
 use super::base::{Provider, Usage};
 use super::configs::DatabricksProviderConfig;
-use super::types::message::Message;
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
     tools_to_openai_spec,
 };
-use crate::tool::Tool;
+use crate::models::message::Message;
+use crate::models::tool::Tool;
 
 pub struct DatabricksProvider {
     client: Client,
@@ -151,6 +151,7 @@ impl Provider for DatabricksProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::message::MessageContent;
     use anyhow::Result;
     use serde_json::json;
     use wiremock::matchers::{body_json, header, method, path};
@@ -207,14 +208,18 @@ mod tests {
         let provider = DatabricksProvider::new(config)?;
 
         // Prepare input
-        let messages = vec![Message::user("Hello")?];
+        let messages = vec![Message::user().with_text("Hello")];
         let tools = vec![]; // Empty tools list
 
         // Call the complete method
         let (reply_message, reply_usage) = provider.complete(system, &messages, &tools).await?;
 
         // Assert the response
-        assert_eq!(reply_message.text(), "Hello!");
+        if let MessageContent::Text(text) = &reply_message.content[0] {
+            assert_eq!(text.text, "Hello!");
+        } else {
+            panic!("Expected Text content");
+        }
         assert_eq!(reply_usage.total_tokens, Some(35));
 
         Ok(())

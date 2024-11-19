@@ -6,7 +6,7 @@ use crate::prompt::Prompt;
 
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
-use goose::providers::types::message::Message;
+use goose::models::message::{Message, Role};
 
 pub struct Session<'a> {
     agent: Box<Agent>,
@@ -29,7 +29,7 @@ impl<'a> Session<'a> {
                 InputType::Exit => break,
                 InputType::Message => {
                     if let Some(content) = &input.content {
-                        messages.push(Message::user(content).unwrap());
+                        messages.push(Message::user().with_text(content));
                     }
                 }
             }
@@ -49,7 +49,7 @@ impl<'a> Session<'a> {
         self.setup_session();
 
         let mut messages = Vec::new();
-        messages.push(Message::user(initial_message.as_str()).unwrap());
+        messages.push(Message::user().with_text(initial_message.as_str()));
 
         self.agent_process_messages(&mut messages).await;
 
@@ -80,7 +80,7 @@ impl<'a> Session<'a> {
                     drop(stream);
                     // Pop all 'messages' from the assistant and the most recent user message. Resets the interaction to before the interrupted user request.
                     while let Some(message) = messages.pop() {
-                        if message.role == goose::providers::types::message::Role::User {
+                        if message.role == Role::User {
                             break;
                         }
                         // else drop any assistant messages.
@@ -110,5 +110,5 @@ impl<'a> Session<'a> {
 }
 
 fn raw_message(content: &str) -> Box<Message> {
-    Box::new(Message::assistant(content).unwrap())
+    Box::new(Message::assistant().with_text(content))
 }

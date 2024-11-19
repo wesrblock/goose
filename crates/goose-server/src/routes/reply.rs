@@ -10,14 +10,9 @@ use futures::{stream::StreamExt, Stream};
 use goose::{
     agent::Agent,
     developer::DeveloperSystem,
-    providers::{
-        configs::ProviderConfig,
-        factory::{self, ProviderType},
-        types::{
-            content::Content,
-            message::{Message, Role},
-        },
-    },
+    models::message::{Message, MessageContent, Role},
+    models::content::Content,
+    providers::factory,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -31,10 +26,30 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use crate::state::AppState;
 
-// Request type matching the Python implementation
+// Types matching the incoming JSON structure
 #[derive(Debug, Deserialize)]
 struct ChatRequest {
-    messages: Vec<Value>,
+    messages: Vec<IncomingMessage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct IncomingMessage {
+    role: String,
+    content: String,
+    #[serde(default)]
+    #[serde(rename = "toolInvocations")]
+    tool_invocations: Vec<ToolInvocation>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ToolInvocation {
+    state: String,
+    #[serde(rename = "toolCallId")]
+    tool_call_id: String,
+    #[serde(rename = "toolName")]
+    tool_name: String,
+    args: Value,
+    result: Option<String>,
 }
 
 // Custom SSE response type that implements the Vercel AI SDK protocol
@@ -73,34 +88,169 @@ impl IntoResponse for SseResponse {
     }
 }
 
-// Convert JSON message to our Message type
-fn convert_message(value: &Value) -> Option<Message> {
-    let role = value.get("role")?.as_str()?;
-    let role = match role {
-        "user" => Role::User,
-        "assistant" => Role::Assistant,
-        _ => return None,
-    };
+// Convert incoming messages to our internal Message type
+fn convert_messages(incoming: Vec<IncomingMessage>) -> Vec<Message> {
+    let mut messages = Vec::new();
 
-    let content = if let Some(content) = value.get("content") {
-        if let Some(text) = content.as_str() {
-            vec![Content::text(text)]
-        } else if let Some(array) = content.as_array() {
-            array
-                .iter()
-                .filter_map(|item| item.get("text").and_then(|t| t.as_str()).map(Content::text))
-                .collect()
-        } else {
-            return None;
+    for msg in incoming {
+        match msg.role.as_str() {
+            "user" => {
+                messages.push(Message::user().with_text(msg.content));
+            }
+            "assistant" => {
+                // First handle any tool invocations - each represents a complete request/response cycle
+                for tool in msg.tool_invocations {
+                    if tool.state == "result" {
+                        // Add the original tool request from assistant
+                        let tool_call = goose::models::tool::ToolCall {
+                            name: tool.tool_name,
+                            arguments: tool.args,
+                        };
+                        messages.push(
+                            Message::assistant()
+                                .with_tool_request(tool.tool_call_id.clone(), Ok(tool_call)),
+                        );
+
+                        // Add the tool response from user
+                        if let Some(result) = &tool.result {
+                            messages.push(
+                                Message::user().with_tool_response(
+                                    tool.tool_call_id,
+                                    Ok(vec![goose::models::content::Content::Text(
+                                        goose::models::content::TextContent {
+                                            text: result.clone(),
+                                        },
+                                    )]),
+                                ),
+                            );
+                        }
+                    }
+                }
+
+                // Then add the assistant's text response after tool interactions
+                if !msg.content.is_empty() {
+                    messages.push(Message::assistant().with_text(msg.content));
+                }
+            }
+            _ => {
+                tracing::warn!("Unknown role: {}", msg.role);
+            }
         }
-    } else {
-        Vec::new()
-    };
+    }
 
-    Message::new(role, content).ok()
+    messages
 }
 
-async fn chat_handler(
+// Protocol-specific message formatting
+struct ProtocolFormatter;
+
+impl ProtocolFormatter {
+    fn format_text(text: &str) -> String {
+        // Text messages start with "0:"
+        format!("0:\"{}\"\n", text.replace('\"', "\\\""))
+    }
+
+    fn format_tool_call(id: &str, name: &str, args: &Value) -> String {
+        // Tool calls start with "9:"
+        let tool_call = json!({
+            "toolCallId": id,
+            "toolName": name,
+            "args": args
+        });
+        format!("9:{}\n", tool_call)
+    }
+
+    fn format_tool_response(id: &str, result: &Vec<Content>) -> String {
+        // Tool responses start with "a:"
+        let response = json!({
+            "toolCallId": id,
+            "result": result,
+        });
+        format!("a:{}\n", response)
+    }
+
+    fn format_finish() -> String {
+        // Finish messages start with "d:"
+        let finish = json!({
+            "finishReason": "stop",
+            "usage": {
+                "promptTokens": 0,
+                "completionTokens": 0
+            }
+        });
+        format!("d:{}\n", finish)
+    }
+}
+
+async fn stream_message(
+    message: Message,
+    tx: &mpsc::Sender<String>,
+) -> Result<(), mpsc::error::SendError<String>> {
+    dbg!(&message);
+    match message.role {
+        Role::User => {
+            // Handle tool responses
+            for content in message.content {
+                dbg!(&content);
+                // I believe with the protocol we aren't intended to pass back user messages, so we only deal with
+                // the tool responses here
+                if let MessageContent::ToolResponse(response) = content {
+                    // We should return a result for either an error or a success
+                    match response.tool_result {
+                        Ok(result) => {
+                            tx.send(ProtocolFormatter::format_tool_response(&response.id, &result)).await?;
+                        }
+                        Err(err) => {
+                            let result = vec![Content::text(format!("Error {}", err))];
+                            tx.send(ProtocolFormatter::format_tool_response(&response.id, &result)).await?;
+                        }
+                    }
+                }
+            }
+        }
+        Role::Assistant => {
+            for content in message.content {
+                match content {
+                    MessageContent::ToolRequest(request) => {
+                        if let Ok(tool_call) = request.tool_call {
+                            tx.send(ProtocolFormatter::format_tool_call(
+                                &request.id,
+                                &tool_call.name,
+                                &tool_call.arguments,
+                            ))
+                            .await?;
+                        } else {
+                            // if the llm generates an invalid object tool call, we still have
+                            // to include it in the history. It always comes with a response indicating the error
+                            tx.send(ProtocolFormatter::format_tool_call(
+                                &request.id,
+                                "invalid name",
+                                &json!({}),
+                            )).await?;
+                        }
+
+                    }
+                    MessageContent::Text(text) => {
+                        for line in text.text.lines() {
+                            tx.send(ProtocolFormatter::format_text(line)).await?;
+                        }
+                    }
+                    MessageContent::Image(_) => {
+                        // TODO
+                        continue;
+                    }
+                    MessageContent::ToolResponse(_) => {
+                        // Tool responses should only come from the user
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn handler(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(request): Json<ChatRequest>,
@@ -118,25 +268,14 @@ async fn chat_handler(
 
     // Setup agent with developer system
     let system = Box::new(DeveloperSystem::new());
-
-    // Determine provider type based on config
-    let provider_type = match &state.provider_config {
-        ProviderConfig::OpenAi(_) => ProviderType::OpenAi,
-        ProviderConfig::Databricks(_) => ProviderType::Databricks,
-    };
-
-    let provider = factory::get_provider(provider_type, state.provider_config)
+    let provider = factory::get_provider(state.provider_config)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut agent = Agent::new(provider);
     agent.add_system(system);
 
     // Convert incoming messages
-    let messages: Vec<Message> = request
-        .messages
-        .iter()
-        .filter_map(convert_message)
-        .collect();
+    let messages = convert_messages(request.messages);
 
     // Spawn task to handle streaming
     tokio::spawn(async move {
@@ -145,45 +284,9 @@ async fn chat_handler(
         while let Some(response) = stream.next().await {
             match response {
                 Ok(message) => {
-                    match message.role {
-                        Role::User => {
-                            // Handle tool results if present
-                            if let Some(Content::ToolResponse(tool_data)) = message.content.first() {
-                                
-                                let result = json!({
-                                    "toolCallId": tool_data.request_id,
-                                    "result": tool_data.output.as_ref().unwrap(),
-                                });
-                                let _ = tx.send(format!("a:{}\n", result)).await;
-                            }
-                        }
-                        Role::Assistant => {
-                            for content in message.content {
-                                match content {
-                                    Content::ToolRequest(request) => {
-                                        if let Ok(call) = request.call {
-                                            let tool_call = json!({
-                                                "toolCallId": request.id,
-                                                "toolName": call.name,
-                                                "args": call.parameters
-                                            });
-                                            let _ = tx.send(format!("9:{}\n", tool_call)).await;
-                                        }
-                                    }
-                                    _ => {
-                                        let text = content.summary();
-                                        // Split text by newlines and send each line separately
-                                        for line in text.lines() {
-                                            let escaped_line = line.replace('\"', "\\\"");
-                                            if let Err(e) = tx.send(format!("0:\"{}\"\n", escaped_line)).await {
-                                                tracing::error!("Error sending line through channel: {}", e);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    if let Err(e) = stream_message(message, &tx).await {
+                        tracing::error!("Error sending message through channel: {}", e);
+                        break;
                     }
                 }
                 Err(e) => {
@@ -194,14 +297,7 @@ async fn chat_handler(
         }
 
         // Send finish message
-        let finish = json!({
-            "finishReason": "stop",
-            "usage": {
-                "promptTokens": 0,
-                "completionTokens": 0
-            }
-        });
-        let _ = tx.send(format!("d:{}\n", finish)).await;
+        let _ = tx.send(ProtocolFormatter::format_finish()).await;
     });
 
     Ok(SseResponse::new(stream))
@@ -209,7 +305,5 @@ async fn chat_handler(
 
 // Configure routes for this module
 pub fn routes(state: AppState) -> Router {
-    Router::new()
-        .route("/reply", post(chat_handler))
-        .with_state(state)
+    Router::new().route("/reply", post(handler)).with_state(state)
 }

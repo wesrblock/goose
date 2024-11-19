@@ -4,8 +4,9 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 use goose::errors::{AgentError, AgentResult};
+use goose::models::content::Content;
+use goose::models::tool::{Tool, ToolCall};
 use goose::systems::System;
-use goose::tool::{Tool, ToolCall};
 
 /// A simple system that echoes input back to the caller
 pub struct EchoSystem {
@@ -38,13 +39,13 @@ impl EchoSystem {
         }
     }
 
-    async fn echo(&self, params: Value) -> AgentResult<Value> {
+    async fn echo(&self, params: Value) -> AgentResult<Vec<Content>> {
         let message = params
             .get("message")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AgentError::InvalidParameters("message parameter required".into()))?;
 
-        Ok(json!({ "response": message }))
+        Ok(vec![Content::text(message)])
     }
 }
 
@@ -70,9 +71,9 @@ impl System for EchoSystem {
         Ok(HashMap::new()) // Echo system has no state to report
     }
 
-    async fn call(&self, tool_call: ToolCall) -> AgentResult<Value> {
+    async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
         match tool_call.name.as_str() {
-            "echo" => self.echo(tool_call.parameters).await,
+            "echo" => self.echo(tool_call.arguments).await,
             _ => Err(AgentError::ToolNotFound(tool_call.name)),
         }
     }
@@ -87,7 +88,12 @@ mod tests {
 
         let tool_call = ToolCall::new("echo", json!({"message": "hello world"}));
         let result = system.call(tool_call).await.unwrap();
-        assert_eq!(result, json!({ "response": "hello world" }));
+        assert_eq!(result.len(), 1);
+        if let Content::Text(text) = &result[0] {
+            assert_eq!(text.text, "hello world");
+        } else {
+            panic!("Expected text content");
+        }
     }
 
     #[tokio::test]

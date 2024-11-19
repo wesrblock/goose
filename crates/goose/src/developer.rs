@@ -7,8 +7,9 @@ use std::process::Command;
 use std::sync::Mutex;
 
 use crate::errors::{AgentError, AgentResult};
+use crate::models::content::Content;
+use crate::models::tool::{Tool, ToolCall};
 use crate::systems::System;
-use crate::tool::{Tool, ToolCall};
 
 pub struct DeveloperSystem {
     tools: Vec<Tool>,
@@ -120,7 +121,7 @@ impl DeveloperSystem {
     }
 
     // Implement bash tool functionality
-    async fn bash(&self, params: Value) -> AgentResult<Value> {
+    async fn bash(&self, params: Value) -> AgentResult<Vec<Content>> {
         let working_dir = params
             .get("working_dir")
             .and_then(|v| v.as_str())
@@ -244,11 +245,11 @@ impl DeveloperSystem {
             outputs.push(output_str);
         }
 
-        Ok(json!(outputs.join("\n")))
+        Ok(outputs.iter().map(|item| Content::text(item)).collect())
     }
 
     // Implement text_editor tool functionality
-    async fn text_editor(&self, params: Value) -> AgentResult<Value> {
+    async fn text_editor(&self, params: Value) -> AgentResult<Vec<Content>> {
         let command = params
             .get("command")
             .and_then(|v| v.as_str())
@@ -314,7 +315,7 @@ impl DeveloperSystem {
         }
     }
 
-    async fn text_editor_view(&self, path: &PathBuf) -> AgentResult<Value> {
+    async fn text_editor_view(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
         if path.is_file() {
             // Read the file content
             let content = std::fs::read_to_string(path)
@@ -323,7 +324,7 @@ impl DeveloperSystem {
             // Add to active files
             self.active_files.lock().unwrap().insert(path.clone());
 
-            Ok(json!({ "content": content }))
+            Ok(vec![Content::text(content)])
         } else if path.is_dir() {
             // List directory contents
             let entries = std::fs::read_dir(path).map_err(|e| {
@@ -337,8 +338,7 @@ impl DeveloperSystem {
                 })?;
                 files.push(entry.file_name().to_string_lossy().into_owned());
             }
-
-            Ok(json!({ "contents": files }))
+            Ok(vec![Content::text(files.join("\n"))])
         } else {
             Err(AgentError::InvalidParameters(format!(
                 "The path '{}' does not exist",
@@ -347,7 +347,11 @@ impl DeveloperSystem {
         }
     }
 
-    async fn text_editor_create(&self, path: &PathBuf, file_text: &str) -> AgentResult<Value> {
+    async fn text_editor_create(
+        &self,
+        path: &PathBuf,
+        file_text: &str,
+    ) -> AgentResult<Vec<Content>> {
         // Check if file already exists and is active
         if path.exists() && !self.active_files.lock().unwrap().contains(path) {
             return Err(AgentError::InvalidParameters(format!(
@@ -366,7 +370,10 @@ impl DeveloperSystem {
         // Add to active files
         self.active_files.lock().unwrap().insert(path.clone());
 
-        Ok(json!({ "result": format!("Successfully wrote to {}", path.display()) }))
+        Ok(vec![Content::text(format!(
+            "Successfully wrote to {}",
+            path.display()
+        ))])
     }
 
     async fn text_editor_str_replace(
@@ -374,7 +381,7 @@ impl DeveloperSystem {
         path: &PathBuf,
         old_str: &str,
         new_str: &str,
-    ) -> AgentResult<Value> {
+    ) -> AgentResult<Vec<Content>> {
         // Check if file exists and is active
         if !path.exists() {
             return Err(AgentError::InvalidParameters(format!(
@@ -408,7 +415,7 @@ impl DeveloperSystem {
         std::fs::write(path, new_content)
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
-        Ok(json!({ "result": "Successfully replaced text" }))
+        Ok(vec![Content::text("Successfully replaced text")])
     }
 
     async fn text_editor_insert(
@@ -416,7 +423,7 @@ impl DeveloperSystem {
         path: &PathBuf,
         insert_line: usize,
         new_str: &str,
-    ) -> AgentResult<Value> {
+    ) -> AgentResult<Vec<Content>> {
         // Check if file exists and is active
         if !path.exists() {
             return Err(AgentError::InvalidParameters(format!(
@@ -452,10 +459,10 @@ impl DeveloperSystem {
         std::fs::write(path, lines.join("\n"))
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
-        Ok(json!({ "result": "Successfully inserted text" }))
+        Ok(vec![Content::text("Successfully inserted text")])
     }
 
-    async fn text_editor_undo_edit(&self, path: &PathBuf) -> AgentResult<Value> {
+    async fn text_editor_undo_edit(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
         let mut history = self.file_history.lock().unwrap();
         if let Some(contents) = history.get_mut(path) {
             if let Some(previous_content) = contents.pop() {
@@ -463,7 +470,7 @@ impl DeveloperSystem {
                 std::fs::write(path, previous_content).map_err(|e| {
                     AgentError::ExecutionError(format!("Failed to write file: {}", e))
                 })?;
-                Ok(json!({ "result": "Successfully undid the last edit" }))
+                Ok(vec![Content::text("Successfully undid the last edit")])
             } else {
                 Err(AgentError::InvalidParameters(
                     "No edit history available to undo".into(),
@@ -523,10 +530,10 @@ impl System for DeveloperSystem {
         ]))
     }
 
-    async fn call(&self, tool_call: ToolCall) -> AgentResult<Value> {
+    async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
         match tool_call.name.as_str() {
-            "bash" => self.bash(tool_call.parameters).await,
-            "text_editor" => self.text_editor(tool_call.parameters).await,
+            "bash" => self.bash(tool_call.arguments).await,
+            "text_editor" => self.text_editor(tool_call.arguments).await,
             _ => Err(AgentError::ToolNotFound(tool_call.name)),
         }
     }
@@ -562,10 +569,10 @@ mod tests {
 
         let tool_call = ToolCall::new("bash", json!({ "working_dir": ".", "command": "pwd" }));
         let result = system.call(tool_call).await.unwrap();
-        assert!(result["result"]
-            .as_str()
+        assert!(result[0]
+            .as_text()
             .unwrap()
-            .contains("Changed directory to"));
+            .contains(&std::env::current_dir().unwrap().display().to_string()));
     }
 
     #[tokio::test]
@@ -595,8 +602,8 @@ mod tests {
             }),
         );
         let create_result = system.call(create_call).await.unwrap();
-        assert!(create_result["result"]
-            .as_str()
+        assert!(create_result[0]
+            .as_text()
             .unwrap()
             .contains("Successfully wrote to"));
 
@@ -609,7 +616,7 @@ mod tests {
             }),
         );
         let view_result = system.call(view_call).await.unwrap();
-        assert_eq!(view_result["content"].as_str().unwrap(), "Hello, world!");
+        assert_eq!(view_result[0].as_text().unwrap(), "Hello, world!");
 
         temp_dir.close().unwrap();
     }
@@ -654,8 +661,8 @@ mod tests {
             }),
         );
         let replace_result = system.call(replace_call).await.unwrap();
-        assert!(replace_result["result"]
-            .as_str()
+        assert!(replace_result[0]
+            .as_text()
             .unwrap()
             .contains("Successfully replaced text"));
 
@@ -668,7 +675,7 @@ mod tests {
             }),
         );
         let view_result = system.call(view_call).await.unwrap();
-        assert_eq!(view_result["content"].as_str().unwrap(), "Hello, Rust!");
+        assert_eq!(view_result[0].as_text().unwrap(), "Hello, Rust!");
 
         temp_dir.close().unwrap();
     }
@@ -723,8 +730,8 @@ mod tests {
             }),
         );
         let undo_result = system.call(undo_call).await.unwrap();
-        assert!(undo_result["result"]
-            .as_str()
+        assert!(undo_result[0]
+            .as_text()
             .unwrap()
             .contains("Successfully undid the last edit"));
 
@@ -739,7 +746,7 @@ mod tests {
             ))
             .await
             .unwrap();
-        assert_eq!(view_result["content"].as_str().unwrap(), "First line");
+        assert_eq!(view_result[0].as_text().unwrap(), "First line");
 
         temp_dir.close().unwrap();
     }

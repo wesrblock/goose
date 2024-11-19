@@ -6,7 +6,6 @@ use tera::{Context, Error as TeraError, Tera};
 // The prompts directory needs to be embedded in the binary (so it works when distributed)
 static PROMPTS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/src/prompts");
 
-
 pub fn load_prompt<T: Serialize>(template: &str, context_data: &T) -> Result<String, TeraError> {
     let mut tera = Tera::default();
     tera.add_raw_template("inline_template", template)?;
@@ -22,13 +21,17 @@ pub fn load_prompt_file<T: Serialize>(
     let template_path = template_file.into();
 
     // Get the file content from the embedded directory
-    let template_content = if let Some(file) = PROMPTS_DIR.get_file(template_path.to_str().unwrap()) {
+    let template_content = if let Some(file) = PROMPTS_DIR.get_file(template_path.to_str().unwrap())
+    {
         String::from_utf8_lossy(file.contents()).into_owned()
     } else {
-        return Err(TeraError::chain("Failed to find template file", std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "Template file not found in embedded directory"
-        )));
+        return Err(TeraError::chain(
+            "Failed to find template file",
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Template file not found in embedded directory",
+            ),
+        ));
     };
 
     load_prompt(&template_content, context_data)
@@ -37,7 +40,7 @@ pub fn load_prompt_file<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tool::Tool;
+    use crate::models::tool::Tool;
     use serde_json::json;
     use std::collections::HashMap;
 
@@ -70,7 +73,10 @@ mod tests {
         context.insert("name".to_string(), "Alice".to_string());
         context.insert("age".to_string(), 30.to_string());
         let result = load_prompt_file(file_path, &context).unwrap();
-        assert_eq!(result, "This prompt is only used for testing.\n\nHello, Alice! You are 30 years old.\n");
+        assert_eq!(
+            result,
+            "This prompt is only used for testing.\n\nHello, Alice! You are 30 years old.\n"
+        );
     }
 
     #[test]
