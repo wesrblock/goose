@@ -57,6 +57,14 @@ export DATABRICKS_TOKEN=...
 cargo run --bin goose -- session
 ```
 
+### Headless mode
+
+Run goose once-off with instructions from a file
+
+```
+Usage: cargo run --bin goose -- run -i instructions.md
+```
+
 ## Troubleshooting
 
 #### Compiling `tokenizers` library
