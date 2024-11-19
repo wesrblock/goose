@@ -9,6 +9,7 @@ import GooseMessage from './components/GooseMessage'
 import UserMessage from './components/UserMessage'
 import Input from './components/Input'
 import Tabs from './components/Tabs'
+import UserInteractionForm from './components/UserInteractionForm'
 
 export interface Chat {
   id: number;
@@ -58,7 +59,14 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                 {message.role === 'user' ? (
                   <UserMessage message={message} />
                 ) : (
-                  <GooseMessage message={message} />
+                  <>
+                    <GooseMessage message={message} />
+                    {data != null && (
+                      <UserInteractionForm 
+                        schema={data[0]}                                            
+                      />
+                    )}
+                  </>
                 )}
               </div>
             ))}
