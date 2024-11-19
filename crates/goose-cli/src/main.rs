@@ -16,6 +16,7 @@ use clap::{Parser, Subcommand};
 use commands::configure::handle_configure;
 use commands::session::build_session;
 use commands::version::print_version;
+use crate::systems::system_handler::{add_system, remove_system};
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -116,10 +117,12 @@ async fn main() -> Result<()> {
         Some(Command::System { action }) => {
             match action {
                 SystemCommands::Add { url } => {
-                    println!("Adding system: {}", url);
+                    add_system(url).await.unwrap();
+                    return Ok(());
                 }
                 SystemCommands::Remove { url } => {
-                    println!("Removing system: {}", url);
+                    remove_system(url).await.unwrap();
+                    return Ok(());
                 }
             }
         }
