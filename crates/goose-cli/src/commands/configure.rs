@@ -74,6 +74,8 @@ async fn set_systems(additional_systems: &mut Vec<AdditionalSystem>) -> Result<(
         if system_name.is_none() {
             println!("System not found. Please enter a valid system location.");
             continue;
+        } else {
+            println!("System found: {}", system_name.clone().unwrap());
         }
         let additional_system = AdditionalSystem {
             name: system_name.unwrap(),

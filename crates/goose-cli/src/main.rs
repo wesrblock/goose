@@ -61,6 +61,10 @@ enum Command {
     Configure {
         profile_name: Option<String>,
     },
+    System {
+        #[command(subcommand)]
+        action: SystemCommands,
+    },
     /// Start or resume sessions with an optional session name
     Session {
         session: Option<String>,
@@ -68,6 +72,18 @@ enum Command {
     },
     /// Run the main application
     Run,
+}
+
+#[derive(Subcommand)]
+enum SystemCommands {
+    Add {
+        #[arg(help = "The URL to add system")]
+        url: String,
+    },
+    Remove {
+        #[arg(help = "The URL to remove system")]
+        url: String,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -89,6 +105,16 @@ async fn main() -> Result<()> {
         Some(Command::Configure { profile_name }) => {
             let _ = handle_configure(profile_name).await;
             return Ok(());
+        }
+        Some(Command::System { action }) => {
+            match action {
+                SystemCommands::Add { url } => {
+                    println!("Adding system: {}", url);
+                }
+                SystemCommands::Remove { url } => {
+                    println!("Removing system: {}", url);
+                }
+            }
         }
         Some(Command::Session { session, profile }) => {
             let mut session = build_session(session, profile);
