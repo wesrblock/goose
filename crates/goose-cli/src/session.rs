@@ -19,14 +19,7 @@ impl<'a> Session<'a> {
     }
 
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.prompt.render(raw_message("Starting session...\n"));
-
-        let system = Box::new(DeveloperSystem::new());
-        self.agent.add_system(system);
-        self.prompt
-            .render(raw_message("Connected the developer system.\n"));
-
-        self.prompt.goose_ready();
+        self.setup_session();
 
         let mut messages = Vec::new();
 
@@ -42,44 +35,77 @@ impl<'a> Session<'a> {
             }
 
             self.prompt.show_busy();
-
-            // Process the stream of messages
-            let mut stream = self.agent.reply(&messages);
-            loop {
-                tokio::select! {
-                    response = stream.next() => {
-                        match response {
-                            Some(Ok(message)) => {
-                                messages.push(message.clone());
-                                self.prompt.render(Box::new(message.clone()));
-                            }
-                            Some(Err(e)) => {
-                                // TODO: Handle error display through prompt
-                                eprintln!("Error: {}", e);
-                                break;
-                            }
-                            None => break,
-                        }
-                    }
-                    _ = tokio::signal::ctrl_c() => {
-                        drop(stream);
-                        // Pop all 'messages' from the assistant and the most recent user message. Resets the interaction to before the interrupted user request.
-                        while let Some(message) = messages.pop() {
-                            if message.role == goose::providers::types::message::Role::User {
-                                break;
-                            }
-                            // else drop any assistant messages.
-                        }
-
-                        self.prompt.render(raw_message(" Interrupt: Resetting conversation to before the last sent message...\n"));
-                        break;
-                    }
-                }
-            }
+            self.agent_process_messages(&mut messages).await;
             self.prompt.hide_busy();
         }
-        self.prompt.close();
+        self.close_session();
         Ok(())
+    }
+
+    pub async fn headless_start(
+        &mut self,
+        initial_message: Box<String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.setup_session();
+
+        let mut messages = Vec::new();
+        messages.push(Message::user(initial_message.as_str()).unwrap());
+
+        self.agent_process_messages(&mut messages).await;
+
+        self.close_session();
+        Ok(())
+    }
+
+    async fn agent_process_messages(&mut self, messages: &mut Vec<Message>) {
+        // Process the stream of messages
+        let mut stream = self.agent.reply(&messages);
+        loop {
+            tokio::select! {
+                response = stream.next() => {
+                    match response {
+                        Some(Ok(message)) => {
+                            messages.push(message.clone());
+                            self.prompt.render(Box::new(message.clone()));
+                        }
+                        Some(Err(e)) => {
+                            // TODO: Handle error display through prompt
+                            eprintln!("Error: {}", e);
+                            break;
+                        }
+                        None => break,
+                    }
+                }
+                _ = tokio::signal::ctrl_c() => {
+                    drop(stream);
+                    // Pop all 'messages' from the assistant and the most recent user message. Resets the interaction to before the interrupted user request.
+                    while let Some(message) = messages.pop() {
+                        if message.role == goose::providers::types::message::Role::User {
+                            break;
+                        }
+                        // else drop any assistant messages.
+                    }
+
+                    self.prompt.render(raw_message(" Interrupt: Resetting conversation to before the last sent message...\n"));
+                    break;
+                }
+            }
+        }
+    }
+
+    fn setup_session(&mut self) {
+        self.prompt.render(raw_message("Starting session...\n"));
+
+        let system = Box::new(DeveloperSystem::new());
+        self.agent.add_system(system);
+        self.prompt
+            .render(raw_message("Connected the developer system.\n"));
+
+        self.prompt.goose_ready();
+    }
+
+    fn close_session(&mut self) {
+        self.prompt.close();
     }
 }
 
