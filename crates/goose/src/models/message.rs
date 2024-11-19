@@ -65,6 +65,14 @@ impl MessageContent {
             None
         }
     }
+
+    /// Get the text content if this is a TextContent variant
+    pub fn as_text(&self) -> Option<&str> {
+        match self {
+            MessageContent::Text(text) => Some(&text.text),
+            _ => None,
+        }
+    }
 }
 
 impl From<Content> for MessageContent {

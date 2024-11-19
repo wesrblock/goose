@@ -17,6 +17,12 @@ use commands::configure::handle_configure;
 use commands::session::build_session;
 use commands::version::print_version;
 use crate::systems::system_handler::{add_system, remove_system};
+use goose::agent::Agent;
+use goose::developer::DeveloperSystem;
+use goose::providers::configs::OpenAiProviderConfig;
+use goose::providers::configs::{DatabricksProviderConfig, ProviderConfig};
+use goose::providers::factory;
+use goose::providers::types::message::Message;
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -147,6 +153,55 @@ async fn main() -> Result<()> {
         None => {
             println!("No command provided");
         }
+    }
+    let provider_type = match cli.provider {
+        CliProviderVariant::OpenAi => ProviderType::OpenAi,
+        CliProviderVariant::Databricks => ProviderType::Databricks,
+    };
+
+    println!(
+        "Example goose CLI {}",
+        style("- type \"exit\" to end the session").dim()
+    );
+    println!("\n");
+
+    let system = Box::new(DeveloperSystem::new());
+    let provider = factory::get_provider(create_provider_config(&cli)).unwrap();
+    let mut agent = Agent::new(provider);
+    agent.add_system(system);
+    println!("Connected the developer system");
+
+    let mut messages = Vec::new();
+
+    loop {
+        let message_text: String = input("Message:").placeholder("").multiline().interact()?;
+        if message_text.trim().eq_ignore_ascii_case("exit") {
+            break;
+        }
+        messages.push(Message::user().with_text(message_text));
+
+        let spin = spinner();
+        spin.start("awaiting reply");
+
+        // Process the stream of messages
+        let mut stream = agent.reply(&messages);
+        while let Some(response) = stream.next().await {
+            match response {
+                Ok(message) => {
+                    messages.push(message.clone());
+                    for text in message.content.iter().filter_map(|c| c.as_text()) {
+                        render(text).await;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    break;
+                }
+            }
+        }
+        spin.stop("");
+
+        println!("\n");
     }
     Ok(())
 }

@@ -221,7 +221,7 @@ impl Agent {
                     .collect();
 
                 if tool_requests.is_empty() {
-                    // No more tool calls, end the conversation
+                    // No more tool calls, end the reply loop
                     break;
                 }
 
@@ -235,7 +235,7 @@ impl Agent {
                 let outputs = futures::future::join_all(futures).await;
 
                 // Create a message with the responses
-                let mut message_tool_response = Message::assistant();
+                let mut message_tool_response = Message::user();
                 // Now combine these into MessageContent::ToolResponse using the original ID
                 for (request, output) in tool_requests.iter().zip(outputs.into_iter()) {
                     message_tool_response = message_tool_response.with_tool_response(
