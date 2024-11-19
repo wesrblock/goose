@@ -31,6 +31,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
   }, [messages, selectedChatId])
 
   return (
+    
     <div className="flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <Tabs chats={chats} selectedChatId={selectedChatId} setSelectedChatId={setSelectedChatId} setChats={setChats} />
 
@@ -48,7 +49,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
         ) : (
           <ScrollArea className="flex-1 px-[10px]">
             <div className="block h-10" />
-            {messages.map((message) => (
+            {messages.map((message) => (              
               <div key={message.id}>
                 {message.role === 'user' ? (
                   <UserMessage message={message} />

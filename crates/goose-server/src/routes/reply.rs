@@ -185,7 +185,7 @@ async fn chat_handler(
                                                 Ok(message) => {
                                                     let clean_json = clean_schema_markdown(&message.text());
                                                     println!("Received message: {}", clean_json);
-                                                    if let Err(e) = tx.send(format!("2:{}\n", clean_json)).await {
+                                                    if let Err(e) = tx.send(format!("2:[{}]\n", clean_json)).await {
                                                         tracing::error!("Error sending message through channel: {}", e);
                                                     }
                                                 }, 
