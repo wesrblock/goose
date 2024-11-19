@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { useChat } from 'ai/react'
+import { useChat, Message } from 'ai/react'
 import { getApiUrl } from './config'
 import { Card } from './components/ui/card'
 import { ScrollArea } from './components/ui/scroll-area'
@@ -19,10 +19,14 @@ export interface Chat {
 export default function Chat({ chats, setChats, selectedChatId, setSelectedChatId } : { chats: Chat[], setChats: any, selectedChatId: number, setSelectedChatId: any }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  const { messages, input, handleInputChange, handleSubmit, append } = useChat({
+  const { messages, data, input, handleInputChange, handleSubmit, append } = useChat({
     api: getApiUrl("/reply"),
-    initialMessages: chat.messages
-  })
+    initialMessages: chat.messages,
+    streamProtocol: 'data'
+  })  
+
+  console.log('data', data)
+  
 
   useEffect(() => {
     const updatedChats = [...chats]
