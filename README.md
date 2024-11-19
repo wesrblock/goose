@@ -40,6 +40,18 @@ cargo build
 
 ## Running the CLI
 
+### Configure
+```
+goose configure
+```
+
+### Add/Remove system
+
+```
+goose system add <system_url>
+goose system remove <system_url>
+```
+
 #### OpenAI provider (default):
 
 ```
@@ -65,6 +77,11 @@ Run goose once-off with instructions from a file
 Usage: cargo run --bin goose -- run -i instructions.md
 ```
 
+## Start sub system server
+```sh
+cd crates/stub-system
+cargo run
+```
 ## Troubleshooting
 
 #### Compiling `tokenizers` library
