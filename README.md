@@ -62,7 +62,7 @@ cargo run --bin goose -- session
 Run goose once-off with instructions from a file
 
 ```
-Usage: goose run -i instructions.md
+Usage: cargo run --bin goose -- run -i instructions.md
 ```
 
 ## Troubleshooting
