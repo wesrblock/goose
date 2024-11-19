@@ -65,8 +65,10 @@ enum Command {
         session: Option<String>,
         profile: Option<String>,
     },
-    /// Run the main application
-    Run,
+    /// Run goose once-off with instructions from a file
+    Run {
+        instructions: Option<String>,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -94,8 +96,15 @@ async fn main() -> Result<()> {
             let _ = session.start().await;
             return Ok(());
         }
-        Some(Command::Run) => {
-            println!("Running the main application");
+        Some(Command::Run { instructions }) => {
+            let file_name =
+                instructions.expect("Instruction file is required (--instructions <file_path>)");
+            let file_path = std::path::Path::new(&file_name);
+            let contents = std::fs::read_to_string(file_path).expect("Failed to read the file");
+
+            let mut session = build_session(None, None);
+            let _ = session.headless_start(Box::new(contents.clone())).await;
+            return Ok(());
         }
         None => {
             println!("No command provided");
