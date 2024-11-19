@@ -63,7 +63,7 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                     <GooseMessage message={message} />
                     {data != null && data.length > 0 && (
                       <UserInteractionForm 
-                        schema={data[0]}                                            
+                        data={data[0]}                                            
                       />
                     )}
                   </>
