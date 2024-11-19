@@ -1,5 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { BoxIcon, GPSIcon } from './ui/icons'
+import { useChat, Message } from 'ai/react'
+import { getApiUrl } from '../config'
 
 interface Plan {
   name: string
@@ -43,11 +45,41 @@ type SchemaType = {
 }
 
 interface UserInteractionFormProps {
-  data: SchemaType
+  message?: Message // Allow `message` to be optional
   onSubmit?: (formData: any) => void
 }
 
-export default function UserInteractionForm({ data, onSubmit }: UserInteractionFormProps) {
+export default function UserInteractionForm({ message, onSubmit }: UserInteractionFormProps) {
+  const { messages, handleSubmit } = useChat({
+    api: getApiUrl("/reply"),
+    initialInput: "how are you"
+  })
+  const [response, setResponse] = useState<string | null>(null)
+
+  // Trigger API call when the component mounts, if message.content exists
+  useEffect(() => {
+    if (message && message.content) {
+      handleSubmit()
+    }
+  }, [message, handleSubmit])
+
+  // Extract the latest assistant response when `messages` updates
+  useEffect(() => {
+    const assistantMessage = messages.find((msg) => msg.role === 'assistant')
+    if (assistantMessage) {
+      setResponse(assistantMessage.content)
+    }
+  }, [messages])
+
+  console.log(response);
+  if (!response) {
+    return null
+  }
+
+  
+  let data = JSON.parse(response);
+
+
   // Check for status complete and waiting for user
   if (data.status === 'complete' && data.waitingForUser === true) {
     console.log('todo - put notification here')
@@ -57,7 +89,7 @@ export default function UserInteractionForm({ data, onSubmit }: UserInteractionF
   const [formValues, setFormValues] = useState<Record<string, any>>({})
   const [selectedOptions, setSelectedOptions] = useState<string[]>([])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const formSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (onSubmit) {
       switch (data.type) {
@@ -275,7 +307,7 @@ export default function UserInteractionForm({ data, onSubmit }: UserInteractionF
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-4 p-4 bg-gray-800 rounded-md">
+    <form onSubmit={formSubmit} className="mt-4 p-4 bg-gray-800 rounded-md">
       {data.type === 'PlanApproval' && renderPlanApproval()}
       {data.type === 'PlanSelection' && renderPlanSelection()}
       {data.type === 'ActionOptions' && renderActionOptions()}

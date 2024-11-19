@@ -20,14 +20,12 @@ export interface Chat {
 export default function Chat({ chats, setChats, selectedChatId, setSelectedChatId } : { chats: Chat[], setChats: any, selectedChatId: number, setSelectedChatId: any }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  const { messages, data, input, handleInputChange, handleSubmit, append } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, append } = useChat({
     api: getApiUrl("/reply"),
     initialMessages: chat.messages,
     streamProtocol: 'data'
   })  
 
-  console.log('data', data)
-  
 
   useEffect(() => {
     const updatedChats = [...chats]
@@ -61,11 +59,6 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
                 ) : (
                   <>
                     <GooseMessage message={message} />
-                    {data != null && data.length > 0 && (
-                      <UserInteractionForm 
-                        data={data[0]}                                            
-                      />
-                    )}
                   </>
                 )}
               </div>
@@ -74,7 +67,9 @@ export default function Chat({ chats, setChats, selectedChatId, setSelectedChatI
           </ScrollArea>
         )}
 
+        <UserInteractionForm message={messages[messages.length - 1]}/>
         <Input handleSubmit={handleSubmit} handleInputChange={handleInputChange} input={input} />
+
       </Card>
     </div>
   )
