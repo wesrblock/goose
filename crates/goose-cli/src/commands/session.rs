@@ -51,6 +51,7 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
             provider: PROVIDER_OPEN_AI.to_string(),
             processor: recommended_models.processor.to_string(),
             accelerator: recommended_models.accelerator.to_string(),
+            additional_systems: Vec::new(),
         })
     } else {
         match profile_name {

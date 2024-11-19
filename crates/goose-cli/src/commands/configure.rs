@@ -25,10 +25,13 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
     let processor = set_processor(existing_profile, &recommended_models)?;
     let accelerator = set_accelerator(existing_profile, &recommended_models)?;
     let provider_config = set_provider_config(&provider_name, processor.clone());
+    let additional_systems = existing_profile
+        .map_or(Vec::new(), |profile| profile.additional_systems.clone());
     let profile = Profile {
         provider: provider_name.to_string(),
         processor: processor.clone(),
         accelerator,
+        additional_systems,
     };
     match save_profile(profile_name.as_str(), profile) {
         Ok(()) => println!("\nProfile saved to: {:?}", profile_path()?),
@@ -46,7 +49,7 @@ async fn check_configuration(
     spin.start("Now let's check your configuration...");
     let provider =
         factory::get_provider(get_provider_type(provider_name), provider_config).unwrap();
-    let message = Message::user("Please give a nice welcome messsage (one sentence) and let them know they are all set to use this agent ").unwrap();
+    let message = Message::user("Please give a nice welcome message (one sentence) and let them know they are all set to use this agent ").unwrap();
     let result = provider.complete(
                                    "You are an AI agent called Goose. You use tools of connected systems to solve problems.",
                                    &[message], &[]).await?;
