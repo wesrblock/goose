@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use anyhow::Result;
 use bat::WrappingMode;
-use cliclack::{input, spinner};
+use cliclack::{input, set_theme, spinner, Theme as CliclackTheme, ThemeState};
 use goose::models::message::{Message, MessageContent};
 
 use super::prompt::{Input, InputType, Prompt, Theme};
@@ -34,6 +34,8 @@ impl CliclackPrompt {
         // for syntax in syntax_set {
         //     println!("{}", syntax.name);
         // }
+
+        set_theme(PromptTheme);
 
         CliclackPrompt {
             spinner: spinner(),
@@ -195,5 +197,41 @@ impl Prompt for CliclackPrompt {
 
     fn close(&self) {
         // No cleanup required
+    }
+}
+
+//////
+/// Custom theme for the prompt
+//////
+struct PromptTheme;
+
+const EDIT_MODE_STR: &str = "[Esc](Preview)";
+const PREVIEW_MODE_STR: &str = "[Enter](Submit)";
+
+// We need a wrapper to be able to call the trait default implementation with the same name.
+#[allow(dead_code)]
+struct Wrapper<'a, T>(&'a T);
+impl<'a, T: CliclackTheme> CliclackTheme for Wrapper<'a, T> {}
+
+impl CliclackTheme for PromptTheme {
+    /// The original logic for teaching the user how to submit in multiline mode.
+    /// https://github.com/fadeevab/cliclack/blob/main/src/input.rs#L250
+    /// We are replacing it to be more explicit.
+    ///
+    fn format_footer_with_message(&self, state: &ThemeState, message: &str) -> String {
+        let new_message = match state {
+            ThemeState::Active => {
+                if EDIT_MODE_STR == message {
+                    "Send [Esc -> Enter]"
+                } else if PREVIEW_MODE_STR == message {
+                    "Send [Enter]"
+                } else {
+                    message
+                }
+            }
+            _ => message,
+        };
+
+        Wrapper(self).format_footer_with_message(state, &new_message)
     }
 }
