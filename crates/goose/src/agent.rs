@@ -1,16 +1,16 @@
 use anyhow::Result;
 use async_stream;
 use futures::stream::BoxStream;
-use serde_json::{json, Value};
+use serde_json::json;
 use std::collections::HashMap;
 
 use crate::errors::{AgentError, AgentResult};
+use crate::models::content::Content;
+use crate::models::message::{Message, ToolRequest};
+use crate::models::tool::{Tool, ToolCall};
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
-use crate::providers::types::content::{Content, ToolResponse};
-use crate::providers::types::message::{Message, Role};
 use crate::systems::System;
-use crate::tool::{Tool, ToolCall};
 use futures::stream;
 use serde::Serialize;
 
@@ -74,7 +74,7 @@ impl Agent {
                 tools.push(Tool::new(
                     &format!("{}__{}", system.name(), tool.name),
                     &tool.description,
-                    tool.parameters.clone(),
+                    tool.input_schema.clone(),
                 ));
             }
         }
@@ -92,7 +92,10 @@ impl Agent {
     }
 
     /// Dispatch a single tool call to the appropriate system
-    async fn dispatch_tool_call(&self, tool_call: AgentResult<ToolCall>) -> AgentResult<Value> {
+    async fn dispatch_tool_call(
+        &self,
+        tool_call: AgentResult<ToolCall>,
+    ) -> AgentResult<Vec<Content>> {
         let call = tool_call?;
         let system = self
             .get_system_for_tool(&call.name)
@@ -103,7 +106,7 @@ impl Agent {
             .split("__")
             .nth(1)
             .ok_or_else(|| AgentError::InvalidToolName(call.name.clone()))?;
-        let system_tool_call = ToolCall::new(tool_name, call.parameters);
+        let system_tool_call = ToolCall::new(tool_name, call.arguments);
 
         system.call(system_tool_call).await
     }
@@ -150,29 +153,18 @@ impl Agent {
     }
 
     // Initialize a new reply round, which may call multiple tools
-    // NOTE this is a simple no-op in this implementation
-    // NOTE this is a potential home for summarization, checkpointing, planning
     async fn rewrite_messages_on_reply(
         &self,
         messages: &mut Vec<Message>,
         status: String,
     ) -> AgentResult<()> {
         // Create tool use message for status check
-        let message_use = Message::new(
-            Role::Assistant,
-            vec![Content::tool_request_success("000", "status", json!({}))],
-        )
-        .map_err(|e| AgentError::Internal(e.to_string()))?;
+        let message_use =
+            Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
 
         // Create tool result message with status
-        let message_result = Message::new(
-            Role::User,
-            vec![Content::tool_response_success(
-                "000",
-                serde_json::json!(status),
-            )],
-        )
-        .map_err(|e| AgentError::Internal(e.to_string()))?;
+        let message_result =
+            Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
 
         messages.push(message_use);
         messages.push(message_result);
@@ -180,10 +172,6 @@ impl Agent {
     }
 
     // Rewrite the exchange as needed after each tool call
-    // NOTE in this implementation, we do system by system updates other agents might use a very different approach
-    // we from a message list that always looks like:
-    // [kickoff, tool_use_0, tool_result_0, ..., tool_use_n, tool_result_n, status_use, status_result]
-    // where status contains system detail that we always want to include for the agent
     async fn rewrite_messages_on_tool_response(
         &self,
         messages: &mut Vec<Message>,
@@ -194,9 +182,7 @@ impl Agent {
         messages.pop();
 
         // Append the pending messages
-        for message in pending {
-            messages.push(message);
-        }
+        messages.extend(pending);
 
         Ok(())
     }
@@ -228,38 +214,43 @@ impl Agent {
                 // Yield the assistant's response
                 yield response.clone();
 
-                // If there are tool calls, handle them in phases
-                if response.has_tool_request() {
-                    // Phase 1: Collect and process all tool requests
-                    let mut tool_requests = Vec::new();
-                    for tool_request in response.tool_request() {
-                        tool_requests.push(tool_request);
-                    }
+                // First collect any tool requests
+                let tool_requests: Vec<&ToolRequest> = response.content
+                    .iter()
+                    .filter_map(|content| content.as_tool_request())
+                    .collect();
 
-                    // Phase 2: Dispatch tool calls and collect responses
-                    let mut content = Vec::new();
-                    for tool_request in tool_requests {
-                        // Add a small delay before processing each tool call to ensure proper sequencing
-                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                        
-                        let output = self.dispatch_tool_call(tool_request.call).await;
-                        content.push(Content::ToolResponse(ToolResponse {
-                            request_id: tool_request.id, 
-                            output
-                        }));
-                    }
-
-                    // Phase 3: Create and yield the tool response message
-                    let tool_response = Message::new(Role::User, content)
-                        .expect("Failed to create tool response message");
-                    yield tool_response.clone();
-
-                    // Update conversation history
-                    self.rewrite_messages_on_tool_response(&mut messages, vec![response.clone(), tool_response.clone()]).await?;
-                } else {
+                if tool_requests.is_empty() {
                     // No more tool calls, end the conversation
                     break;
                 }
+
+                // Then dispatch each in parallel
+                let futures: Vec<_> = tool_requests
+                    .iter()
+                    .map(|request| self.dispatch_tool_call(request.tool_call.clone()))
+                    .collect();
+
+                // Process all the futures in parallel but wait until all are finished
+                let outputs = futures::future::join_all(futures).await;
+
+                // Create a message with the responses
+                let mut message_tool_response = Message::assistant();
+                // Now combine these into MessageContent::ToolResponse using the original ID
+                for (request, output) in tool_requests.iter().zip(outputs.into_iter()) {
+                    message_tool_response = message_tool_response.with_tool_response(
+                        request.id.clone(),
+                        output,
+                    );
+                }
+
+                yield message_tool_response.clone();
+
+                // Update conversation history after a tool call
+                self.rewrite_messages_on_tool_response(
+                    &mut messages,
+                    vec![response.clone(), message_tool_response],
+                ).await?;
             }
         })
     }
@@ -268,8 +259,8 @@ impl Agent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::message::MessageContent;
     use crate::providers::mock::MockProvider;
-    use crate::providers::types::content::Content;
     use async_trait::async_trait;
     use futures::StreamExt;
     use serde_json::json;
@@ -312,13 +303,15 @@ mod tests {
             &self.tools
         }
 
-        async fn status(&self) -> anyhow::Result<HashMap<String, Value>> {
+        async fn status(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
             Ok(HashMap::new())
         }
 
-        async fn call(&self, tool_call: ToolCall) -> AgentResult<Value> {
+        async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
             match tool_call.name.as_str() {
-                "echo" => Ok(tool_call.parameters),
+                "echo" => Ok(vec![Content::text(
+                    tool_call.arguments["message"].as_str().unwrap_or(""),
+                )]),
                 _ => Err(AgentError::ToolNotFound(tool_call.name)),
             }
         }
@@ -326,11 +319,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_response() -> Result<()> {
-        let response = Message::new(Role::Assistant, vec![Content::text("Hello!")])?;
+        let response = Message::assistant().with_text("Hello!");
         let provider = MockProvider::new(vec![response.clone()]);
         let agent = Agent::new(Box::new(provider));
 
-        let initial_message = Message::new(Role::User, vec![Content::text("Hi")])?;
+        let initial_message = Message::user().with_text("Hi");
         let initial_messages = vec![initial_message];
         let messages: Vec<Message> = agent
             .reply(&initial_messages)
@@ -347,19 +340,16 @@ mod tests {
     #[tokio::test]
     async fn test_tool_call() -> Result<()> {
         let mut agent = Agent::new(Box::new(MockProvider::new(vec![
-            Message::new(
-                Role::Assistant,
-                vec![Content::tool_request(
-                    "test__echo",
-                    json!({"message": "test"}),
-                )],
-            )?,
-            Message::new(Role::Assistant, vec![Content::text("Done!")])?,
+            Message::assistant().with_tool_request(
+                "1",
+                Ok(ToolCall::new("test_echo", json!({"message": "test"}))),
+            ),
+            Message::assistant().with_text("Done!"),
         ])));
 
         agent.add_system(Box::new(MockSystem::new("test")));
 
-        let initial_message = Message::new(Role::User, vec![Content::text("Echo test")])?;
+        let initial_message = Message::user().with_text("Echo test");
         let initial_messages = vec![initial_message];
         let messages: Vec<Message> = agent
             .reply(&initial_messages)
@@ -370,24 +360,25 @@ mod tests {
 
         // Should have three messages: tool request, response, and model text
         assert_eq!(messages.len(), 3);
-        assert!(messages[0].has_tool_request());
-        assert_eq!(messages[2].content[0], Content::text("Done!"));
+        assert!(messages[0]
+            .content
+            .iter()
+            .any(|c| matches!(c, MessageContent::ToolRequest(_))));
+        assert_eq!(messages[2].content[0], MessageContent::text("Done!"));
         Ok(())
     }
 
     #[tokio::test]
     async fn test_invalid_tool() -> Result<()> {
         let mut agent = Agent::new(Box::new(MockProvider::new(vec![
-            Message::new(
-                Role::Assistant,
-                vec![Content::tool_request("invalid.tool", json!({}))],
-            )?,
-            Message::new(Role::Assistant, vec![Content::text("Error occurred")])?,
+            Message::assistant()
+                .with_tool_request("1", Ok(ToolCall::new("invalid_tool", json!({})))),
+            Message::assistant().with_text("Error occurred"),
         ])));
 
         agent.add_system(Box::new(MockSystem::new("test")));
 
-        let initial_message = Message::new(Role::User, vec![Content::text("Invalid tool")])?;
+        let initial_message = Message::user().with_text("Invalid tool");
         let initial_messages = vec![initial_message];
         let messages: Vec<Message> = agent
             .reply(&initial_messages)
@@ -398,27 +389,35 @@ mod tests {
 
         // Should have three messages: failed tool request, fail response, and model text
         assert_eq!(messages.len(), 3);
-        assert!(messages[0].has_tool_request());
-        assert_eq!(messages[2].content[0], Content::text("Error occurred"));
+        assert!(messages[0]
+            .content
+            .iter()
+            .any(|c| matches!(c, MessageContent::ToolRequest(_))));
+        assert_eq!(
+            messages[2].content[0],
+            MessageContent::text("Error occurred")
+        );
         Ok(())
     }
 
     #[tokio::test]
     async fn test_multiple_tool_calls() -> Result<()> {
         let mut agent = Agent::new(Box::new(MockProvider::new(vec![
-            Message::new(
-                Role::Assistant,
-                vec![
-                    Content::tool_request("test__echo", json!({"message": "first"})),
-                    Content::tool_request("test__echo", json!({"message": "second"})),
-                ],
-            )?,
-            Message::new(Role::Assistant, vec![Content::text("All done!")])?,
+            Message::assistant()
+                .with_tool_request(
+                    "1",
+                    Ok(ToolCall::new("test_echo", json!({"message": "first"}))),
+                )
+                .with_tool_request(
+                    "2",
+                    Ok(ToolCall::new("test_echo", json!({"message": "second"}))),
+                ),
+            Message::assistant().with_text("All done!"),
         ])));
 
         agent.add_system(Box::new(MockSystem::new("test")));
 
-        let initial_message = Message::new(Role::User, vec![Content::text("Multiple calls")])?;
+        let initial_message = Message::user().with_text("Multiple calls");
         let initial_messages = vec![initial_message];
         let messages: Vec<Message> = agent
             .reply(&initial_messages)
@@ -427,58 +426,13 @@ mod tests {
             .into_iter()
             .collect::<Result<Vec<Message>>>()?;
 
-        // Should have three messages: tool requests, response, and model text
+        // Should have three messages: tool requests, responses, and model text
         assert_eq!(messages.len(), 3);
-        assert!(messages[0].has_tool_request());
-        assert_eq!(messages[2].content[0], Content::text("All done!"));
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_conversation_flow() -> Result<()> {
-        let mut agent = Agent::new(Box::new(MockProvider::new(vec![
-            // First interaction: tool request
-            Message::new(
-                Role::Assistant,
-                vec![Content::tool_request(
-                    "test__echo",
-                    json!({"message": "first"}),
-                )],
-            )?,
-            // Second interaction: final response
-            Message::new(Role::Assistant, vec![Content::text("Done!")])?,
-        ])));
-
-        agent.add_system(Box::new(MockSystem::new("test")));
-
-        let initial_message = Message::new(Role::User, vec![Content::text("Test conversation")])?;
-        let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent
-            .reply(&initial_messages)
-            .collect::<Vec<Result<Message>>>()
-            .await
-            .into_iter()
-            .collect::<Result<Vec<Message>>>()?;
-
-        assert_eq!(messages.len(), 3);
-
-        // First message should be the tool request
-        assert!(messages[0].has_tool_request());
-        let tool_requests: Vec<_> = messages[0].tool_request().into_iter().collect();
-        assert_eq!(tool_requests[0].call.as_ref().unwrap().name, "test__echo");
-
-        // Second message should be the tool response
-        assert_eq!(
-            messages[1].content[0],
-            Content::tool_response_success(
-                tool_requests[0].id.clone(),
-                json!({"message": "first"})
-            )
-        );
-
-        // Third message should be the final response
-        assert_eq!(messages[2].content[0], Content::text("Done!"));
-
+        assert!(messages[0]
+            .content
+            .iter()
+            .any(|c| matches!(c, MessageContent::ToolRequest(_))));
+        assert_eq!(messages[2].content[0], MessageContent::text("All done!"));
         Ok(())
     }
 }

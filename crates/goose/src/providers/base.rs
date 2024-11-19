@@ -1,8 +1,8 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use super::types::message::Message;
-use crate::tool::Tool;
+use crate::models::message::Message;
+use crate::models::tool::Tool;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Usage {
@@ -31,6 +31,14 @@ use async_trait::async_trait;
 #[async_trait]
 pub trait Provider: Send + Sync {
     /// Generate the next message using the configured model and other parameters
+    ///
+    /// # Arguments
+    /// * `system` - The system prompt that guides the model's behavior
+    /// * `messages` - The conversation history as a sequence of messages
+    /// * `tools` - Optional list of tools the model can use
+    ///
+    /// # Returns
+    /// A tuple containing the model's response message and usage statistics
     async fn complete(
         &self,
         system: &str,

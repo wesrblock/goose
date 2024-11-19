@@ -14,16 +14,14 @@ const CLAUDE_TOKENIZER_KEY: &str = "Xenova--claude-tokenizer";
 const QWEN_TOKENIZER_KEY: &str = "Qwen--Qwen2.5-Coder-32B-Instruct";
 
 impl TokenCounter {
-
     fn load_tokenizer(&mut self, tokenizer_key: &str) {
         // Load from embedded tokenizer files. The tokenizer_key must match the directory name.
         let tokenizer_path = format!("{}/tokenizer.json", tokenizer_key);
         let file_content = TOKENIZER_FILES
             .get_file(&tokenizer_path)
             .map(|f| f.contents())
-            .ok_or_else(|| {
-                format!("Embedded tokenizer file not found: {}", tokenizer_path)
-            }).unwrap();
+            .ok_or_else(|| format!("Embedded tokenizer file not found: {}", tokenizer_path))
+            .unwrap();
 
         let tokenizer = Tokenizer::from_bytes(file_content);
 

@@ -3,10 +3,9 @@ use async_trait::async_trait;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use crate::models::message::Message;
+use crate::models::tool::Tool;
 use crate::providers::base::{Provider, Usage};
-use crate::providers::types::content::Content;
-use crate::providers::types::message::{Message, Role};
-use crate::tool::Tool;
 
 /// A mock provider that returns pre-configured responses for testing
 pub struct MockProvider {
@@ -33,11 +32,7 @@ impl Provider for MockProvider {
         let mut responses = self.responses.lock().unwrap();
         if responses.is_empty() {
             // Return empty response if no more pre-configured responses
-            Ok((
-                Message::new(Role::Assistant, vec![Content::text("")])
-                    .expect("Failed to create message"),
-                Usage::default(),
-            ))
+            Ok((Message::assistant().with_text(""), Usage::default()))
         } else {
             Ok((responses.remove(0), Usage::default()))
         }
