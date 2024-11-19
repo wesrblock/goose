@@ -176,14 +176,24 @@ async fn chat_handler(
                                         let text = content.summary();
                                         if is_question_ask(&text) {
                                             print!("\n\n\n-------\n\n\n{}\n\n\n-------\n\n\n", &text);
-                                            let task = format!("Following is some questions and information to present to the user. There may be lists of options of different kinds. 
-                                            Present it in JSON Schema format strictly in the response: 
-                                            ### Content: {}
-                                            ### jsonschema:\n", text);
-                                            let schema_response = agent.complete_simple(&task).await;    
-                                            match schema_response {
+                                            let task = format!(r#"Analyze the following text and generate a JSON-LD response based on these rules:
+
+1. If the text is a conversation flow question (like "Would you like me to continue?" or "Anything else?"), respond with this structure:
+   {{"@type": "ConversationFlow", "status": "complete", "waitingForUser": true}}
+
+2. For all other questions or information, create a simple JSON-LD structure that represents the key information:
+   - Use clear, semantic types
+   - Include only relevant information
+   - Keep the structure flat when possible
+   - Avoid nested arrays unless absolutely necessary
+
+Content to analyze: {}
+
+Generate ONLY the JSON-LD, no markdown formatting or explanation:"#, text);
+                                            let jsonld = agent.complete_simple(&task).await;    
+                                            match jsonld {
                                                 Ok(message) => {
-                                                    let clean_json = clean_schema_markdown(&message.text());
+                                                    let clean_json = clean_jsonld_markdown(&message.text());
                                                     println!("Received message: {}", clean_json);
                                                     if let Err(e) = tx.send(format!("2:[{}]\n", clean_json)).await {
                                                         tracing::error!("Error sending message through channel: {}", e);
@@ -237,11 +247,11 @@ pub fn routes(state: AppState) -> Router {
 }
 
 
-fn clean_schema_markdown(content: &str) -> String {
+fn clean_jsonld_markdown(content: &str) -> String {
     content
         .trim() // Remove leading/trailing whitespace
-        .trim_start_matches("```jsonschema") // Remove opening markdown for jsonschema
-        .trim_start_matches("```json") // Remove opening markdown for json
+        .trim_start_matches("```jsonld") // Remove opening markdown
+        .trim_start_matches("```json") // Remove opening markdown
         .trim_end_matches("```") // Remove closing markdown
         .trim() // Remove any remaining whitespace
         .to_string()
@@ -264,25 +274,10 @@ fn clean_schema_markdown(content: &str) -> String {
 /// # Returns
 /// 
 /// Returns true if the text appears to be a question or confirmation request
-/// Cleans markdown-wrapped JSON Schema content by removing markdown code block markers
-/// and any extra whitespace.
-///
-/// # Arguments
-/// * `content` - A string containing JSON Schema content potentially wrapped in markdown code blocks
-///
-/// # Returns
-/// A String containing clean JSON Schema content with markdown markers removed
-///
-/// # Example
-/// ```
-/// let markdown_json = "```jsonschema\n{\"key\": \"value\"}\n```";
-/// let clean_json = clean_schema_markdown(markdown_json);
-/// assert_eq!(clean_json, "{\"key\": \"value\"}");
-/// ```
 pub fn is_question_ask(text: &str) -> bool {
     let text = text.trim().to_lowercase();
     
-    if text.is_empty() {
+    if text.is_empty() || text == "?" {
         return false;
     }
 
@@ -291,61 +286,78 @@ pub fn is_question_ask(text: &str) -> bool {
         return true;
     }
 
-    // Skip single question mark
-    if text == "?" {
-        return false;
-    }
-    
-    // Skip words with embedded question marks like "?word?"
-    if text.matches('?').count() >= 2 && text.split_whitespace().any(|word| word.starts_with('?') && word.ends_with('?')) {
-        return false;
-    }
-
-    // Check for question marks in the text that are not part of embedded patterns
+    // Check for question marks in the text
     if text.contains('?') {
-        // If there's a question mark not surrounded by other question marks, it's likely a question
+        // Special case: if question marks are surrounded by the same word, it's not a question
+        // Example: "this ?thing? will"
+        let parts: Vec<&str> = text.split_whitespace().collect();
+        let mut has_surrounded_question = false;
+        for part in parts {
+            if part.starts_with('?') && part.ends_with('?') {
+                has_surrounded_question = true;
+            }
+        }
+        if has_surrounded_question {
+            return false;
+        }
+
+        // Split by question marks and check each part
         let parts: Vec<&str> = text.split('?').collect();
-        if parts.len() > 1 {
-            // Check if any part has a question mark that's not part of a ?word? pattern
-            let mut has_valid_question = false;
-            for (i, part) in parts.iter().enumerate() {
-                let trimmed = part.trim();
-                if i > 0 && !trimmed.is_empty() && !trimmed.ends_with('?') {
-                    has_valid_question = true;
-                    break;
+        for (i, part) in parts.iter().enumerate() {
+            let part = part.trim();
+            
+            // Skip empty parts and the last part (after the last question mark)
+            if part.is_empty() || i == parts.len() - 1 {
+                continue;
+            }
+
+            // Get the first word of the part
+            if let Some(first_word) = part.split_whitespace().next() {
+                // Check if part starts with a question word
+                if ["what", "why", "how", "when", "where", "who", "which", "whose", "are"].contains(&first_word) {
+                    return true;
                 }
             }
-            if has_valid_question {
+
+            // If this part has content before the question mark, it's likely a question
+            if !part.is_empty() {
                 return true;
             }
         }
     }
-    
-    // Split text into words for analysis
+
+    // Check for question words at the start of any sentence
+    let sentences: Vec<&str> = text.split(['.', '!', '?']).collect();
+    for sentence in sentences {
+        let sentence = sentence.trim();
+        if sentence.is_empty() {
+            continue;
+        }
+
+        // Get the first word of the sentence
+        if let Some(first_word) = sentence.split_whitespace().next() {
+            // Check if sentence starts with a question word
+            if ["what", "why", "how", "when", "where", "who", "which", "whose", "are"].contains(&first_word) {
+                return true;
+            }
+        }
+    }
+
+    // Split text into words for additional analysis
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.is_empty() {
         return false;
     }
 
-    // Common question words at the start of a sentence
-    const QUESTION_STARTERS: [&str; 9] = [
-        "what", "why", "how", "when", "where", "who", "which", "whose", "are"
-    ];
-    
     // Modal verbs and auxiliary verbs that often indicate questions
-    const QUESTION_VERBS: [&str; 9] = [
+    let question_verbs = [
         "can", "could", "will", "would", "should", "may", "do", "does", "have"
     ];
-
-    // Check if sentence starts with a question word or auxiliary verb
-    if QUESTION_STARTERS.contains(&words[0]) {
-        return true;
-    }
 
     // Check for verb patterns
     if words.len() >= 2 {
         // Check for inverted sentence structure (verb + subject)
-        if QUESTION_VERBS.contains(&words[0]) {
+        if question_verbs.contains(&words[0]) {
             if words[1] == "you" || words[1] == "i" || words[1] == "we" || words[1] == "this" {
                 return true;
             }
@@ -390,30 +402,30 @@ pub fn is_question_ask(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test_clean_schema_markdown() {
+    fn test_clean_jsonld_markdown() {
         // Test basic markdown removal
         assert_eq!(
-            clean_schema_markdown("```jsonschema\n{\"key\": \"value\"}\n```"),
+            clean_jsonld_markdown("```jsonld\n{\"key\": \"value\"}\n```"),
             "{\"key\": \"value\"}"
         );
 
         // Test with extra whitespace
         assert_eq!(
-            clean_schema_markdown("  ```jsonschema  \n  {\"key\": \"value\"}  \n  ```  "),
+            clean_jsonld_markdown("  ```jsonld  \n  {\"key\": \"value\"}  \n  ```  "),
             "{\"key\": \"value\"}"
         );
 
         // Test with no markdown wrapping
         assert_eq!(
-            clean_schema_markdown("{\"key\": \"value\"}"),
+            clean_jsonld_markdown("{\"key\": \"value\"}"),
             "{\"key\": \"value\"}"
         );
 
         // Test with empty content
-        assert_eq!(clean_schema_markdown(""), "");
+        assert_eq!(clean_jsonld_markdown(""), "");
 
         // Test with only whitespace
-        assert_eq!(clean_schema_markdown("   "), "");
+        assert_eq!(clean_jsonld_markdown("   "), "");
     }
     use super::*;
 
