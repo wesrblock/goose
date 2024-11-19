@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { app, BrowserWindow, Tray, Menu, globalShortcut } from 'electron';
+import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain } from 'electron';
 import path from 'node:path';
 import { spawn } from 'child_process';
 import started from "electron-squirrel-startup";
@@ -12,6 +12,9 @@ let isQuitting = false;
 
 // Function to show the main window
 let spotlightWindow: BrowserWindow | null = null;
+
+declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
+declare var MAIN_WINDOW_VITE_NAME: string;
 
 const createSpotlightWindow = () => {
   // If window exists, just show it
@@ -202,11 +205,6 @@ const createWindow = (query?: string) => {
     return false;
   });
 };
-
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Import ipcMain at the top
-import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain } from 'electron';
 
 // Add IPC handler for hiding windows
 ipcMain.on('hide-window', () => {
