@@ -31,12 +31,12 @@ impl<'a> Session<'a> {
         let mut messages = Vec::new();
 
         loop {
-            let input = self.prompt.get_input().unwrap();
+            let input = self.prompt.get_input()?;
             match input.input_type {
                 InputType::Exit => break,
                 InputType::Message => {
                     if let Some(content) = &input.content {
-                        messages.push(Message::user(content).unwrap());
+                        messages.push(Message::user(content)?);
                     }
                 }
             }
