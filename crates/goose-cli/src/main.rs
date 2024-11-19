@@ -62,12 +62,17 @@ enum Command {
     },
     /// Start or resume sessions with an optional session name
     Session {
+        #[arg(short, long)]
         session: Option<String>,
+        #[arg(short, long)]
         profile: Option<String>,
     },
     /// Run goose once-off with instructions from a file
     Run {
+        #[arg(short, long)]
         instructions: Option<String>,
+        #[arg(short, long)]
+        profile: Option<String>,
     },
 }
 
@@ -96,13 +101,16 @@ async fn main() -> Result<()> {
             let _ = session.start().await;
             return Ok(());
         }
-        Some(Command::Run { instructions }) => {
+        Some(Command::Run {
+            instructions,
+            profile,
+        }) => {
             let file_name =
                 instructions.expect("Instruction file is required (--instructions <file_path>)");
             let file_path = std::path::Path::new(&file_name);
             let contents = std::fs::read_to_string(file_path).expect("Failed to read the file");
 
-            let mut session = build_session(None, None);
+            let mut session = build_session(None, profile);
             let _ = session.headless_start(Box::new(contents.clone())).await;
             return Ok(());
         }
