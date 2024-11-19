@@ -209,8 +209,8 @@ const EDIT_MODE_STR: &str = "[Esc](Preview)";
 const PREVIEW_MODE_STR: &str = "[Enter](Submit)";
 
 // We need a wrapper to be able to call the trait default implementation with the same name.
+#[allow(dead_code)]
 struct Wrapper<'a, T>(&'a T);
-
 impl<'a, T: CliclackTheme> CliclackTheme for Wrapper<'a, T> {}
 
 impl CliclackTheme for PromptTheme {
