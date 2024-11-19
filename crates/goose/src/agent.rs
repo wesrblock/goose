@@ -216,7 +216,7 @@ impl Agent {
 
                 // Not sure why this is needed, but it seems to ensure the above resposne is
                 // flushed to the client before waiting any potentially long run tool calls below
-                tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
                 // First collect any tool requests
                 let tool_requests: Vec<&ToolRequest> = response.content
