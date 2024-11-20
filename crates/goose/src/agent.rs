@@ -72,7 +72,7 @@ impl Agent {
         for system in &self.systems {
             for tool in system.tools() {
                 tools.push(Tool::new(
-                    &format!("{}__{}", system.name(), tool.name),
+                    format!("{}__{}", system.name(), tool.name),
                     &tool.description,
                     tool.input_schema.clone(),
                 ));

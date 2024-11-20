@@ -66,14 +66,14 @@ impl<'a> Session<'a> {
     }
 
     async fn agent_process_messages(&mut self, messages: &mut Vec<Message>) {
-        let mut stream = self.agent.reply(&messages);
+        let mut stream = self.agent.reply(messages);
         loop {
             tokio::select! {
                 response = stream.next() => {
                     match response {
                         Some(Ok(message)) => {
                             messages.push(message.clone());
-                            persist_messages(&self.session_file, &messages).unwrap_or_else(|e| eprintln!("Failed to persist messages: {}", e));
+                            persist_messages(&self.session_file, messages).unwrap_or_else(|e| eprintln!("Failed to persist messages: {}", e));
                             self.prompt.render(Box::new(message.clone()));
                         }
                         Some(Err(e)) => {
