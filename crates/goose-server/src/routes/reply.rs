@@ -163,10 +163,10 @@ impl ProtocolFormatter {
         format!("a:{}\n", response)
     }
 
-    fn format_finish() -> String {
+    fn format_finish(reason: &str) -> String {
         // Finish messages start with "d:"
         let finish = json!({
-            "finishReason": "stop",
+            "finishReason": reason,
             "usage": {
                 "promptTokens": 0,
                 "completionTokens": 0
@@ -281,7 +281,15 @@ async fn handler(
 
     // Spawn task to handle streaming
     tokio::spawn(async move {
-        let mut stream = agent.reply(&messages);
+        let mut stream = match agent.reply(&messages).await {
+            Ok(stream) => stream,
+            Err(e) => {
+                tracing::error!("Failed to start reply stream: {}", e);
+                // Send a finish message with error as the reason
+                let _ = tx.send(ProtocolFormatter::format_finish("error")).await;
+                return;
+            }
+        };
 
         while let Some(response) = stream.next().await {
             match response {
@@ -299,7 +307,7 @@ async fn handler(
         }
 
         // Send finish message
-        let _ = tx.send(ProtocolFormatter::format_finish()).await;
+        let _ = tx.send(ProtocolFormatter::format_finish("stop")).await;
     });
 
     Ok(SseResponse::new(stream))
