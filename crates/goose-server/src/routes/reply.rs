@@ -10,8 +10,8 @@ use futures::{stream::StreamExt, Stream};
 use goose::{
     agent::Agent,
     developer::DeveloperSystem,
-    models::message::{Message, MessageContent, Role},
     models::content::Content,
+    models::message::{Message, MessageContent, Role},
     providers::factory,
 };
 use serde::Deserialize;
@@ -114,10 +114,8 @@ fn convert_messages(incoming: Vec<IncomingMessage>) -> Vec<Message> {
                         // Add the tool response from user
                         if let Some(result) = &tool.result {
                             messages.push(
-                                Message::user().with_tool_response(
-                                    tool.tool_call_id,
-                                    Ok(result.clone())
-                                ),
+                                Message::user()
+                                    .with_tool_response(tool.tool_call_id, Ok(result.clone())),
                             );
                         }
                     }
@@ -194,11 +192,19 @@ async fn stream_message(
                     // We should return a result for either an error or a success
                     match response.tool_result {
                         Ok(result) => {
-                            tx.send(ProtocolFormatter::format_tool_response(&response.id, &result)).await?;
+                            tx.send(ProtocolFormatter::format_tool_response(
+                                &response.id,
+                                &result,
+                            ))
+                            .await?;
                         }
                         Err(err) => {
                             let result = vec![Content::text(format!("Error {}", err))];
-                            tx.send(ProtocolFormatter::format_tool_response(&response.id, &result)).await?;
+                            tx.send(ProtocolFormatter::format_tool_response(
+                                &response.id,
+                                &result,
+                            ))
+                            .await?;
                         }
                     }
                 }
@@ -222,9 +228,9 @@ async fn stream_message(
                                 &request.id,
                                 "invalid name",
                                 &json!({}),
-                            )).await?;
+                            ))
+                            .await?;
                         }
-
                     }
                     MessageContent::Text(text) => {
                         for line in text.text.lines() {
@@ -301,5 +307,7 @@ async fn handler(
 
 // Configure routes for this module
 pub fn routes(state: AppState) -> Router {
-    Router::new().route("/reply", post(handler)).with_state(state)
+    Router::new()
+        .route("/reply", post(handler))
+        .with_state(state)
 }
