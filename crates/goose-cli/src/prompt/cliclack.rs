@@ -1,9 +1,12 @@
-use std::io::{self, Write};
+use std::{
+    collections::HashMap,
+    io::{self, Write},
+};
 
 use anyhow::Result;
 use bat::WrappingMode;
 use cliclack::{input, set_theme, spinner, Theme as CliclackTheme, ThemeState};
-use goose::models::message::{Message, MessageContent};
+use goose::models::message::{Message, MessageContent, ToolRequest, ToolResponse};
 
 use super::prompt::{Input, InputType, Prompt, Theme};
 
@@ -11,6 +14,7 @@ pub struct CliclackPrompt {
     spinner: cliclack::ProgressBar,
     input_mode: InputMode,
     theme: Theme,
+    renderers: HashMap<String, Box<dyn ToolRenderer>>,
 }
 
 enum InputMode {
@@ -37,10 +41,63 @@ impl CliclackPrompt {
 
         set_theme(PromptTheme);
 
+        let mut renderers: HashMap<String, Box<dyn ToolRenderer>> = HashMap::new();
+        let default_renderer = DefaultRenderer;
+        renderers.insert(default_renderer.tool_name(), Box::new(default_renderer));
+
         CliclackPrompt {
             spinner: spinner(),
             input_mode: InputMode::Multiline,
             theme: Theme::Dark,
+            renderers,
+        }
+    }
+}
+
+/// Implement the ToolRenderer trait for each tool that you want to render in the prompt.
+trait ToolRenderer {
+    fn tool_name(&self) -> String;
+    fn request(&self, tool_request: &ToolRequest, theme: &str);
+    fn response(&self, tool_response: &ToolResponse, theme: &str);
+}
+
+struct DefaultRenderer;
+
+impl ToolRenderer for DefaultRenderer {
+    fn tool_name(&self) -> String {
+        "default".to_string()
+    }
+
+    fn request(&self, tool_request: &ToolRequest, theme: &str) {
+        match &tool_request.tool_call {
+            Ok(call) => {
+                print_tool_request(
+                    &serde_json::to_string_pretty(&call.arguments).unwrap(),
+                    theme,
+                    &call.name,
+                );
+            }
+            Err(e) => print(&e.to_string(), theme),
+        }
+    }
+
+    fn response(&self, tool_response: &ToolResponse, theme: &str) {
+        match &tool_response.tool_result {
+            Ok(output) => {
+                let output_value = serde_json::to_string_pretty(output).unwrap();
+
+                // For pure text responses, strip the quotes and replace escaped newlines. Eg. bash responses
+                let unquoted = output_value.trim_matches('"');
+                let formatted = unquoted.replace("\\n", "\n");
+
+                let language = if formatted.starts_with("{") {
+                    "JSON"
+                } else {
+                    "Markdown"
+                };
+                print_tool_response(&formatted, theme, language);
+            }
+            Err(e) => print(&e.to_string(), theme),
         }
     }
 }
@@ -92,38 +149,39 @@ impl Prompt for CliclackPrompt {
             Theme::Dark => "zenburn",
         };
 
+        let mut last_tool_name: &str = "default";
         for message_content in &message.content {
             match message_content {
                 MessageContent::Text(text) => print(&text.text, theme),
                 MessageContent::ToolRequest(tool_request) => match &tool_request.tool_call {
                     Ok(call) => {
-                        print_tool_request(
-                            &serde_json::to_string_pretty(&call.arguments).unwrap(),
-                            theme,
-                            &call.name,
-                        );
+                        last_tool_name = &call.name;
+                        self.renderers
+                            .get(&call.name)
+                            .or_else(|| self.renderers.get("default"))
+                            .unwrap()
+                            .request(tool_request, theme);
                     }
-                    Err(e) => print(&e.to_string(), theme),
+                    Err(_) => self
+                        .renderers
+                        .get("default")
+                        .unwrap()
+                        .request(tool_request, theme),
                 },
-                MessageContent::ToolResponse(tool_response) => {
-                    match &tool_response.tool_result {
-                        Ok(output) => {
-                            let output_value = serde_json::to_string_pretty(output).unwrap();
-
-                            // For pure text responses, strip the quotes and replace escaped newlines. Eg. bash responses
-                            let unquoted = output_value.trim_matches('"');
-                            let formatted = unquoted.replace("\\n", "\n");
-
-                            let language = if formatted.starts_with("{") {
-                                "JSON"
-                            } else {
-                                "Markdown"
-                            };
-                            print_tool_response(&formatted, theme, language);
-                        }
-                        Err(e) => print(&e.to_string(), theme),
+                MessageContent::ToolResponse(tool_response) => match &tool_response.tool_result {
+                    Ok(_) => {
+                        self.renderers
+                            .get(last_tool_name)
+                            .or_else(|| self.renderers.get("default"))
+                            .unwrap()
+                            .response(tool_response, theme);
                     }
-                }
+                    Err(_) => self
+                        .renderers
+                        .get("default")
+                        .unwrap()
+                        .response(tool_response, theme),
+                },
                 MessageContent::Image(image) => {
                     println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
                 }
