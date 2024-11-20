@@ -75,27 +75,7 @@ function ToolResult({ result }: ToolResultProps) {
               <div key={index} className="mb-2">
                 {item.type === 'text' && item.text && (
                   <ReactMarkdown
-                    className="text-tool-result-green whitespace-pre-wrap"
-                    components={{
-                      code({ node, className, children, ...props }) {
-                        return (
-                          <code className={className} {...props}>
-                            {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
-                          </code>
-                        )
-                      },
-                      pre({ children }) {
-                        return <div className="whitespace-pre overflow-x-auto">
-                          {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
-                        </div>
-                      },
-                      p({ children }) {
-                        return <div>
-                          {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
-                        </div>
-                      }
-                    }}
-                  >
+                    className="text-tool-result-green whitespace-pre-wrap">
                     {item.text}
                   </ReactMarkdown>
                 )}

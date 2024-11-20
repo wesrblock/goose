@@ -66,7 +66,13 @@ impl<'a> Session<'a> {
     }
 
     async fn agent_process_messages(&mut self, messages: &mut Vec<Message>) {
-        let mut stream = self.agent.reply(messages);
+        let mut stream = match self.agent.reply(messages).await {
+            Ok(stream) => stream,
+            Err(e) => {
+                eprintln!("Error starting reply stream: {}", e);
+                return;
+            }
+        };
         loop {
             tokio::select! {
                 response = stream.next() => {
