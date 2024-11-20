@@ -13,7 +13,7 @@ pub struct SerializableMessage<'a> {
 #[serde(untagged)]
 enum SerializableContent<'a> {
     Text {
-        text: &'a str,
+        text: String,
     },
     ToolRequest {
         tool_name: &'a str,
@@ -44,14 +44,16 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
             .iter()
             .map(|content| {
                 match content {
-                    MessageContent::Text(text) => SerializableContent::Text { text: &text.text },
+                    MessageContent::Text(text) => SerializableContent::Text {
+                        text: text.text.to_string(),
+                    },
                     MessageContent::ToolRequest(req) => match &req.tool_call {
                         Ok(tool_call) => SerializableContent::ToolRequest {
                             tool_name: &tool_call.name,
                             arguments: &tool_call.arguments,
                         },
                         Err(e) => SerializableContent::Text {
-                            text: Box::leak(e.to_string().into_boxed_str()), // TODO: Find a fix and Remove Box::leak
+                            text: format!("Tool Request Error: {}", e),
                         },
                     },
                     MessageContent::ToolResponse(resp) => SerializableContent::ToolResponse {
