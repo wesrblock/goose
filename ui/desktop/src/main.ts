@@ -101,6 +101,7 @@ const createChat = (query?: string) => {
     trafficLightPosition: { x: 16, y: 18 },
     width: 1024,
     height: 768,
+    transparent: true,
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
