@@ -24,7 +24,6 @@ pub fn persist_messages(session_file: &PathBuf, messages: &[Message]) -> Result<
     let file = fs::File::create(session_file)?;
     let mut writer = std::io::BufWriter::new(file);
 
-    // Write each message as a JSON line
     for message in messages {
         let serializable = SerializableMessage::from(message);
         serde_json::to_writer(&mut writer, &serializable)?;

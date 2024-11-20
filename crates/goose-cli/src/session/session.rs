@@ -66,7 +66,6 @@ impl<'a> Session<'a> {
     }
 
     async fn agent_process_messages(&mut self, messages: &mut Vec<Message>) {
-        // Process the stream of messages
         let mut stream = self.agent.reply(&messages);
         loop {
             tokio::select! {

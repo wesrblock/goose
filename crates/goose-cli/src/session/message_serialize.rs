@@ -39,34 +39,37 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
         let created = msg.created;
 
         // Process all content items
-        let content: Vec<SerializableContent> = msg.content.iter().map(|content| {
-            match content {
-                MessageContent::Text(text) => SerializableContent::Text { text: &text.text },
-                MessageContent::ToolRequest(req) => {
-                    if let Ok(tool_call) = &req.tool_call {
-                        SerializableContent::ToolRequest {
+        let content: Vec<SerializableContent> = msg
+            .content
+            .iter()
+            .map(|content| {
+                match content {
+                    MessageContent::Text(text) => SerializableContent::Text { text: &text.text },
+                    MessageContent::ToolRequest(req) => match &req.tool_call {
+                        Ok(tool_call) => SerializableContent::ToolRequest {
                             tool_name: &tool_call.name,
                             arguments: &tool_call.arguments,
-                        }
-                    } else {
-                        // Fallback to empty text if tool call is an error
-                        SerializableContent::Text { text: "" }
-                    }
-                }
-                MessageContent::ToolResponse(resp) => SerializableContent::ToolResponse {
-                    id: &resp.id,
-                    tool_result: match &resp.tool_result {
-                        Ok(content) => serde_json::to_string(content)
-                            .unwrap_or_else(|e| format!("{{\"error\": \"Failed to serialize: {}\"}}", e)),
-                        Err(e) => format!("{{\"error\": \"{}\"}}", e),
+                        },
+                        Err(e) => SerializableContent::Text {
+                            text: Box::leak(e.to_string().into_boxed_str()), // TODO: Find a fix and Remove Box::leak
+                        },
                     },
-                },
-                MessageContent::Image(img) => SerializableContent::Image {
-                    // data: &img.data,
-                    mime_type: &img.mime_type,
-                },
-            }
-        }).collect();
+                    MessageContent::ToolResponse(resp) => SerializableContent::ToolResponse {
+                        id: &resp.id,
+                        tool_result: match &resp.tool_result {
+                            Ok(content) => serde_json::to_string(content).unwrap_or_else(|e| {
+                                format!("{{\"error\": \"Failed to serialize: {}\"}}", e)
+                            }),
+                            Err(e) => format!("{{\"error\": \"{}\"}}", e),
+                        },
+                    },
+                    MessageContent::Image(img) => SerializableContent::Image {
+                        // data: &img.data,
+                        mime_type: &img.mime_type,
+                    },
+                }
+            })
+            .collect();
 
         SerializableMessage {
             role,
