@@ -11,7 +11,6 @@ declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
 
 const createLauncher = () => {
-  // Create new launcher window
   const launcherWindow = new BrowserWindow({
     width: 600,
     height: 60,
@@ -56,7 +55,6 @@ const createWingToWing = (query?: string) => {
   const windowHeight = 150;
   const gap = 40;
 
-  // Create new launcher window
   const wingToWingWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
@@ -96,6 +94,8 @@ const createWingToWing = (query?: string) => {
 };
 
 const createChat = (query?: string) => {
+  const isDev = process.env.NODE_ENV === 'development';
+
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 18 },
@@ -108,7 +108,7 @@ const createChat = (query?: string) => {
     },
   });
 
-  // and load the index.html of the app.
+  // Load the index.html of the app.
   const queryParam = query ? `?initialQuery=${encodeURIComponent(query)}` : '';
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${queryParam}`);
@@ -119,8 +119,14 @@ const createChat = (query?: string) => {
     );
   }
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // DevTools
+  if (isDev) {
+    mainWindow.webContents.openDevTools(); // always in dev
+  } else {
+    globalShortcut.register('Alt+Command+I', () => {
+      mainWindow.webContents.openDevTools(); // key combo in distributed app
+    });
+  }
 };
 
 const createTray = () => {
