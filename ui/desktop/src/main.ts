@@ -99,9 +99,12 @@ const createChat = (query?: string) => {
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 18 },
-    width: 1024,
-    height: 768,
+    width: 530,
+    height: 800,
+    minWidth: 530,
+    minHeight: 800,
     transparent: true,
+    useContentSize: true,
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
