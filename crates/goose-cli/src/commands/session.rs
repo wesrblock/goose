@@ -2,6 +2,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use std::path::PathBuf;
 
 use goose::agent::Agent;
+use goose::models::message::Message;
 use goose::providers::factory;
 
 use crate::commands::expected_config::get_recommended_models;
@@ -10,6 +11,7 @@ use crate::profile::profile_handler::{load_profiles, PROFILE_DEFAULT_NAME};
 use crate::profile::provider_helper::set_provider_config;
 use crate::profile::provider_helper::PROVIDER_OPEN_AI;
 use crate::prompt::cliclack::CliclackPrompt;
+use crate::prompt::prompt::Prompt;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
@@ -28,7 +30,17 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_config).unwrap();
     let agent = Box::new(Agent::new(provider));
-    let prompt = Box::new(CliclackPrompt::new());
+    let mut prompt = Box::new(CliclackPrompt::new());
+
+    prompt.render(Box::new(Message::assistant().with_text(format!(
+        r#"Stretching wings...
+    Provider: {}
+    Model: {}
+    Session file: {}"#,
+        loaded_profile.provider,
+        loaded_profile.processor,
+        session_file.display()
+    ))));
 
     Box::new(Session::new(agent, prompt, session_file))
 }

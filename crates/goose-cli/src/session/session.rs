@@ -109,23 +109,15 @@ impl<'a> Session<'a> {
     }
 
     fn setup_session(&mut self) {
-        self.prompt.render(raw_message(
-            format!(
-                "Starting session. Recording to {}\n",
-                self.session_file.display()
-            )
-            .as_str(),
-        ));
-
         let system = Box::new(DeveloperSystem::new());
         self.agent.add_system(system);
         self.prompt
-            .render(raw_message("Connected the developer system.\n"));
+            .render(raw_message("Connected developer system."));
 
         let goosehints_system = Box::new(GooseHintsSystem::new());
         self.agent.add_system(goosehints_system);
         self.prompt
-            .render(raw_message("Connected .goosehints system.\n"));
+            .render(raw_message("Connected .goosehints system."));
 
         self.prompt.goose_ready();
     }

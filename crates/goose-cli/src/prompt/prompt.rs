@@ -13,10 +13,9 @@ pub trait Prompt {
 
     fn draw_goose(&self) {
         println!(
-            r#"
-        __
-       ( 0)>
-       ||
+            r#"        __      - - - -
+       ( 0)>  <  honk!  >
+       ||       - - - -
        ||
      __||_
   <=/     \=>
