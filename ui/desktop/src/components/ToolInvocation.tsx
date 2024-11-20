@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown'
 
 export default function ToolInvocation({ toolInvocation }) {
   return (
-    <div key={toolInvocation.toolCallId} className="text-tool space-y-4 transition-all duration-300">
+    <div key={toolInvocation.toolCallId} className="w-full text-tool space-y-4 transition-all duration-300">
       <ToolCall call={toolInvocation} />
       {toolInvocation.state === 'result' && <ToolResult result={toolInvocation} />}
     </div>
@@ -125,7 +125,7 @@ function ToolResult({ result }: ToolResultProps) {
                 )
               },
               pre({ children }) {
-                return <div className="whitespace-pre overflow-x-auto">
+                return <div className="overflow-x-auto">
                   {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
                 </div>
               },
