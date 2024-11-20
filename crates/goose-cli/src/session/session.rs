@@ -59,7 +59,6 @@ impl<'a> Session<'a> {
         persist_messages(&self.session_file, &messages)?;
 
         self.agent_process_messages(&mut messages).await;
-        persist_messages(&self.session_file, &messages)?;
 
         self.close_session();
         Ok(())
