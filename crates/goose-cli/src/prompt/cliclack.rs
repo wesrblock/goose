@@ -92,9 +92,6 @@ impl Prompt for CliclackPrompt {
             Theme::Dark => "zenburn",
         };
 
-        // Currently tool usages seem to be coming back as User messages, is that right?
-        // if message.role == goose::providers::types::message::Role::Assistant
-
         for message_content in &message.content {
             match message_content {
                 MessageContent::Text(text) => print(&text.text, theme),
