@@ -168,20 +168,12 @@ impl Prompt for CliclackPrompt {
                         .unwrap()
                         .request(tool_request, theme),
                 },
-                MessageContent::ToolResponse(tool_response) => match &tool_response.tool_result {
-                    Ok(_) => {
-                        self.renderers
-                            .get(last_tool_name)
-                            .or_else(|| self.renderers.get("default"))
-                            .unwrap()
-                            .response(tool_response, theme);
-                    }
-                    Err(_) => self
-                        .renderers
-                        .get("default")
-                        .unwrap()
-                        .response(tool_response, theme),
-                },
+                MessageContent::ToolResponse(tool_response) => self
+                    .renderers
+                    .get(last_tool_name)
+                    .or_else(|| self.renderers.get("default"))
+                    .unwrap()
+                    .response(tool_response, theme),
                 MessageContent::Image(image) => {
                     println!("Image: [data: {}, type: {}]", image.data, image.mime_type);
                 }
