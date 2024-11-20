@@ -4,10 +4,10 @@ use std::path::PathBuf;
 
 use crate::prompt::prompt::{InputType, Prompt};
 use crate::session::session_file::persist_messages;
+use crate::systems::goose_hints::GooseHintsSystem;
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::models::message::{Message, Role};
-use crate::systems::goose_hints::GooseHintsSystem;
 
 pub struct Session<'a> {
     agent: Box<Agent>,

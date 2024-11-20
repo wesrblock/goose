@@ -24,7 +24,7 @@ impl GooseHintsSystem {
     pub fn new() -> Self {
         // Check for .goosehints in current directory
         let mut hints = Vec::new();
-        
+
         if let Ok(cwd) = std::env::current_dir() {
             let local_hints = cwd.join(".goosehints");
             if local_hints.exists() {
