@@ -66,11 +66,11 @@ impl System for GooseHintsSystem {
     }
 
     fn tools(&self) -> &[Tool] {
-        &[] // No tools provided
+        &[]
     }
 
     async fn status(&self) -> AnyhowResult<HashMap<String, Value>> {
-        Ok(HashMap::new()) // No status needed
+        Ok(HashMap::new())
     }
 
     async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
@@ -87,7 +87,6 @@ mod tests {
 
     #[test]
     fn test_goose_hints_system() {
-        // Create a temporary directory for testing
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path();
 
@@ -96,13 +95,10 @@ mod tests {
         let mut file = File::create(&hints_path).unwrap();
         writeln!(file, "Test hint from local file").unwrap();
 
-        // Set the current directory to the temp directory
         std::env::set_current_dir(temp_path).unwrap();
 
-        // Create the system
         let system = GooseHintsSystem::new();
 
-        // Check that the hint was loaded
         assert!(system.instructions().contains("Test hint from local file"));
     }
 }
