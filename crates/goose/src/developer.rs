@@ -245,7 +245,7 @@ impl DeveloperSystem {
             outputs.push(output_str);
         }
 
-        Ok(outputs.iter().map(|item| Content::text(item)).collect())
+        Ok(outputs.iter().map(Content::text).collect())
     }
 
     // Implement text_editor tool functionality
