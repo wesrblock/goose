@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use crate::prompt::prompt::{InputType, Prompt};
 use crate::session::session_file::persist_messages;
+use crate::systems::goose_hints::GooseHintsSystem;
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::models::message::{Message, Role};
@@ -66,7 +67,13 @@ impl<'a> Session<'a> {
     }
 
     async fn agent_process_messages(&mut self, messages: &mut Vec<Message>) {
-        let mut stream = self.agent.reply(messages);
+        let mut stream = match self.agent.reply(messages).await {
+            Ok(stream) => stream,
+            Err(e) => {
+                eprintln!("Error starting reply stream: {}", e);
+                return;
+            }
+        };
         loop {
             tokio::select! {
                 response = stream.next() => {
@@ -114,6 +121,11 @@ impl<'a> Session<'a> {
         self.agent.add_system(system);
         self.prompt
             .render(raw_message("Connected the developer system.\n"));
+
+        let goosehints_system = Box::new(GooseHintsSystem::new());
+        self.agent.add_system(goosehints_system);
+        self.prompt
+            .render(raw_message("Connected .goosehints system.\n"));
 
         self.prompt.goose_ready();
     }
