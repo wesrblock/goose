@@ -7,6 +7,7 @@ use crate::session::session_file::persist_messages;
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::models::message::{Message, Role};
+use crate::systems::goose_hints::GooseHintsSystem;
 
 pub struct Session<'a> {
     agent: Box<Agent>,
@@ -113,6 +114,11 @@ impl<'a> Session<'a> {
         self.agent.add_system(system);
         self.prompt
             .render(raw_message("Connected the developer system.\n"));
+
+        let goosehints_system = Box::new(GooseHintsSystem::new());
+        self.agent.add_system(goosehints_system);
+        self.prompt
+            .render(raw_message("Connected .goosehints system.\n"));
 
         self.prompt.goose_ready();
     }
