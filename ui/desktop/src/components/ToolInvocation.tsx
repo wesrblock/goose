@@ -4,7 +4,6 @@ import { Button } from './ui/button';
 import { BoxIcon, GPSIcon } from './ui/icons'
 import ReactMarkdown from 'react-markdown'
 
-
 export default function ToolInvocation({ toolInvocation }) {
   return (
     <div key={toolInvocation.toolCallId} className="text-tool space-y-4 transition-all duration-300">
@@ -13,9 +12,6 @@ export default function ToolInvocation({ toolInvocation }) {
     </div>
   )
 }
-
-
-
 
 interface ToolCallProps {
   call: {
@@ -43,13 +39,17 @@ function ToolCall({ call }: ToolCallProps) {
   )
 }
 
-
-
+interface ResultItem {
+  text?: string
+  type: 'text' | 'image'
+  mimeType?: string
+  data?: string // Base64 encoded image data
+}
 
 interface ToolResultProps {
   result: {
     message?: string
-    result?: string
+    result?: ResultItem[] | string
     state?: string
     toolCallId?: string
     toolName?: string
@@ -59,21 +59,65 @@ interface ToolResultProps {
 }
 
 function ToolResult({ result }: ToolResultProps) {
-  if (!result?.result) return null
+  console.log('result', result)
+  if (!result || !result.result) return null
 
-  return (
+  return (    
     <Card className="bg-tool-card mt-2 p-4">
-      {result.result && (
-        <div className="rounded-b-md rounded-tr-md p-3">
-          <div className="flex items-center space-x-2">
-            <BoxIcon size={14} />
-            <span>Tool Result: {result.toolName.substring(result.toolName.lastIndexOf("__") + 2)}</span>
+      <div className="rounded-b-md rounded-tr-md p-3">
+        <div className="flex items-center space-x-2">
+          <BoxIcon size={14} />
+          <span>Tool Result: {result.toolName.substring(result.toolName.lastIndexOf("__") + 2)}</span>
+        </div>
+        {Array.isArray(result.result) ? (
+          <div className="mt-2">
+            {result.result.map((item: ResultItem, index: number) => (
+              <div key={index} className="mb-2">
+                {item.type === 'text' && item.text && (
+                  <ReactMarkdown
+                    className="text-tool-result-green whitespace-pre-wrap"
+                    components={{
+                      code({ node, className, children, ...props }) {
+                        return (
+                          <code className={className} {...props}>
+                            {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
+                          </code>
+                        )
+                      },
+                      pre({ children }) {
+                        return <div className="whitespace-pre overflow-x-auto">
+                          {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
+                        </div>
+                      },
+                      p({ children }) {
+                        return <div>
+                          {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
+                        </div>
+                      }
+                    }}
+                  >
+                    {item.text}
+                  </ReactMarkdown>
+                )}
+                {item.type === 'image' && item.data && item.mimeType && (
+                  <img 
+                    src={`data:${item.mimeType};base64,${item.data}`}
+                    alt="Tool result" 
+                    className="max-w-full h-auto rounded-md"
+                    onError={(e) => {
+                      console.error('Failed to load image: Invalid MIME-type encoded image data');
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                )}
+              </div>
+            ))}
           </div>
+        ) : (
           <ReactMarkdown
             className="mt-2 text-tool-result-green whitespace-pre-wrap"
             components={{
               code({ node, className, children, ...props }) {
-                {console.log(children)}
                 return (
                   <code className={className} {...props}>
                     {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
@@ -81,13 +125,11 @@ function ToolResult({ result }: ToolResultProps) {
                 )
               },
               pre({ children }) {
-                {console.log(children)}
                 return <div className="whitespace-pre overflow-x-auto">
                   {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
                 </div>
               },
               p({ children }) {
-                {console.log(children)}
                 return <div>
                   {typeof children === 'string' ? children : "Unrenderable tool result - check logs"}
                 </div>
@@ -96,14 +138,11 @@ function ToolResult({ result }: ToolResultProps) {
           >
             {result.result}
           </ReactMarkdown>
-        </div>
-      )}
+        )}
+      </div>
     </Card>
   )
 }
-
-
-
 
 interface ToolResponseFormProps {
   result: {
@@ -137,7 +176,6 @@ function getIconForSchemaType(schema: JsonSchemaProperty) {
   return BoxIcon
 }
 
-// NOTE - Not yet tested/matched to designs
 function ToolResponseForm({ result, onSubmitInput }: ToolResponseFormProps) {
   const [inputValues, setInputValues] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
@@ -246,13 +284,3 @@ function ToolResponseForm({ result, onSubmitInput }: ToolResponseFormProps) {
     </div>
   )}
 }
-
-// TODO - Use when we have plans
-/*
-function AppoveFlightPlanButton(){
-  return (
-    <Button className="w-full transition-colors tool-form-button">
-      Take flight with this direction
-    </Button>
-  )
-} */
