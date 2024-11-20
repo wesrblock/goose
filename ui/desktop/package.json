@@ -1,8 +1,8 @@
 {
-  "name": "goose-ui",
-  "productName": "goose-ui",
+  "name": "goose-app",
+  "productName": "Goose",
   "version": "1.0.0",
-  "description": "Goose",
+  "description": "Goose App",
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",

@@ -1,24 +1,19 @@
-import React, { useState } from 'react';
-import { Route, Routes, Navigate } from 'react-router-dom';
-import Chat from './Chat';
+import React from 'react';
+import LauncherWindow from './LauncherWindow';
+import WingToWingWindow from './WingToWingWindow';
+import ChatWindow from './ChatWindow';
 
 export default function App() {
-  const initialChats = [
-    { id: 1, title: 'Chat 1', messages: [] },
-  ]
+  const searchParams = new URLSearchParams(window.location.search);
+  const isLauncher = searchParams.get('window') === 'launcher';
+  const isWingToWing = searchParams.get('window') === 'wingToWing';
 
-  const [chats, setChats] = useState(initialChats)
-  const [selectedChatId, setSelectedChatId] = useState(1)
-
-  return (
-    <div className="relative w-screen h-screen overflow-hidden bg-gradient-to-b from-white to-gray-50 flex flex-col">
-      <Routes>
-        <Route
-          path="/chat/:id"
-          element={<Chat key={selectedChatId} chats={chats} setChats={setChats} selectedChatId={selectedChatId} setSelectedChatId={setSelectedChatId} />}
-        />
-        <Route path="*" element={<Navigate to="/chat/1" replace />} />
-      </Routes>
-    </div>
-  );
+  // TODO - Look at three separate renderers for this
+  if (isLauncher) {
+    return <LauncherWindow />;
+  } else if (isWingToWing) {
+    return <WingToWingWindow />;
+  } else {
+    return <ChatWindow />;
+  }
 }
