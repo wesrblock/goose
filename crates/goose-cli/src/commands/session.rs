@@ -35,12 +35,13 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
 
 fn session_name(session: Option<String>) -> String {
     match session {
-        Some(name) => name,
+        Some(name) => name.to_lowercase(),
         None => rand::thread_rng()
             .sample_iter(&Alphanumeric)
             .take(4)
             .map(char::from)
-            .collect(),
+            .collect::<String>()
+            .to_lowercase(),
     }
 }
 
