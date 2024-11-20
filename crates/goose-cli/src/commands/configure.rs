@@ -21,10 +21,10 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
     let existing_profile = existing_profile_result.as_ref();
 
     let provider_name = select_provider(existing_profile);
-    let recommended_models = get_recommended_models(&provider_name);
+    let recommended_models = get_recommended_models(provider_name);
     let processor = set_processor(existing_profile, &recommended_models)?;
     let accelerator = set_accelerator(existing_profile, &recommended_models)?;
-    let provider_config = set_provider_config(&provider_name, processor.clone());
+    let provider_config = set_provider_config(provider_name, processor.clone());
     let additional_systems =
         existing_profile.map_or(Vec::new(), |profile| profile.additional_systems.clone());
     let profile = Profile {

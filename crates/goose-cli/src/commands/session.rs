@@ -65,7 +65,7 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
                 Some(profile) => Box::new(profile.clone()),
                 None => panic!(
                     "No '{}' profile found. Run configure to create a profile.",
-                    PROFILE_DEFAULT_NAME.to_string()
+                    PROFILE_DEFAULT_NAME
                 ),
             }, // Default to the first profile. TODO: Define a constant name for the default profile.
         }
