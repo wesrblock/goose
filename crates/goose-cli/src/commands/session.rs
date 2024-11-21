@@ -38,7 +38,7 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
     Model: {}
     Session file: {}"#,
         loaded_profile.provider,
-        loaded_profile.processor,
+        loaded_profile.model,
         session_file.display()
     ))));
 
