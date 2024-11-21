@@ -1,6 +1,8 @@
+mod lang;
+
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
-use indoc::{indoc, formatdoc};
+use indoc::{formatdoc, indoc};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -9,6 +11,7 @@ use std::sync::Mutex;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
+use crate::models::role::Role;
 use crate::models::tool::{Tool, ToolCall};
 use crate::systems::System;
 
@@ -99,7 +102,7 @@ impl DeveloperSystem {
             }),
         );
 
-        let instructions = formatdoc!{r#"
+        let instructions = formatdoc! {r#"
             The developer system is loaded in the directory listed below.
             You can use the shell tool to run any command that would work on the relevant operating system.
             Use the shell tool as needed to locate files or interact with the project. Only files
@@ -126,7 +129,7 @@ impl DeveloperSystem {
             cwd: Mutex::new(std::env::current_dir().unwrap()),
             active_files: Mutex::new(HashSet::new()),
             file_history: Mutex::new(HashMap::new()),
-            instructions: instructions,
+            instructions,
         }
     }
 
@@ -177,7 +180,7 @@ impl DeveloperSystem {
             return Err(AgentError::ExecutionError(output_str));
         }
 
-        let formatted = formatdoc!{"
+        let formatted = formatdoc! {"
             ## Output
 
             ```
@@ -259,15 +262,36 @@ impl DeveloperSystem {
 
     async fn text_editor_view(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
         if path.is_file() {
-            // Rather than reading, we add this to the active files and it is shown in the system status
+            let content = std::fs::read_to_string(path)
+                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
 
             // Add to active files
             self.active_files.lock().unwrap().insert(path.clone());
 
-            Ok(vec![Content::text(format!(
-                "The file content for {} is now available in the system status.",
-                path.display()
-            ))])
+            let language = lang::get_language_identifier(path);
+            let formatted = formatdoc! {"
+                ### {path}
+                ```{language}
+                {content}
+                ```
+                ",
+                path=path.display(),
+                language=language,
+                content=content,
+            };
+
+            // The LLM gets just a quick update as we expect the file to view in the status
+            // but we send a low priority message for the human
+            Ok(vec![
+                Content::text(format!(
+                    "The file content for {} is now available in the system status.",
+                    path.display()
+                ))
+                .with_audience(vec![Role::Assistant]),
+                Content::text(formatted)
+                    .with_audience(vec![Role::User])
+                    .with_priority(0.0),
+            ])
         } else {
             Err(AgentError::InvalidParameters(format!(
                 "The path '{}' does not exist or is not a file.",
@@ -299,10 +323,25 @@ impl DeveloperSystem {
         // Add to active files
         self.active_files.lock().unwrap().insert(path.clone());
 
-        Ok(vec![Content::text(format!(
-            "Successfully wrote to {}",
-            path.display()
-        ))])
+        // Try to detect the language from the file extension
+        let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+
+        Ok(vec![
+            Content::text(format!("Successfully wrote to {}", path.display()))
+                .with_audience(vec![Role::Assistant]),
+            Content::text(formatdoc! {r#"
+                ### {path}
+                ```{language}
+                {content}
+                ```
+                "#,
+                path=path.display(),
+                language=language,
+                content=file_text,
+            })
+            .with_audience(vec![Role::User])
+            .with_priority(0.0),
+        ])
     }
 
     async fn text_editor_replace(
@@ -344,7 +383,32 @@ impl DeveloperSystem {
         std::fs::write(path, new_content)
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
-        Ok(vec![Content::text("Successfully replaced text")])
+        // Try to detect the language from the file extension
+        let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+
+        Ok(vec![
+            Content::text("Successfully replaced text").with_audience(vec![Role::Assistant]),
+            Content::text(formatdoc! {r#"
+                ### {path}
+                
+                *Before*:
+                ```{language}
+                {old_str}
+                ```
+
+                *After*:
+                ```{language}
+                {new_str}
+                ```
+                "#,
+                path=path.display(),
+                language=language,
+                old_str=old_str,
+                new_str=new_str,
+            })
+            .with_audience(vec![Role::User])
+            .with_priority(0.0),
+        ])
     }
 
     async fn text_editor_insert(
@@ -388,7 +452,26 @@ impl DeveloperSystem {
         std::fs::write(path, lines.join("\n"))
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
-        Ok(vec![Content::text("Successfully inserted text")])
+        // Try to detect the language from the file extension
+        let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
+
+        Ok(vec![
+            Content::text("Successfully inserted text").with_audience(vec![Role::Assistant]),
+            Content::text(formatdoc! {r#"
+                ### {path}
+                @{line}
+                ```{language}
+                {new_str}
+                ```
+                "#,
+                path=path.display(),
+                line=insert_line,
+                language=language,
+                new_str=new_str,
+            })
+            .with_audience(vec![Role::User])
+            .with_priority(0.0),
+        ])
     }
 
     async fn text_editor_undo(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
@@ -399,7 +482,7 @@ impl DeveloperSystem {
                 std::fs::write(path, previous_content).map_err(|e| {
                     AgentError::ExecutionError(format!("Failed to write file: {}", e))
                 })?;
-                Ok(vec![Content::text("Successfully undid the last edit")])
+                Ok(vec![Content::text("Undid the last edit")])
             } else {
                 Err(AgentError::InvalidParameters(
                     "No edit history available to undo".into(),
@@ -527,7 +610,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_text_editor_create_and_view_file() {
+    async fn test_text_editor_write_and_view_file() {
         let system = get_system().await;
 
         let temp_dir = tempfile::tempdir().unwrap();
@@ -538,7 +621,7 @@ mod tests {
         let create_call = ToolCall::new(
             "text_editor",
             json!({
-                "command": "create",
+                "command": "write",
                 "path": file_path_str,
                 "file_text": "Hello, world!"
             }),
@@ -558,7 +641,10 @@ mod tests {
             }),
         );
         let view_result = system.call(view_call).await.unwrap();
-        assert!(view_result[0].as_text().unwrap().contains("The file content for"));
+        assert!(view_result[0]
+            .as_text()
+            .unwrap()
+            .contains("The file content for"));
 
         temp_dir.close().unwrap();
     }
@@ -575,7 +661,7 @@ mod tests {
         let create_call = ToolCall::new(
             "text_editor",
             json!({
-                "command": "create",
+                "command": "write",
                 "path": file_path_str,
                 "file_text": "Hello, world!"
             }),
@@ -617,7 +703,10 @@ mod tests {
             }),
         );
         let view_result = system.call(view_call).await.unwrap();
-        assert!(view_result[0].as_text().unwrap().contains("The file content for"));
+        assert!(view_result[0]
+            .as_text()
+            .unwrap()
+            .contains("The file content for"));
 
         temp_dir.close().unwrap();
     }
@@ -634,7 +723,7 @@ mod tests {
         let create_call = ToolCall::new(
             "text_editor",
             json!({
-                "command": "create",
+                "command": "write",
                 "path": file_path_str,
                 "file_text": "First line"
             }),
@@ -675,7 +764,7 @@ mod tests {
         assert!(undo_result[0]
             .as_text()
             .unwrap()
-            .contains("Successfully undid the last edit"));
+            .contains("Undid the last edit"));
 
         // View the file again
         let view_result = system
@@ -688,7 +777,10 @@ mod tests {
             ))
             .await
             .unwrap();
-        assert!(view_result[0].as_text().unwrap().contains("The file content for"));
+        assert!(view_result[0]
+            .as_text()
+            .unwrap()
+            .contains("The file content for"));
 
         temp_dir.close().unwrap();
     }

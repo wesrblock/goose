@@ -3,8 +3,8 @@ use regex::Regex;
 use serde_json::{json, Value};
 
 use crate::errors::AgentError;
-use crate::models::content::Content;
-use crate::models::message::{Message, MessageContent, Role};
+use crate::models::message::{Message, MessageContent};
+use crate::models::role::Role;
 use crate::models::tool::{Tool, ToolCall};
 
 /// Convert internal Message format to OpenAI's API message specification
@@ -21,7 +21,9 @@ pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
         for content in &message.content {
             match content {
                 MessageContent::Text(text) => {
-                    converted["content"] = json!(text.text);
+                    if !text.text.is_empty() {
+                        converted["content"] = json!(text.text);
+                    }
                 }
                 MessageContent::ToolRequest(request) => match &request.tool_call {
                     Ok(tool_call) => {
@@ -52,37 +54,24 @@ pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
                 MessageContent::ToolResponse(response) => {
                     match &response.tool_result {
                         Ok(contents) => {
-                            for content in contents {
-                                match content {
-                                    Content::Text(text) => {
-                                        let text_str = text.text.clone();
-                                        // Handle image results
-                                        if text_str.starts_with("image:") {
-                                            output.push(json!({
-                                                "role": "tool",
-                                                "content": [{
-                                                    "type": "text",
-                                                    "text": "This tool result included an image that is uploaded in the next message."
-                                                }],
-                                                "tool_call_id": response.id
-                                            }));
-                                            continue;
-                                        }
-                                        output.push(json!({
-                                            "role": "tool",
-                                            "content": text_str,
-                                            "tool_call_id": response.id
-                                        }));
-                                    }
-                                    Content::Image(image) => {
-                                        output.push(json!({
-                                            "role": "tool",
-                                            "content": format!("image data: {}, type: {}", image.data, image.mime_type),
-                                            "tool_call_id": response.id
-                                        }));
-                                    }
-                                }
-                            }
+                            // Send only contents with no audience or with Assistant in the audience
+                            let abridged: Vec<_> = contents
+                                .iter()
+                                .filter(|content| {
+                                    content.audience().is_none()
+                                        || content
+                                            .audience()
+                                            .expect("has audience")
+                                            .contains(&Role::Assistant)
+                                })
+                                .map(|content| content.unannotated())
+                                .collect();
+
+                            output.push(json!({
+                                "role": "tool",
+                                "content": abridged,
+                                "tool_call_id": response.id
+                            }));
                         }
                         Err(e) => {
                             output.push(json!({
@@ -226,6 +215,7 @@ pub fn check_openai_context_length_error(error: &Value) -> Option<InitialMessage
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::content::Content;
     use serde_json::json;
 
     const OPENAI_TOOL_USE_RESPONSE: &str = r#"{
@@ -330,7 +320,10 @@ mod tests {
         assert_eq!(spec[2]["role"], "assistant");
         assert!(spec[2]["tool_calls"].is_array());
         assert_eq!(spec[3]["role"], "tool");
-        assert_eq!(spec[3]["content"], "Result");
+        assert_eq!(
+            spec[3]["content"],
+            json!([{"text": "Result", "type": "text"}])
+        );
         assert_eq!(spec[3]["tool_call_id"], spec[2]["tool_calls"][0]["id"]);
 
         Ok(())

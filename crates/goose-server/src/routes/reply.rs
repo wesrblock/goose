@@ -11,7 +11,8 @@ use goose::{
     agent::Agent,
     developer::DeveloperSystem,
     models::content::Content,
-    models::message::{Message, MessageContent, Role},
+    models::message::{Message, MessageContent},
+    models::role::Role,
     providers::factory,
 };
 use serde::Deserialize;

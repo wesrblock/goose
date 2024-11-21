@@ -17,7 +17,8 @@ export default {
         '50': '50px'
       },
       backgroundImage: {
-        'card-gradient': 'linear-gradient(28.59deg, rgba(255, 255, 255, 0.9) 5.64%, rgba(226, 245, 251, 0.9) 94.49%);',
+        'prev-goose-gradient': 'linear-gradient(89deg, rgba(85, 95, 231, 0.04) 0.16%, rgba(85, 95, 231, 0.20) 99.77%)',
+        'card-gradient': 'linear-gradient(359deg, rgba(255, 255, 255, 0.90) 9.96%, rgba(226, 245, 251, 0.90) 95.35%);',
         'window-gradient': 'linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0%, rgba(246, 247, 255, 0.55) 100%);'
       },
       fontSize: {
@@ -26,10 +27,11 @@ export default {
       colors: {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
-        tab: '#E9F7FA',
 
         'splash-pills': 'rgba(255, 255, 255, 0.60)',
         'splash-pills-text': 'rgba(0, 0, 0, 0.60)',
+
+        'prev-goose-text': '#4E52C5',
 
         'tool-bold': 'rgba(0, 0, 0, 0.65);',
         'tool': 'rgba(0, 0, 0, 0.50);',

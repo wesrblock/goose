@@ -1,15 +1,8 @@
 use super::content::{Content, ImageContent, TextContent};
+use super::role::Role;
 use super::tool::ToolCall;
 use crate::errors::AgentResult;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Role {
-    User,
-    Assistant,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolRequest {
@@ -34,13 +27,19 @@ pub enum MessageContent {
 
 impl MessageContent {
     pub fn text<S: Into<String>>(text: S) -> Self {
-        MessageContent::Text(TextContent { text: text.into() })
+        MessageContent::Text(TextContent {
+            text: text.into(),
+            audience: None,
+            priority: None,
+        })
     }
 
     pub fn image<S: Into<String>, T: Into<String>>(data: S, mime_type: T) -> Self {
         MessageContent::Image(ImageContent {
             data: data.into(),
             mime_type: mime_type.into(),
+            audience: None,
+            priority: None,
         })
     }
 

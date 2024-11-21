@@ -339,7 +339,7 @@ mod tests {
 
         let initial_message = Message::user().with_text("Hi");
         let initial_messages = vec![initial_message];
-        
+
         let mut stream = agent.reply(&initial_messages).await?;
         let mut messages = Vec::new();
         while let Some(msg) = stream.try_next().await? {
@@ -365,7 +365,7 @@ mod tests {
 
         let initial_message = Message::user().with_text("Echo test");
         let initial_messages = vec![initial_message];
-        
+
         let mut stream = agent.reply(&initial_messages).await?;
         let mut messages = Vec::new();
         while let Some(msg) = stream.try_next().await? {
@@ -394,7 +394,7 @@ mod tests {
 
         let initial_message = Message::user().with_text("Invalid tool");
         let initial_messages = vec![initial_message];
-        
+
         let mut stream = agent.reply(&initial_messages).await?;
         let mut messages = Vec::new();
         while let Some(msg) = stream.try_next().await? {
@@ -433,7 +433,7 @@ mod tests {
 
         let initial_message = Message::user().with_text("Multiple calls");
         let initial_messages = vec![initial_message];
-        
+
         let mut stream = agent.reply(&initial_messages).await?;
         let mut messages = Vec::new();
         while let Some(msg) = stream.try_next().await? {

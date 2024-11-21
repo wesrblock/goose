@@ -12,4 +12,5 @@
 //! the internal models are not an exactly match to any of these formats.
 pub mod content;
 pub mod message;
+pub mod role;
 pub mod tool;

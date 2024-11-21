@@ -46,7 +46,7 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
         setChats={setChats}
       />
 
-      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl rounded-tl-none">
+      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl">
         {messages.length === 0 ? (
           <Splash append={append} />
         ) : (

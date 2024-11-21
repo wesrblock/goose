@@ -6,9 +6,17 @@ use std::{
 use anyhow::Result;
 use bat::WrappingMode;
 use cliclack::spinner;
+use console::style;
+use goose::models::content::Content;
 use goose::models::message::{Message, MessageContent, ToolRequest, ToolResponse};
+use goose::models::role::Role;
+use serde_json::Value;
 
 use super::{prompt::{Input, InputType, Prompt, Theme}, thinking::get_random_thinking_message};
+
+const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
+const MAX_STRING_LENGTH: usize = 40;
+const INDENT: &str = "    ";
 
 pub struct RustylinePrompt {
     spinner: cliclack::ProgressBar,
@@ -62,11 +70,20 @@ impl ToolRenderer for DefaultRenderer {
     fn request(&self, tool_request: &ToolRequest, theme: &str) {
         match &tool_request.tool_call {
             Ok(call) => {
-                print_tool_request(
-                    &serde_json::to_string_pretty(&call.arguments).unwrap(),
-                    theme,
-                    &call.name,
+                // Print the tool name with an emoji
+                let parts: Vec<_> = call.name.split("__").collect();
+
+                let tool_header = format!(
+                    "─── {} | {} ──────────────────────────",
+                    style(parts.get(1).unwrap_or(&"unknown")),
+                    style(parts.get(0).unwrap_or(&"unknown")).magenta().dim(),
                 );
+                print_newline();
+                println!("{}", tool_header);
+
+                // Format and print the parameters
+                print_params(&call.arguments, 0);
+                print_newline();
             }
             Err(e) => print(&e.to_string(), theme),
         }
@@ -74,46 +91,30 @@ impl ToolRenderer for DefaultRenderer {
 
     fn response(&self, tool_response: &ToolResponse, theme: &str) {
         match &tool_response.tool_result {
-            Ok(output) => {
-                let output_value = serde_json::to_string_pretty(output).unwrap();
+            Ok(contents) => {
+                for content in contents {
+                    if content
+                        .audience()
+                        .is_some_and(|audience| !audience.contains(&Role::User))
+                    {
+                        continue;
+                    }
 
-                // For pure text responses, strip the quotes and replace escaped newlines. Eg. bash responses
-                let unquoted = output_value.trim_matches('"');
-                let formatted = unquoted.replace("\\n", "\n");
-
-                let language = if formatted.starts_with("{") {
-                    "JSON"
-                } else {
-                    "Markdown"
-                };
-                print_tool_response(&formatted, theme, language);
+                    if let Content::Text(text) = content {
+                        print_markdown(&text.text, theme);
+                    }
+                }
             }
             Err(e) => print(&e.to_string(), theme),
         }
     }
 }
 
-fn print_tool_request(content: &str, theme: &str, tool_name: &str) {
+fn print_markdown(content: &str, theme: &str) {
     bat::PrettyPrinter::new()
-        .input(
-            bat::Input::from_bytes(content.as_bytes()).name(format!("Tool Request: {}", tool_name)),
-        )
+        .input(bat::Input::from_bytes(content.as_bytes()))
         .theme(theme)
-        .language("JSON")
-        .grid(true)
-        .header(true)
-        .wrapping_mode(WrappingMode::Character)
-        .print()
-        .unwrap();
-}
-
-fn print_tool_response(content: &str, theme: &str, language: &str) {
-    bat::PrettyPrinter::new()
-        .input(bat::Input::from_bytes(content.as_bytes()).name("Tool Response:"))
-        .theme(theme)
-        .language(language)
-        .grid(true)
-        .header(true)
+        .language("Markdown")
         .wrapping_mode(WrappingMode::Character)
         .print()
         .unwrap();
@@ -127,6 +128,73 @@ fn print(content: &str, theme: &str) {
         .wrapping_mode(WrappingMode::Character)
         .print()
         .unwrap();
+}
+
+/// Format and print parameters recursively with proper indentation and colors
+fn print_params(value: &Value, depth: usize) {
+    let indent = INDENT.repeat(depth);
+
+    match value {
+        Value::Object(map) => {
+            for (key, val) in map {
+                match val {
+                    Value::Object(_) => {
+                        println!("{}{}:", indent, style(key).dim());
+                        print_params(val, depth + 1);
+                    }
+                    Value::Array(arr) => {
+                        println!("{}{}:", indent, style(key).dim());
+                        for item in arr.iter() {
+                            println!("{}{}- ", indent, INDENT);
+                            print_params(item, depth + 2);
+                        }
+                    }
+                    Value::String(s) => {
+                        if s.len() > MAX_STRING_LENGTH {
+                            println!("{}{}: {}", indent, style(key).dim(), style("...").dim());
+                        } else {
+                            println!("{}{}: {}", indent, style(key).dim(), style(s).green());
+                        }
+                    }
+                    Value::Number(n) => {
+                        println!("{}{}: {}", indent, style(key).dim(), style(n).blue());
+                    }
+                    Value::Bool(b) => {
+                        println!("{}{}: {}", indent, style(key).dim(), style(b).blue());
+                    }
+                    Value::Null => {
+                        println!("{}{}: {}", indent, style(key).dim(), style("null").dim());
+                    }
+                }
+            }
+        }
+        Value::Array(arr) => {
+            for (i, item) in arr.iter().enumerate() {
+                println!("{}{}.", indent, i + 1);
+                print_params(item, depth + 1);
+            }
+        }
+        Value::String(s) => {
+            if s.len() > MAX_STRING_LENGTH {
+                println!(
+                    "{}{}",
+                    indent,
+                    style(format!("[REDACTED: {} chars]", s.len())).yellow()
+                );
+            } else {
+                println!("{}{}", indent, style(s).green());
+            }
+        }
+        Value::Number(n) => {
+            println!("{}{}", indent, style(n).yellow());
+        }
+        Value::Bool(b) => {
+            println!("{}{}", indent, style(b).yellow());
+        }
+        Value::Null => {
+            println!("{}{}", indent, style("null").dim());
+        }
+    }
 }
 
 fn print_newline() {
@@ -143,7 +211,7 @@ impl Prompt for RustylinePrompt {
         let mut last_tool_name: &str = "default";
         for message_content in &message.content {
             match message_content {
-                MessageContent::Text(text) => print(&text.text, theme),
+                MessageContent::Text(text) => print_markdown(&text.text, theme),
                 MessageContent::ToolRequest(tool_request) => match &tool_request.tool_call {
                     Ok(call) => {
                         last_tool_name = &call.name;
@@ -186,7 +254,7 @@ impl Prompt for RustylinePrompt {
 
     fn get_input(&mut self) -> Result<Input> {
         let mut editor = rustyline::DefaultEditor::new()?;
-        let input = editor.readline("( O)> ");
+        let input = editor.readline(PROMPT);
         let mut message_text = match input {
             Ok(text) => text,
             Err(e) => {
