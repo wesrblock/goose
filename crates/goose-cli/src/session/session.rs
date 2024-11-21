@@ -7,7 +7,8 @@ use crate::session::session_file::persist_messages;
 use crate::systems::goose_hints::GooseHintsSystem;
 use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
-use goose::models::message::{Message, Role};
+use goose::models::message::Message;
+use goose::models::role::Role;
 
 pub struct Session<'a> {
     agent: Box<Agent>,

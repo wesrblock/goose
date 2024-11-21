@@ -1,4 +1,5 @@
-use goose::models::message::{Message, MessageContent, Role};
+use goose::models::message::{Message, MessageContent};
+use goose::models::role::Role;
 use serde::Serialize;
 
 /// A wrapper struct for Message that implements Serialize
