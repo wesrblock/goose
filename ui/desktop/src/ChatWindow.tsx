@@ -49,7 +49,7 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
    {"type": "PlanConfirmation", "selectedPlan": {"id": "...", "name": "...", "description": "..."}}
 2. If it's presenting multiple plans to choose from, respond with:
    {"type": "PlanChoice", "plans": [{"id": "...", "name": "...", "description": "..."}, ...]}
-3. If it requires more complex input or doesn't fit the above cases, respond with:
+3. If it requires much more complex input can't only if it the above cases, respond with:
    {"type": "ComplexInput", "complexInputReason": "explanation of what's needed"}
 4. If it's a simple greeting or acknowledgment, respond with:
    {"status": "complete", "waitingForUser": true}

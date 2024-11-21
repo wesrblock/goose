@@ -100,11 +100,15 @@ const SchemaContentDisplay: React.FC<{ content: SchemaContent; onPlanSelect?: (p
       );
 
     case 'ComplexInput':
+      return null;
+      // TODO, do an additional call to get more detail:
+      /*
       return (
         <div className="text-gray-600 italic bg-gray-50 p-4 rounded-lg border border-gray-200">
           {content.complexInputReason}
         </div>
       );
+      */
 
     default:
       return null;
