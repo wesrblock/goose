@@ -1,4 +1,4 @@
-# Goose UX
+# Goose App
 
 Work in progress on an electron app for Goose. 
 
