@@ -26,7 +26,6 @@ export default {
       colors: {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
-        tab: '#E9F7FA',
 
         'splash-pills': 'rgba(255, 255, 255, 0.60)',
         'splash-pills-text': 'rgba(0, 0, 0, 0.60)',

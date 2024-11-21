@@ -49,7 +49,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
           >
             <path 
               d="M25 11C25 4.92487 29.9249 0 36 0H114C120.075 0 125 4.92487 125 11V13C125 19.0751 129.925 24 136 24H146.5H0H14C20.0751 24 25 19.0751 25 13V11Z" 
-              fill={selectedChatId === chat.id ? '#E4F6FA' : 'rgba(254, 254, 254, 0.80);'}
+              fill={selectedChatId === chat.id ? 'rgba(226, 245, 251, 1)' : 'rgba(254, 254, 254, 0.80);'}
             />
           </svg>
           <div className="relative z-10 flex items-center justify-center tab-type text-center w-full">
