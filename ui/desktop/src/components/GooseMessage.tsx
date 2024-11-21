@@ -2,6 +2,8 @@ import React from 'react'
 import ToolInvocation from './ToolInvocation'
 import ReactMarkdown from 'react-markdown'
 import { Button } from './ui/button'
+import { BoxIcon, GPSIcon } from './ui/icons';
+
 
 export interface Plan {
   id: string;
@@ -28,9 +30,9 @@ interface GooseMessageProps {
 }
 
 const PlanDisplay: React.FC<{ plan: Plan }> = ({ plan }) => (
-  <div className="border rounded-lg p-4 mb-4">
-    <h3 className="font-bold mb-2">{plan.name}</h3>
-    <div className="text-sm">{plan.description}</div>
+  <div className="border-2 border-gray-300 rounded-lg p-4 mb-4 bg-white shadow-sm">
+    <h3 className="font-bold mb-2 text-gray-900">{plan.name}</h3>
+    <div className="text-base text-gray-700">{plan.description}</div>
   </div>
 );
 
@@ -59,16 +61,16 @@ const SchemaContentDisplay: React.FC<{ content: SchemaContent; onPlanSelect?: (p
           <div className="flex gap-4 mt-4">
             <Button 
               onClick={handleConfirm}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 flex items-center gap-2"
             >
-              Confirm Plan
+              <BoxIcon size={16} /> Confirm Plan
             </Button>
             <Button 
               variant="destructive"
               onClick={handleCancel}
-              className="font-semibold px-6"
+              className="font-semibold px-6 flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800"
             >
-              Cancel
+              <GPSIcon size={16} /> Cancel
             </Button>
           </div>
         </div>
@@ -91,9 +93,9 @@ const SchemaContentDisplay: React.FC<{ content: SchemaContent; onPlanSelect?: (p
             <Button 
               variant="destructive"
               onClick={handleCancel}
-              className="font-semibold px-6"
+              className="font-semibold px-6 flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-800"
             >
-              Cancel
+              <GPSIcon size={16} /> Cancel
             </Button>
           </div>
         </div>

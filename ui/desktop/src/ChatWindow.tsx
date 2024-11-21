@@ -45,10 +45,10 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
     console.log("Chat finished with message:", message);
     try {
       const promptTemplate = `Analyze the following text and determine if it matches one of these cases:
-1. If it's asking for confirmation of a specific plan, respond with:
-   {"type": "PlanConfirmation", "selectedPlan": {"id": "...", "name": "...", "description": "..."}}
-2. If it's presenting multiple plans to choose from, respond with:
-   {"type": "PlanChoice", "plans": [{"id": "...", "name": "...", "description": "..."}, ...]}
+1. If it's asking for confirmation for goose to take action of a specific plan, respond with:
+   {"type": "PlanConfirmation", "selectedPlan": {"id": "...", "name": "an optional prompt like: please confirm", "description": " a more detailed description of the plan"}}
+2. If it's presenting multiple plans to choose from to take action, respond with:
+   {"type": "PlanChoice", "plans": [{"id": "...", "name": "name of the option", "description": "more detailed description of the option"}, ...]}
 3. If it requires much more complex input can't only if it the above cases, respond with:
    {"type": "ComplexInput", "complexInputReason": "explanation of what's needed"}
 4. If it's a simple greeting or acknowledgment, respond with:
