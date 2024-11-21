@@ -293,7 +293,7 @@ impl CliclackTheme for PromptTheme {
         let new_message = match state {
             ThemeState::Active => {
                 if EDIT_MODE_STR == message {
-                    "Send [Esc -> Enter]"
+                    "Send [Press Esc then Enter]"
                 } else if PREVIEW_MODE_STR == message {
                     "Send [Enter]"
                 } else {
