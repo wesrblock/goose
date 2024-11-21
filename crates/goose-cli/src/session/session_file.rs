@@ -24,7 +24,8 @@ pub fn persist_messages(session_file: &PathBuf, messages: &[Message]) -> Result<
     persist_messages_internal(file, messages)
 }
 
-fn persist_messages_internal(session_file: File, messages: &[Message]) -> Result<()> {
+// TODO: Public for testing but ideally this would be private.
+pub fn persist_messages_internal(session_file: File, messages: &[Message]) -> Result<()> {
     let mut writer = std::io::BufWriter::new(session_file);
 
     for message in messages {
