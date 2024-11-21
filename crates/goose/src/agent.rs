@@ -276,7 +276,7 @@ mod tests {
     use crate::models::message::MessageContent;
     use crate::providers::mock::MockProvider;
     use async_trait::async_trait;
-    use futures::StreamExt;
+    use futures::TryStreamExt;
     use serde_json::json;
     use std::collections::HashMap;
 
@@ -339,12 +339,12 @@ mod tests {
 
         let initial_message = Message::user().with_text("Hi");
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent
-            .reply(&initial_messages)
-            .collect::<Vec<Result<Message>>>()
-            .await
-            .into_iter()
-            .collect::<Result<Vec<Message>>>()?;
+        
+        let mut stream = agent.reply(&initial_messages).await?;
+        let mut messages = Vec::new();
+        while let Some(msg) = stream.try_next().await? {
+            messages.push(msg);
+        }
 
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0], response);
@@ -365,12 +365,12 @@ mod tests {
 
         let initial_message = Message::user().with_text("Echo test");
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent
-            .reply(&initial_messages)
-            .collect::<Vec<Result<Message>>>()
-            .await
-            .into_iter()
-            .collect::<Result<Vec<Message>>>()?;
+        
+        let mut stream = agent.reply(&initial_messages).await?;
+        let mut messages = Vec::new();
+        while let Some(msg) = stream.try_next().await? {
+            messages.push(msg);
+        }
 
         // Should have three messages: tool request, response, and model text
         assert_eq!(messages.len(), 3);
@@ -394,12 +394,12 @@ mod tests {
 
         let initial_message = Message::user().with_text("Invalid tool");
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent
-            .reply(&initial_messages)
-            .collect::<Vec<Result<Message>>>()
-            .await
-            .into_iter()
-            .collect::<Result<Vec<Message>>>()?;
+        
+        let mut stream = agent.reply(&initial_messages).await?;
+        let mut messages = Vec::new();
+        while let Some(msg) = stream.try_next().await? {
+            messages.push(msg);
+        }
 
         // Should have three messages: failed tool request, fail response, and model text
         assert_eq!(messages.len(), 3);
@@ -433,12 +433,12 @@ mod tests {
 
         let initial_message = Message::user().with_text("Multiple calls");
         let initial_messages = vec![initial_message];
-        let messages: Vec<Message> = agent
-            .reply(&initial_messages)
-            .collect::<Vec<Result<Message>>>()
-            .await
-            .into_iter()
-            .collect::<Result<Vec<Message>>>()?;
+        
+        let mut stream = agent.reply(&initial_messages).await?;
+        let mut messages = Vec::new();
+        while let Some(msg) = stream.try_next().await? {
+            messages.push(msg);
+        }
 
         // Should have three messages: tool requests, responses, and model text
         assert_eq!(messages.len(), 3);
