@@ -11,8 +11,8 @@ use crate::profile::profile_handler::{load_profiles, PROFILE_DEFAULT_NAME};
 use crate::profile::provider_helper::set_provider_config;
 use crate::profile::provider_helper::PROVIDER_OPEN_AI;
 use crate::prompt::cliclack::CliclackPrompt;
-use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::prompt::Prompt;
+use crate::prompt::rustyline::RustylinePrompt;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
