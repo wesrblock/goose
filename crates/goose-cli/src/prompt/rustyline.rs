@@ -5,24 +5,18 @@ use std::{
 
 use anyhow::Result;
 use bat::WrappingMode;
-use cliclack::{input, set_theme, spinner, Theme as CliclackTheme, ThemeState};
+use cliclack::spinner;
 use goose::models::message::{Message, MessageContent, ToolRequest, ToolResponse};
 
 use super::prompt::{Input, InputType, Prompt, Theme};
 
-pub struct CliclackPrompt {
+pub struct RustylinePrompt {
     spinner: cliclack::ProgressBar,
-    input_mode: InputMode,
     theme: Theme,
     renderers: HashMap<String, Box<dyn ToolRenderer>>,
 }
 
-enum InputMode {
-    Singleline,
-    Multiline,
-}
-
-impl CliclackPrompt {
+impl RustylinePrompt {
     pub fn new() -> Self {
         // // Load highlighting assets
         // let assets = HighlightingAssets::from_binary();
@@ -39,15 +33,12 @@ impl CliclackPrompt {
         //     println!("{}", syntax.name);
         // }
 
-        set_theme(PromptTheme);
-
         let mut renderers: HashMap<String, Box<dyn ToolRenderer>> = HashMap::new();
         let default_renderer = DefaultRenderer;
         renderers.insert(default_renderer.tool_name(), Box::new(default_renderer));
 
-        CliclackPrompt {
+        RustylinePrompt {
             spinner: spinner(),
-            input_mode: InputMode::Multiline,
             theme: Theme::Dark,
             renderers,
         }
@@ -142,7 +133,7 @@ fn print_newline() {
     println!();
 }
 
-impl Prompt for CliclackPrompt {
+impl Prompt for RustylinePrompt {
     fn render(&mut self, message: Box<Message>) {
         let theme = match self.theme {
             Theme::Light => "GitHub",
@@ -194,18 +185,17 @@ impl Prompt for CliclackPrompt {
     }
 
     fn get_input(&mut self) -> Result<Input> {
-        let mut input = input("Goose Chat: ( O)>         [Help: /?]").placeholder("");
-        match self.input_mode {
-            InputMode::Multiline => input = input.multiline(),
-            InputMode::Singleline => (),
-        }
-        let mut message_text: String = match input.interact() {
+        let mut editor = rustyline::DefaultEditor::new()?;
+        let input = editor.readline("( O)> ");
+        let mut message_text = match input {
             Ok(text) => text,
             Err(e) => {
-                eprintln!("Error getting input: {}", e);
-                println!("If you are trying to exit use /exit");
+                match e {
+                    rustyline::error::ReadlineError::Interrupted => (),
+                    _ => eprintln!("Input error: {}", e),
+                }
                 return Ok(Input {
-                    input_type: InputType::AskAgain,
+                    input_type: InputType::Exit,
                     content: None,
                 });
             }
@@ -218,20 +208,6 @@ impl Prompt for CliclackPrompt {
                 input_type: InputType::Exit,
                 content: None,
             })
-        } else if message_text.eq_ignore_ascii_case("/m") {
-            println!("Switching to Multiline input mode");
-            self.input_mode = InputMode::Multiline;
-            return Ok(Input {
-                input_type: InputType::AskAgain,
-                content: None,
-            });
-        } else if message_text.eq_ignore_ascii_case("/s") {
-            println!("Switching to Singleline input mode");
-            self.input_mode = InputMode::Singleline;
-            return Ok(Input {
-                input_type: InputType::AskAgain,
-                content: None,
-            });
         } else if message_text.eq_ignore_ascii_case("/t") {
             self.theme = match self.theme {
                 Theme::Light => {
@@ -247,13 +223,13 @@ impl Prompt for CliclackPrompt {
                 input_type: InputType::AskAgain,
                 content: None,
             });
-        } else if message_text.eq_ignore_ascii_case("/?") {
+        } else if message_text.eq_ignore_ascii_case("/?")
+            || message_text.eq_ignore_ascii_case("/help")
+        {
             println!("Commands:");
             println!("/exit - Exit the session");
-            println!("/m - Switch to multiline input mode");
-            println!("/s - Switch to singleline input mode");
             println!("/t - Toggle Light/Dark theme");
-            println!("/? - Display this help message");
+            println!("/? | /help - Display this help message");
             println!("Ctrl+C - Interrupt goose (resets the interaction to before the interrupted user request)");
             return Ok(Input {
                 input_type: InputType::AskAgain,
@@ -269,41 +245,5 @@ impl Prompt for CliclackPrompt {
 
     fn close(&self) {
         // No cleanup required
-    }
-}
-
-//////
-/// Custom theme for the prompt
-//////
-struct PromptTheme;
-
-const EDIT_MODE_STR: &str = "[Esc](Preview)";
-const PREVIEW_MODE_STR: &str = "[Enter](Submit)";
-
-// We need a wrapper to be able to call the trait default implementation with the same name.
-#[allow(dead_code)]
-struct Wrapper<'a, T>(&'a T);
-impl<'a, T: CliclackTheme> CliclackTheme for Wrapper<'a, T> {}
-
-impl CliclackTheme for PromptTheme {
-    /// The original logic for teaching the user how to submit in multiline mode.
-    /// https://github.com/fadeevab/cliclack/blob/main/src/input.rs#L250
-    /// We are replacing it to be more explicit.
-    ///
-    fn format_footer_with_message(&self, state: &ThemeState, message: &str) -> String {
-        let new_message = match state {
-            ThemeState::Active => {
-                if EDIT_MODE_STR == message {
-                    "Send [Press Esc then Enter]"
-                } else if PREVIEW_MODE_STR == message {
-                    "Send [Enter]"
-                } else {
-                    message
-                }
-            }
-            _ => message,
-        };
-
-        Wrapper(self).format_footer_with_message(state, new_message)
     }
 }
