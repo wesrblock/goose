@@ -44,14 +44,13 @@ pub fn load_profiles() -> Result<HashMap<String, Profile>, Box<dyn Error>> {
         return Ok(HashMap::new());
     }
     let file = File::open(&path)?;
-    let profiles: HashMap<String, Profile> = match serde_yaml::from_reader(file) {
-        Ok(profiles) => profiles,
+    match serde_yaml::from_reader(file) {
+        Ok(profiles) => Ok(profiles),
         Err(e) => {
-            eprintln!("\x1b[31mFailed to parse profile file: {}\n\nAbort or we will create a new empty profile file.\n\x1b[0m", e);
-            HashMap::new()
+            eprintln!("\x1b[31mFailed to parse profile file: {}\n\nPlease delete {} and recreate it.\n\x1b[0m", e, path.display());
+            Err(Box::new(e))
         }
-    };
-    Ok(profiles)
+    }
 }
 
 pub fn find_existing_profile(profile_name: &str) -> Option<Profile> {
