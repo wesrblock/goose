@@ -16,6 +16,20 @@ export interface Chat {
   messages: Array<{ id: string; role: "function" | "system" | "user" | "assistant" | "data" | "tool"; content: string }>;
 }
 
+function stripMarkdownCodeBlocks(text: string): string {
+  const jsonBlockRegex = /^```(?:json)?\n([\s\S]*?)```$/;
+  const match = text.trim().match(jsonBlockRegex);
+  return match ? match[1].trim() : text.trim();
+}
+
+function logResponseContent(content: any): void {
+  console.log('Response content:', {
+    type: content.type,
+    rawContent: content,
+    timestamp: new Date().toISOString()
+  });
+}
+
 function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
   chats: Chat[],
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
@@ -24,9 +38,67 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
+  const [messageMetadata, setMessageMetadata] = useState<Record<string, { schemaContent: any }>>({});
+
+  const onFinish = async (message: any) => {
+    console.log("Chat finished with message:", message);
+    try {
+      const promptTemplate = `Analyze the following text and determine if it matches one of these cases:
+1. If it's asking for confirmation of a specific plan, respond with:
+   {"type": "PlanConfirmation", "selectedPlan": {"id": "...", "name": "...", "description": "..."}}
+2. If it's presenting multiple plans to choose from, respond with:
+   {"type": "PlanChoice", "plans": [{"id": "...", "name": "...", "description": "..."}, ...]}
+3. If it requires more complex input or doesn't fit the above cases, respond with:
+   {"type": "ComplexInput", "complexInputReason": "explanation of what's needed"}
+4. If it's a simple greeting or acknowledgment, respond with:
+   {"status": "complete", "waitingForUser": true}
+Content to analyze:
+${message.content}
+Generate ONLY the JSON response, no additional text:`;
+
+      const response = await fetch(getApiUrl("/ask"), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: promptTemplate
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get response');
+      }
+
+      const data = await response.json();
+      console.log('Raw response from /ask:', data.response);
+
+      try {
+        const cleanedResponse = stripMarkdownCodeBlocks(data.response);
+        console.log('Cleaned response:', cleanedResponse);
+        const parsedContent = JSON.parse(cleanedResponse);
+        logResponseContent(parsedContent);
+
+        setMessageMetadata(prev => ({
+          ...prev,
+          [message.id]: { schemaContent: parsedContent }
+        }));
+      } catch (parseError) {
+        console.error('JSON Parse Error:', {
+          error: parseError,
+          rawResponse: data.response,
+          errorMessage: parseError.message
+        });
+      }
+    } catch (error) {
+      console.error('Error getting feedback:', error);
+    }
+  };  
+
   const { messages, input, handleInputChange, handleSubmit, append } = useChat({
     api: getApiUrl("/reply"),
-    initialMessages: chat?.messages || []
+    initialMessages: chat?.messages || [], 
+    onFinish
   });
 
   // Update chat messages when they change
@@ -57,7 +129,8 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
                 {message.role === 'user' ? (
                   <UserMessage message={message} />
                 ) : (
-                  <GooseMessage message={message} />
+                  <GooseMessage message={message}
+                                metadata={messageMetadata[message.id]} />
                 )}
               </div>
             ))}
