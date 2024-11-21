@@ -16,7 +16,8 @@ pub struct DeveloperSystem {
     tools: Vec<Tool>,
     cwd: Mutex<PathBuf>,
     active_files: Mutex<HashSet<PathBuf>>,
-    file_history: Mutex<HashMap<PathBuf, Vec<String>>>, // Moved file_history here
+    file_history: Mutex<HashMap<PathBuf, Vec<String>>>,
+    instructions: String,
 }
 
 impl Default for DeveloperSystem {
@@ -60,6 +61,7 @@ impl DeveloperSystem {
             indoc! {r#"
                 Perform text editing operations on files.
                 The `command` parameter specifies the operation to perform.
+                You can use "write" to fully overwrite an existing file or to create a new file.
             "#},
             json!({
                 "type": "object",
@@ -70,7 +72,7 @@ impl DeveloperSystem {
                         "description": "Path to the file. Can be absolute or relative to the system CWD"
                     },
                     "command": {
-                        "enum": ["view", "create", "replace", "insert", "undo"],
+                        "enum": ["view", "write", "replace", "insert", "undo"],
                         "description": "The commands to run."
                     },
                     "new_str": {
@@ -97,11 +99,34 @@ impl DeveloperSystem {
             }),
         );
 
+        let instructions = formatdoc!{r#"
+            The developer system is loaded in the directory listed below.
+            You can use the shell tool to run any command that would work on the relevant operating system.
+            Use the shell tool as needed to locate files or interact with the project. Only files
+            that have been read or modified using the edit tools will show up in the active files list.
+
+            bash
+              - Prefer ripgrep - `rg` - when you need to locate content, it will respected ignored files for
+            efficiency.
+                - to locate files by name: `rg --files | rg example.py`
+                - to locate consent inside files: `rg 'class Example'`
+              - The operating system for these commands is {os}
+
+
+            text_edit
+              - Always use 'view' command first before any edit operations
+              - File edits are tracked and can be undone with 'undo'
+              - String replacements must match exactly once in the file
+              - Line numbers start at 1 for insert operations
+            "#,
+            os=std::env::consts::OS,
+        };
         Self {
             tools: vec![bash_tool, text_editor_tool],
             cwd: Mutex::new(std::env::current_dir().unwrap()),
             active_files: Mutex::new(HashSet::new()),
-            file_history: Mutex::new(HashMap::new()), // Initialize file_history
+            file_history: Mutex::new(HashMap::new()),
+            instructions: instructions,
         }
     }
 
@@ -181,7 +206,7 @@ impl DeveloperSystem {
 
         match command {
             "view" => self.text_editor_view(&path).await,
-            "create" => {
+            "write" => {
                 let file_text = params
                     .get("file_text")
                     .and_then(|v| v.as_str())
@@ -407,11 +432,12 @@ impl System for DeveloperSystem {
     }
 
     fn description(&self) -> &str {
-        "A system that provides bash and text editing capabilities"
+        "Use the developer system to build software and solve problems by editing files and
+running commands on the shell."
     }
 
     fn instructions(&self) -> &str {
-        "Use the provided tools to perform bash operations and text editing tasks."
+        self.instructions.as_str()
     }
 
     fn tools(&self) -> &[Tool] {
