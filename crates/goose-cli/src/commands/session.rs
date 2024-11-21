@@ -2,6 +2,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use std::path::PathBuf;
 
 use goose::agent::Agent;
+use goose::models::message::Message;
 use goose::providers::factory;
 
 use crate::commands::expected_config::get_recommended_models;
@@ -10,8 +11,8 @@ use crate::profile::profile_handler::{load_profiles, PROFILE_DEFAULT_NAME};
 use crate::profile::provider_helper::set_provider_config;
 use crate::profile::provider_helper::PROVIDER_OPEN_AI;
 use crate::prompt::cliclack::CliclackPrompt;
-use crate::prompt::prompt::Prompt;
 use crate::prompt::rustyline::RustylinePrompt;
+use crate::prompt::prompt::Prompt;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
@@ -25,12 +26,12 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
 
     // TODO: Reconsider fn name as we are just using the fn to ask the user if env vars are not set
     let provider_config =
-        set_provider_config(&loaded_profile.provider, loaded_profile.processor.clone());
+        set_provider_config(&loaded_profile.provider, loaded_profile.model.clone());
 
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_config).unwrap();
     let agent = Box::new(Agent::new(provider));
-    let prompt = match std::env::var("GOOSE_INPUT") {
+    let mut prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
             "cliclack" => Box::new(CliclackPrompt::new()) as Box<dyn Prompt>,
             "rustyline" => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,
@@ -38,6 +39,16 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
         },
         Err(_) => Box::new(RustylinePrompt::new()),
     };
+
+    prompt.render(Box::new(Message::assistant().with_text(format!(
+        r#"Stretching wings...
+    Provider: {}
+    Model: {}
+    Session file: {}"#,
+        loaded_profile.provider,
+        loaded_profile.model,
+        session_file.display()
+    ))));
 
     Box::new(Session::new(agent, prompt, session_file))
 }
@@ -60,8 +71,7 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
         let recommended_models = get_recommended_models(PROVIDER_OPEN_AI);
         Box::new(Profile {
             provider: PROVIDER_OPEN_AI.to_string(),
-            processor: recommended_models.processor.to_string(),
-            accelerator: recommended_models.accelerator.to_string(),
+            model: recommended_models.model.to_string(),
             additional_systems: Vec::new(),
         })
     } else {

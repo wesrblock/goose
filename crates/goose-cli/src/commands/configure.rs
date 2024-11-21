@@ -22,15 +22,13 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
 
     let provider_name = select_provider(existing_profile);
     let recommended_models = get_recommended_models(provider_name);
-    let processor = set_processor(existing_profile, &recommended_models)?;
-    let accelerator = set_accelerator(existing_profile, &recommended_models)?;
-    let provider_config = set_provider_config(provider_name, processor.clone());
+    let model = set_model(existing_profile, &recommended_models)?;
+    let provider_config = set_provider_config(provider_name, model.clone());
     let additional_systems =
         existing_profile.map_or(Vec::new(), |profile| profile.additional_systems.clone());
     let profile = Profile {
         provider: provider_name.to_string(),
-        processor: processor.clone(),
-        accelerator,
+        model: model.clone(),
         additional_systems,
     };
     match save_profile(profile_name.as_str(), profile) {
@@ -70,28 +68,14 @@ fn get_existing_profile(profile_name: &String) -> Option<Profile> {
     existing_profile_result
 }
 
-fn set_processor(
+fn set_model(
     existing_profile: Option<&Profile>,
     recommended_models: &RecommendedModels,
 ) -> Result<String, Box<dyn Error>> {
-    let default_processor_value = existing_profile
-        .map_or(recommended_models.processor, |profile| {
-            profile.processor.as_str()
-        });
-    let processor = get_user_input("Enter processor:", default_processor_value)?;
-    Ok(processor)
-}
-
-fn set_accelerator(
-    existing_profile: Option<&Profile>,
-    recommended_models: &RecommendedModels,
-) -> Result<String, Box<dyn Error>> {
-    let default_accelerator_value = existing_profile
-        .map_or(recommended_models.accelerator, |profile| {
-            profile.accelerator.as_str()
-        });
-    let processor = get_user_input("Enter accelerator:", default_accelerator_value)?;
-    Ok(processor)
+    let default_model_value =
+        existing_profile.map_or(recommended_models.model, |profile| profile.model.as_str());
+    let model = get_user_input("Enter model:", default_model_value)?;
+    Ok(model)
 }
 
 fn select_provider(existing_profile: Option<&Profile>) -> &str {
