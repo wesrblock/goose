@@ -538,7 +538,7 @@ mod tests {
         let create_call = ToolCall::new(
             "text_editor",
             json!({
-                "command": "create",
+                "command": "write",
                 "path": file_path_str,
                 "file_text": "Hello, world!"
             }),
@@ -575,7 +575,7 @@ mod tests {
         let create_call = ToolCall::new(
             "text_editor",
             json!({
-                "command": "create",
+                "command": "write",
                 "path": file_path_str,
                 "file_text": "Hello, world!"
             }),
@@ -634,7 +634,7 @@ mod tests {
         let create_call = ToolCall::new(
             "text_editor",
             json!({
-                "command": "create",
+                "command": "write",
                 "path": file_path_str,
                 "file_text": "First line"
             }),
