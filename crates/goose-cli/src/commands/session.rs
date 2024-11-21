@@ -25,7 +25,7 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
 
     // TODO: Reconsider fn name as we are just using the fn to ask the user if env vars are not set
     let provider_config =
-        set_provider_config(&loaded_profile.provider, loaded_profile.processor.clone());
+        set_provider_config(&loaded_profile.provider, loaded_profile.model.clone());
 
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_config).unwrap();
@@ -63,8 +63,7 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
         let recommended_models = get_recommended_models(PROVIDER_OPEN_AI);
         Box::new(Profile {
             provider: PROVIDER_OPEN_AI.to_string(),
-            processor: recommended_models.processor.to_string(),
-            accelerator: recommended_models.accelerator.to_string(),
+            model: recommended_models.model.to_string(),
             additional_systems: Vec::new(),
         })
     } else {
