@@ -8,7 +8,7 @@ use bat::WrappingMode;
 use cliclack::spinner;
 use goose::models::message::{Message, MessageContent, ToolRequest, ToolResponse};
 
-use super::prompt::{Input, InputType, Prompt, Theme};
+use super::{prompt::{Input, InputType, Prompt, Theme}, thinking::get_random_thinking_message};
 
 pub struct RustylinePrompt {
     spinner: cliclack::ProgressBar,
@@ -177,7 +177,7 @@ impl Prompt for RustylinePrompt {
 
     fn show_busy(&mut self) {
         self.spinner = spinner();
-        self.spinner.start("Thinking...");
+        self.spinner.start(format!("{}...", get_random_thinking_message()));
     }
 
     fn hide_busy(&self) {

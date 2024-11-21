@@ -8,7 +8,7 @@ use bat::WrappingMode;
 use cliclack::{input, set_theme, spinner, Theme as CliclackTheme, ThemeState};
 use goose::models::message::{Message, MessageContent, ToolRequest, ToolResponse};
 
-use super::prompt::{Input, InputType, Prompt, Theme};
+use super::{prompt::{Input, InputType, Prompt, Theme}, thinking::get_random_thinking_message};
 
 pub struct CliclackPrompt {
     spinner: cliclack::ProgressBar,
@@ -186,7 +186,7 @@ impl Prompt for CliclackPrompt {
 
     fn show_busy(&mut self) {
         self.spinner = spinner();
-        self.spinner.start("Thinking...");
+        self.spinner.start(format!("{}...", get_random_thinking_message()));
     }
 
     fn hide_busy(&self) {
