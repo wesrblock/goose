@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Profile {
     pub provider: String,
-    pub processor: String,
-    pub accelerator: String,
+    pub model: String,
     #[serde(default)]
     pub additional_systems: Vec<AdditionalSystem>,
 }

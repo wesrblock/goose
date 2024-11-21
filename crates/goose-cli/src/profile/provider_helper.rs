@@ -19,7 +19,7 @@ pub fn select_provider_lists() -> Vec<(&'static str, String, &'static str)> {
         .collect()
 }
 
-pub fn set_provider_config(provider_name: &str, processor: String) -> ProviderConfig {
+pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig {
     match provider_name.to_lowercase().as_str() {
         PROVIDER_OPEN_AI => ProviderConfig::OpenAi(OpenAiProviderConfig {
             host: "https://api.openai.com".to_string(),
@@ -28,7 +28,7 @@ pub fn set_provider_config(provider_name: &str, processor: String) -> ProviderCo
                 "Please enter your OpenAI API key:",
                 true,
             ),
-            model: processor,
+            model,
             temperature: None,
             max_tokens: None,
         }),
@@ -43,7 +43,7 @@ pub fn set_provider_config(provider_name: &str, processor: String) -> ProviderCo
                 "Please enter your Databricks token:",
                 true,
             ),
-            model: processor,
+            model,
             temperature: None,
             max_tokens: None,
         }),
