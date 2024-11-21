@@ -1,0 +1,61 @@
+name: Rust Build and Test
+
+on:
+  push:
+    branches:
+      - v1.0
+  pull_request:
+    branches:
+      - v1.0
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Install UV
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Run download_tokenizer_files.py
+      run: uv run download_tokenizer_files.py
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Cache Cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+
+    - name: Cache Cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/index
+        key: ${{ runner.os }}-cargo-index
+        restore-keys: |
+          ${{ runner.os }}-cargo-index
+
+    - name: Cache Cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-build-
+
+    - name: Build the Rust project
+      run: cargo build
+
+    - name: Run Tests
+      run: cargo test --verbose
