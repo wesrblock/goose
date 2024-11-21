@@ -1,8 +1,10 @@
 import 'dotenv/config';
+import { loadZshEnv } from './utils/loadEnv';
 import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain } from 'electron';
 import path from 'node:path';
 import { start as startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
+import log from './utils/logger';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -159,7 +161,7 @@ const showWindow = () => {
   const windows = BrowserWindow.getAllWindows();
 
   if (windows.length === 0) {
-    console.log("No windows are currently open.");
+    log.info("No windows are currently open.");
     return;
   }
 
@@ -192,14 +194,17 @@ const showWindow = () => {
 };
 
 app.whenReady().then(() => {
+  // Load zsh environment variables in production mode only
+  const isProduction = app.isPackaged;
+  loadZshEnv(isProduction);
   // Get the server startup configuration
   const shouldStartServer = (process.env.VITE_START_EMBEDDED_SERVER || 'yes').toLowerCase() === 'yes';
   
   if (shouldStartServer) {
-    console.log('Starting embedded goosed server');
+    log.info('Starting embedded goosed server');
     startGoosed(app);
   } else {
-    console.log('Skipping embedded server startup (disabled by configuration)');
+    log.info('Skipping embedded server startup (disabled by configuration)');
   }
 
   createTray();
