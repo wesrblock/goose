@@ -37,8 +37,9 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
   setSelectedChatId: React.Dispatch<React.SetStateAction<number>>
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
-
   const [messageMetadata, setMessageMetadata] = useState<Record<string, { schemaContent: any }>>({});
+  const [inputValue, setInputValue] = useState('');
+
 
   const onFinish = async (message: any) => {
     console.log("Chat finished with message:", message);
@@ -81,7 +82,15 @@ Generate ONLY the JSON response, no additional text:`;
 
         setMessageMetadata(prev => ({
           ...prev,
-          [message.id]: { schemaContent: parsedContent }
+          [message.id]: { 
+            schemaContent: parsedContent,
+            onPlanSelect: (plan) => {
+              setInputValue(plan.description);
+            },
+            onPlanConfirm: (plan) => {
+              setInputValue(plan.description);
+            }
+          }
         }));
       } catch (parseError) {
         console.error('JSON Parse Error:', {
@@ -101,6 +110,7 @@ Generate ONLY the JSON response, no additional text:`;
     onFinish
   });
 
+
   // Update chat messages when they change
   useEffect(() => {
     const updatedChats = chats.map(c => 
@@ -108,6 +118,13 @@ Generate ONLY the JSON response, no additional text:`;
     );
     setChats(updatedChats);
   }, [messages, selectedChatId]);
+
+  // Effect to sync input value with the chat input
+  useEffect(() => {
+    if (inputValue) {
+      handleInputChange({ target: { value: inputValue } } as React.ChangeEvent<HTMLTextAreaElement>);
+    }
+  }, [inputValue]);
 
   return (
     <div className="flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
