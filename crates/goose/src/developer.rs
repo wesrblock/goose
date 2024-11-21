@@ -641,10 +641,7 @@ mod tests {
             }),
         );
         let view_result = system.call(view_call).await.unwrap();
-        assert!(view_result[0]
-            .as_text()
-            .unwrap()
-            .contains("The file content for"));
+        assert_eq!(view_result[0].as_text().unwrap(), "Hello, world!");
 
         temp_dir.close().unwrap();
     }
@@ -703,10 +700,7 @@ mod tests {
             }),
         );
         let view_result = system.call(view_call).await.unwrap();
-        assert!(view_result[0]
-            .as_text()
-            .unwrap()
-            .contains("The file content for"));
+        assert!(view_result[0].as_text().unwrap().contains("The file content for"));
 
         temp_dir.close().unwrap();
     }
@@ -777,10 +771,7 @@ mod tests {
             ))
             .await
             .unwrap();
-        assert!(view_result[0]
-            .as_text()
-            .unwrap()
-            .contains("The file content for"));
+        assert!(view_result[0].as_text().unwrap().contains("The file content for"));
 
         temp_dir.close().unwrap();
     }
