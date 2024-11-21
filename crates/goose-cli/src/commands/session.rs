@@ -10,6 +10,8 @@ use crate::profile::profile_handler::{load_profiles, PROFILE_DEFAULT_NAME};
 use crate::profile::provider_helper::set_provider_config;
 use crate::profile::provider_helper::PROVIDER_OPEN_AI;
 use crate::prompt::cliclack::CliclackPrompt;
+use crate::prompt::prompt::Prompt;
+use crate::prompt::rustyline::RustylinePrompt;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
@@ -28,7 +30,14 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_config).unwrap();
     let agent = Box::new(Agent::new(provider));
-    let prompt = Box::new(CliclackPrompt::new());
+    let prompt = match std::env::var("GOOSE_INPUT") {
+        Ok(val) => match val.as_str() {
+            "cliclack" => Box::new(CliclackPrompt::new()) as Box<dyn Prompt>,
+            "rustyline" => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,
+            _ => Box::new(RustylinePrompt::new()) as Box<dyn Prompt>,
+        },
+        Err(_) => Box::new(RustylinePrompt::new()),
+    };
 
     Box::new(Session::new(agent, prompt, session_file))
 }

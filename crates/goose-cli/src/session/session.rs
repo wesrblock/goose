@@ -16,7 +16,7 @@ pub struct Session<'a> {
 }
 
 impl<'a> Session<'a> {
-    pub fn new(agent: Box<Agent>, prompt: Box<impl Prompt + 'a>, session_file: PathBuf) -> Self {
+    pub fn new(agent: Box<Agent>, prompt: Box<dyn Prompt + 'a>, session_file: PathBuf) -> Self {
         Session {
             agent,
             prompt,

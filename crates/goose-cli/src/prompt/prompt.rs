@@ -4,7 +4,7 @@ use goose::models::message::Message;
 pub trait Prompt {
     fn render(&mut self, message: Box<Message>);
     fn get_input(&mut self) -> Result<Input>;
-    fn show_busy(&self);
+    fn show_busy(&mut self);
     fn hide_busy(&self);
     fn close(&self);
     fn goose_ready(&self) {
