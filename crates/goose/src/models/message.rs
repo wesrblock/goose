@@ -4,19 +4,19 @@ use super::tool::ToolCall;
 use crate::errors::AgentResult;
 use chrono::Utc;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ToolRequest {
     pub id: String,
     pub tool_call: AgentResult<ToolCall>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ToolResponse {
     pub id: String,
     pub tool_result: AgentResult<Vec<Content>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Content passed inside a message, which can be both simple content and tool content
 pub enum MessageContent {
     Text(TextContent),
@@ -83,7 +83,7 @@ impl From<Content> for MessageContent {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A message to or from an LLM
 pub struct Message {
     pub role: Role,
