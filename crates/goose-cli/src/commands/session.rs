@@ -1,5 +1,5 @@
 use rand::{distributions::Alphanumeric, Rng};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use goose::agent::Agent;
 use goose::models::message::Message;
@@ -23,13 +23,7 @@ pub fn build_session<'a>(
     resume: bool,
 ) -> Box<Session<'a>> {
     let session_dir = ensure_session_dir().expect("Failed to create session directory");
-
-    let session_name = if session.is_none() && !resume {
-        generate_new_session_name(&session_dir)
-    } else {
-        session_name_or_rand(session.clone())
-    };
-    let session_file = session_dir.join(format!("{}.jsonl", session_name));
+    let session_file = session_path(session.clone(), &session_dir, session.is_none() && !resume);
 
     // Guard against resuming a non-existent session
     if resume && !session_file.exists() {
@@ -79,29 +73,41 @@ pub fn build_session<'a>(
     Box::new(Session::new(agent, prompt, session_file))
 }
 
-fn session_name_or_rand(session: Option<String>) -> String {
-    match session {
-        Some(name) => name.to_lowercase(),
-        None => rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(8)
-            .map(char::from)
-            .collect::<String>()
-            .to_lowercase(),
+fn session_path(
+    provided_session_name: Option<String>,
+    session_dir: &Path,
+    retry_on_conflict: bool,
+) -> PathBuf {
+    let session_name = provided_session_name.unwrap_or(random_session_name());
+    let session_file = session_dir.join(format!("{}.jsonl", session_name));
+
+    if session_file.exists() && retry_on_conflict {
+        generate_new_session_path(session_dir)
+    } else {
+        session_file
     }
 }
 
+fn random_session_name() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(8)
+        .map(char::from)
+        .collect::<String>()
+        .to_lowercase()
+}
+
 // For auto-generated names, try up to 5 times to get a unique name
-fn generate_new_session_name(session_dir: &Path) -> String {
+fn generate_new_session_path(session_dir: &Path) -> PathBuf {
     let mut attempts = 0;
     let max_attempts = 5;
 
     loop {
-        let generated_name = session_name_or_rand(None);
+        let generated_name = random_session_name();
         let generated_file = session_dir.join(format!("{}.jsonl", generated_name));
 
         if !generated_file.exists() {
-            break generated_name;
+            break generated_file;
         }
 
         attempts += 1;
