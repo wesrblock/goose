@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde_json;
-use std::fs;
+use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -19,10 +19,27 @@ pub fn ensure_session_dir() -> Result<PathBuf> {
     Ok(config_dir)
 }
 
+pub fn readable_session_file(session_file: &PathBuf) -> Result<File> {
+    match fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(session_file)
+    {
+        Ok(file) => Ok(file),
+        Err(e) => Err(anyhow::anyhow!("Failed to open session file: {}", e)),
+    }
+}
+
 pub fn persist_messages(session_file: &PathBuf, messages: &[Message]) -> Result<()> {
-    // Create or truncate the file
-    let file = fs::File::create(session_file)?;
-    let mut writer = std::io::BufWriter::new(file);
+    let file = fs::File::create(session_file)?; // Create or truncate the file
+    persist_messages_internal(file, messages)
+}
+
+// TODO: Public for testing but ideally this would be private.
+pub fn persist_messages_internal(session_file: File, messages: &[Message]) -> Result<()> {
+    let mut writer = std::io::BufWriter::new(session_file);
 
     for message in messages {
         let serializable = SerializableMessage::from(message);
