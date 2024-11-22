@@ -12,7 +12,7 @@ use goose::models::message::{Message, MessageContent, ToolRequest, ToolResponse}
 use goose::models::role::Role;
 use serde_json::Value;
 
-use super::prompt::{Input, InputType, Prompt, Theme};
+use super::{prompt::{Input, InputType, Prompt, Theme}, thinking::get_random_thinking_message};
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
 const MAX_STRING_LENGTH: usize = 40;
@@ -245,7 +245,7 @@ impl Prompt for RustylinePrompt {
 
     fn show_busy(&mut self) {
         self.spinner = spinner();
-        self.spinner.start("Thinking...");
+        self.spinner.start(format!("{}...", get_random_thinking_message()));
     }
 
     fn hide_busy(&self) {
