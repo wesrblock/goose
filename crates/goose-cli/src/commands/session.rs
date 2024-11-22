@@ -17,13 +17,23 @@ use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
 pub fn build_session<'a>(session: Option<String>, profile: Option<String>, resume: bool) -> Box<Session<'a>> {
-    let session_name = session_name(session);
-    let session_file: PathBuf = ensure_session_dir()
-        .expect("Failed to create session directory")
-        .join(format!("{}.jsonl", session_name));
+    let session_dir = ensure_session_dir().expect("Failed to create session directory");
 
+    let session_name = if session.is_none() && !resume {
+        generate_new_session_name(&session_dir)
+    } else {
+        session_name_or_rand(session.clone())
+    };
+    let session_file = session_dir.join(format!("{}.jsonl", session_name));
+
+    // Guard against resuming a non-existent session
     if resume && !session_file.exists() {
         panic!("Cannot resume session: file {} does not exist", session_file.display());
+    }
+
+    // Guard against running a new session with a file that already exists
+    if !resume && session_file.exists() {
+        panic!("Session file {} already exists. Use --resume to continue an existing session", session_file.display());
     }
 
     let loaded_profile = load_profile(profile);
@@ -57,7 +67,7 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>, resum
     Box::new(Session::new(agent, prompt, session_file))
 }
 
-fn session_name(session: Option<String>) -> String {
+fn session_name_or_rand(session: Option<String>) -> String {
     match session {
         Some(name) => name.to_lowercase(),
         None => rand::thread_rng()
@@ -66,6 +76,26 @@ fn session_name(session: Option<String>) -> String {
             .map(char::from)
             .collect::<String>()
             .to_lowercase(),
+    }
+}
+
+// For auto-generated names, try up to 5 times to get a unique name
+fn generate_new_session_name(session_dir: &PathBuf) -> String {
+    let mut attempts = 0;
+    let max_attempts = 5;
+
+    loop {
+        let generated_name = session_name_or_rand(None);
+        let generated_file = session_dir.join(format!("{}.jsonl", generated_name));
+
+        if !generated_file.exists() {
+            break generated_name;
+        }
+
+        attempts += 1;
+        if attempts >= max_attempts {
+            panic!("Failed to generate unique session name after {} attempts", max_attempts);
+        }
     }
 }
 
