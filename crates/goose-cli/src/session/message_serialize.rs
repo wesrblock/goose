@@ -19,6 +19,15 @@ pub struct SerializableMessage<'a> {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct SerializableToolResult {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audience: Option<Vec<Role>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<f32>,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SerializableContent {
     Text {
@@ -31,7 +40,7 @@ pub enum SerializableContent {
     },
     ToolResponse {
         id: String,
-        tool_result: String,
+        tool_results: Vec<SerializableToolResult>,
     },
     Image {
         // data: &'a str, // Don't serialize image data until further discussion.
@@ -64,20 +73,31 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
                         arguments: tool_call.arguments.clone(),
                     },
                     Err(e) => SerializableContent::Text {
-                        text: format!("{{\"error\": \"{}\"}}", e), // TODO: Fix this interaction.
+                        text: format!("{{\"error\": \"{}\"}}", e), // TODO: Explore this interaction.
                     },
                 },
                 MessageContent::ToolResponse(resp) => SerializableContent::ToolResponse {
                     id: resp.id.clone(),
-                    tool_result: match &resp.tool_result {
-                        Ok(content) => {
-                            if let Some(Content::Text(text_content)) = content.first() {
-                                text_content.text.clone()
-                            } else {
-                                "".to_string()
-                            }
-                        }
-                        Err(e) => format!("{{\"error\": \"{}\"}}", e),
+                    tool_results: match &resp.tool_result {
+                        Ok(contents) => contents
+                            .iter()
+                            .filter_map(|content| {
+                                if let Content::Text(text_content) = content {
+                                    Some(SerializableToolResult {
+                                        text: text_content.text.clone(),
+                                        audience: text_content.audience.clone(),
+                                        priority: text_content.priority,
+                                    })
+                                } else {
+                                    None // Skip non-text content for now
+                                }
+                            })
+                            .collect(),
+                        Err(e) => vec![SerializableToolResult {
+                            text: format!("{{\"error\": \"{}\"}}", e), // TODO: Explore this interaction.
+                            audience: None,
+                            priority: None,
+                        }],
                     },
                 },
                 MessageContent::Image(img) => SerializableContent::Image {
@@ -129,14 +149,19 @@ pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
                         arguments,
                     }),
                 }),
-                SerializableContent::ToolResponse { id, tool_result } => {
+                SerializableContent::ToolResponse { id, tool_results } => {
                     MessageContent::ToolResponse(ToolResponse {
                         id,
-                        tool_result: Ok(vec![Content::Text(TextContent {
-                            text: tool_result.trim_matches('"').to_string(),
-                            audience: None,
-                            priority: None,
-                        })]),
+                        tool_result: Ok(tool_results
+                            .into_iter()
+                            .map(|result| {
+                                Content::Text(TextContent {
+                                    text: result.text,
+                                    audience: result.audience,
+                                    priority: result.priority,
+                                })
+                            })
+                            .collect()),
                     })
                 }
                 SerializableContent::Image { mime_type } => MessageContent::Image(ImageContent {
@@ -276,6 +301,73 @@ mod tests {
                 assert_eq!(resp.id, deserialized_resp.id);
                 assert_eq!(resp.tool_result, deserialized_resp.tool_result);
                 assert!(deserialized_resp.tool_result.is_ok());
+            } else {
+                panic!("Deserialized content is not a tool response");
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_persist_tool_response_multiple_content() -> Result<()> {
+        let temp_file = NamedTempFile::new()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let messages = vec![Message {
+            role: Role::Assistant,
+            created: now,
+            content: vec![MessageContent::ToolResponse(ToolResponse {
+                id: "test_id".to_string(),
+                tool_result: Ok(vec![
+                    Content::Text(TextContent {
+                        text: "first result".to_string(),
+                        audience: Some(vec![Role::User]),
+                        priority: Some(1.0),
+                    }),
+                    Content::Text(TextContent {
+                        text: "second result".to_string(),
+                        audience: None,
+                        priority: None,
+                    }),
+                ]),
+            })],
+        }];
+
+        persist_messages_internal(temp_file.reopen()?, &messages)?;
+        let deserialized = deserialize_messages(temp_file.reopen()?)?;
+
+        assert_eq!(messages.len(), deserialized.len());
+        if let MessageContent::ToolResponse(resp) = &messages[0].content[0] {
+            if let MessageContent::ToolResponse(deserialized_resp) = &deserialized[0].content[0] {
+                assert_eq!(resp.id, deserialized_resp.id);
+                if let (Ok(original_results), Ok(deserialized_results)) =
+                    (&resp.tool_result, &deserialized_resp.tool_result)
+                {
+                    assert_eq!(original_results.len(), deserialized_results.len());
+
+                    // Check first result with audience and priority
+                    if let (Content::Text(original_text), Content::Text(deserialized_text)) =
+                        (&original_results[0], &deserialized_results[0])
+                    {
+                        assert_eq!(original_text.text, deserialized_text.text);
+                        assert_eq!(original_text.audience, deserialized_text.audience);
+                        assert_eq!(original_text.priority, deserialized_text.priority);
+                    }
+
+                    // Check second result without audience and priority
+                    if let (Content::Text(original_text), Content::Text(deserialized_text)) =
+                        (&original_results[1], &deserialized_results[1])
+                    {
+                        assert_eq!(original_text.text, deserialized_text.text);
+                        assert_eq!(original_text.audience, deserialized_text.audience);
+                        assert_eq!(original_text.priority, deserialized_text.priority);
+                    }
+                } else {
+                    panic!("Tool result is not Ok");
+                }
             } else {
                 panic!("Deserialized content is not a tool response");
             }
