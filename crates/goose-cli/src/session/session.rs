@@ -69,7 +69,7 @@ impl<'a> Session<'a> {
 
     pub async fn headless_start(
         &mut self,
-        initial_message: Box<String>,
+        initial_message: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.setup_session();
 

@@ -1,5 +1,5 @@
 use rand::{distributions::Alphanumeric, Rng};
-use std::path::PathBuf;
+use std::path::Path;
 
 use goose::agent::Agent;
 use goose::models::message::Message;
@@ -90,7 +90,7 @@ fn session_name_or_rand(session: Option<String>) -> String {
 }
 
 // For auto-generated names, try up to 5 times to get a unique name
-fn generate_new_session_name(session_dir: &PathBuf) -> String {
+fn generate_new_session_name(session_dir: &Path) -> String {
     let mut attempts = 0;
     let max_attempts = 5;
 

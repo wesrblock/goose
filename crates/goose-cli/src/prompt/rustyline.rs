@@ -76,7 +76,7 @@ impl ToolRenderer for DefaultRenderer {
                 let tool_header = format!(
                     "─── {} | {} ──────────────────────────",
                     style(parts.get(1).unwrap_or(&"unknown")),
-                    style(parts.get(0).unwrap_or(&"unknown")).magenta().dim(),
+                    style(parts.first().unwrap_or(&"unknown")).magenta().dim(),
                 );
                 print_newline();
                 println!("{}", tool_header);

@@ -155,7 +155,7 @@ async fn main() -> Result<()> {
             let contents = std::fs::read_to_string(file_path).expect("Failed to read the file");
 
             let mut session = build_session(session, profile, resume);
-            let _ = session.headless_start(Box::new(contents.clone())).await;
+            let _ = session.headless_start(contents.clone()).await;
             return Ok(());
         }
         None => {
