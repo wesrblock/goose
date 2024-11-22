@@ -5,8 +5,8 @@ import Plus from './ui/Plus';
 import X from './ui/X';
 
 const TAB_MIN_WIDTH = 80; // Minimum width a tab can shrink to
-const TAB_MAX_WIDTH = 135; // Current fixed width
-const CONTAINER_PADDING = 100; // Current ml-[100px]
+const TAB_MAX_WIDTH = 135; // Maximum/default tab width
+const CONTAINER_PADDING = 100; // Left padding of the tabs container
 
 function calculateTabWidths(containerWidth: number, tabCount: number) {
   const availableWidth = containerWidth - CONTAINER_PADDING;
@@ -59,7 +59,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
     return () => window.removeEventListener('resize', updateTabWidths);
   }, [chats.length]);
 
-  // Generate SVG path based on tab width
+  // Generate SVG path for tab shape - this creates the curved tab design
   const generatePath = (width: number) => {
     const curve = Math.min(25, width * 0.2); // Scale curve with width
     const innerWidth = width - (curve * 2);
@@ -71,7 +71,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
       C${curve + innerWidth - 4.9249} 0 ${curve + innerWidth} 4.92487 ${curve + innerWidth} 11
       V13
       C${curve + innerWidth} 19.0751 ${curve + innerWidth + 4.925} 24 ${curve + innerWidth + 11} 24
-      H${width + 11.5}H0H${curve - 11}
+      H${width - 2}H0H${curve - 11}
       C${curve - 4.9249} 24 ${curve} 19.0751 ${curve} 13
       V11Z
     `;
@@ -142,31 +142,45 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
               />
             </svg>
             
-            <div className="relative z-10 flex items-center justify-between w-full px-2">
+            <div className="relative z-10 flex items-center w-full">
               <span 
                 className="tab-type truncate ml-6" 
                 style={{ 
-                  maxWidth: tabWidth - 45  // Adjusted since we removed plus button
+                  maxWidth: tabWidth - 20  // Reserves some space for the X button so it does not overlap with tab name
                 }}
               >
                 {chat.title}
               </span>
+
+              {/* X (Close) Button Container
+               * - Shown only when there's more than one tab
+               * - Absolutely positioned within the tab
+               * - right-3: positions 12px from right edge
+               * - Centered vertically with top-1/2 and -translate-y-1/2
+               */}
               {chats.length > 1 && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeChat(chat.id);
-                  }}
-                  className="mr-2"
-                >
-                  <X size={12} />
-                </button>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {/* X Button
+                   * - Fixed size of 16x16px
+                   * - Centered icon within button
+                   * - Icon size of 12px
+                   * - Stops click event from triggering tab selection
+                   */}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeChat(chat.id);
+                    }}
+                    className="flex items-center justify-center w-[16px] h-[16px]"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
               )}
             </div>
           </div>
         ))}
 
-        {/* New Plus button outside of tabs */}
         <button 
           onClick={addChat}
           className="flex items-center justify-center h-[32px] w-[32px] ml-2"
