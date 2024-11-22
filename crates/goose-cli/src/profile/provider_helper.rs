@@ -1,10 +1,12 @@
 use crate::inputs::inputs::get_env_value_or_input;
-use goose::providers::configs::{DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig};
+use goose::providers::configs::{DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig};
 use goose::providers::factory::ProviderType;
+use goose::providers::ollama::OLLAMA_HOST;
 use strum::IntoEnumIterator;
 
 pub const PROVIDER_OPEN_AI: &str = "openai";
 pub const PROVIDER_DATABRICKS: &str = "databricks";
+pub const PROVIDER_OLLAMA: &str = "ollama";
 
 pub fn select_provider_lists() -> Vec<(&'static str, String, &'static str)> {
     ProviderType::iter()
@@ -15,6 +17,7 @@ pub fn select_provider_lists() -> Vec<(&'static str, String, &'static str)> {
                 "Recommended",
             ),
             ProviderType::Databricks => (PROVIDER_DATABRICKS, PROVIDER_DATABRICKS.to_string(), ""),
+            ProviderType::Ollama => (PROVIDER_OLLAMA, PROVIDER_OLLAMA.to_string(), "")
         })
         .collect()
 }
@@ -43,6 +46,13 @@ pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig
                 "Please enter your Databricks token:",
                 true,
             ),
+            model,
+            temperature: None,
+            max_tokens: None,
+        }),
+        PROVIDER_OLLAMA => ProviderConfig::Ollama(OllamaProviderConfig {
+            host: std::env::var("OLLAMA_HOST")
+                .unwrap_or_else(|_| String::from(OLLAMA_HOST)),
             model,
             temperature: None,
             max_tokens: None,
