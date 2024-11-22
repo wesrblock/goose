@@ -4,6 +4,13 @@ import { useNavigate } from 'react-router-dom'
 import Plus from './ui/Plus';
 import X from './ui/X';
 
+// Extending React CSSProperties to include custom webkit property
+declare module 'react' {
+  interface CSSProperties {
+    WebkitAppRegion?: string;  // Now TypeScript knows about WebkitAppRegion
+  }
+}
+
 // Core layout constants
 const TAB_MIN_WIDTH = 80;    // Tabs won't shrink smaller than this
 const TAB_MAX_WIDTH = 140;   // Default/maximum tab width
@@ -140,7 +147,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
 
   return (
     // Outer container - full width with relative positioning for scroll buttons
-    <div className="relative w-full">
+    <div className="relative w-full" style={{ WebkitAppRegion: 'drag' }}>
       {/* Left scroll button - only visible when tabs overflow */}
       {needsScroll && (
         <button className="absolute left-[70px] top-1/2 -translate-y-1/2 z-20">
@@ -148,7 +155,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
         </button>
       )}
       
-      {/* Main tabs container - includes 100px left margin */}
+      {/* Main tabs container - includes 50px left margin */}
       <div 
         ref={containerRef} 
         className={`
@@ -157,10 +164,13 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
         `}
       >
         {/* Individual tab rendering */}
-        {chats.map((chat, idx) => (
+        {chats.map((chat) => (
           <div
             key={chat.id}
-            style={{ width: tabWidth }}  // Dynamic width based on available space
+            style={{
+              width: tabWidth,
+              WebkitAppRegion: 'no-drag'
+            }}
             className="relative flex items-center h-[32px] mr-1 cursor-pointer transition-all group"
             onClick={() => navigateChat(chat.id)}
             onKeyDown={(e) => e.key === "Enter" && navigateChat(chat.id)}
@@ -197,6 +207,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
                         removeChat(chat.id);
                       }}
                       className="align-middle ml-[20px] w-[16px] h-[16px]"
+                      style={{ WebkitAppRegion: 'no-drag' }}
                   >
                       <X size={12} />
                     </button>
@@ -211,6 +222,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
           onClick={addChat}
           className="flex items-center justify-center h-[32px] w-[32px]"
           aria-label="New chat"
+          style={{ WebkitAppRegion: 'no-drag' }}
         >
           <Plus size={18} />
         </button>
