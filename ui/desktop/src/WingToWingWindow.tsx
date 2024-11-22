@@ -67,9 +67,8 @@ export default function WingToWingWindow() {
   }, [messages]);
 
   const handleOpenChat = () => {
-    // Create URL with chat history
-    const chatHistory = encodeURIComponent(JSON.stringify(messages));
-    window.open(`/chat/1?history=${chatHistory}`, '_blank');
+    // Send message to main process to transition this window
+    window.electron.transitionToChat(messages);
   };
 
   return (
