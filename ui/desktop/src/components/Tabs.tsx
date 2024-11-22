@@ -72,6 +72,29 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
     }
   }, [chats]); // Trigger when chats array changes
 
+  // Add this effect alongside the other useEffects
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // Prevent the default vertical scroll
+      e.preventDefault();
+
+      // Convert vertical scroll to horizontal
+      // You can adjust the multiplier (30) to change scroll speed
+      container.scrollLeft += e.deltaY * 0.5;
+    };
+
+    // Add event listener
+    container.addEventListener('wheel', handleWheel, { passive: false });
+
+    // Cleanup
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, []); // Empty dependency array since we only need to set this up once
+
   // SVG path generator for tab shape
   const generatePath = (width: number) => {
     const curve = Math.min(25, width * 0.2); // Scale curve with width
