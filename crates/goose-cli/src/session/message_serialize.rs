@@ -43,6 +43,10 @@ pub enum SerializableToolResult {
 pub enum SerializableContent {
     Text {
         text: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        audience: Option<Vec<Role>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        priority: Option<f32>,
     },
     ToolRequest {
         id: String,
@@ -56,10 +60,13 @@ pub enum SerializableContent {
     Image {
         // data: &'a str, // Don't serialize image data until further discussion.
         mime_type: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        audience: Option<Vec<Role>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        priority: Option<f32>,
     },
 }
 
-// TODO: Handle audience and priority attributes
 impl<'a> From<&'a Message> for SerializableMessage<'a> {
     fn from(msg: &'a Message) -> Self {
         let role = match msg.role {
@@ -76,6 +83,8 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
             .map(|content| match content {
                 MessageContent::Text(text) => SerializableContent::Text {
                     text: text.text.to_string(),
+                    audience: text.audience.clone(),
+                    priority: text.priority,
                 },
                 MessageContent::ToolRequest(req) => match &req.tool_call {
                     Ok(tool_call) => SerializableContent::ToolRequest {
@@ -85,6 +94,8 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
                     },
                     Err(e) => SerializableContent::Text {
                         text: format!("{{\"error\": \"{}\"}}", e), // TODO: Explore this interaction.
+                        audience: None,
+                        priority: None,
                     },
                 },
                 MessageContent::ToolResponse(resp) => SerializableContent::ToolResponse {
@@ -121,6 +132,9 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
                 },
                 MessageContent::Image(img) => SerializableContent::Image {
                     mime_type: img.mime_type.clone(),
+                    // data: img.data.as_str(),
+                    audience: img.audience.clone(),
+                    priority: img.priority,
                 },
             })
             .collect();
@@ -133,7 +147,6 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
     }
 }
 
-// TODO: Handle audience and priority attributes
 pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
     let reader = io::BufReader::new(file);
     let mut messages = Vec::new();
@@ -152,10 +165,14 @@ pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
             .content
             .into_iter()
             .map(|c| match c {
-                SerializableContent::Text { text } => MessageContent::Text(TextContent {
+                SerializableContent::Text {
                     text,
-                    audience: None,
-                    priority: None,
+                    audience,
+                    priority,
+                } => MessageContent::Text(TextContent {
+                    text,
+                    audience,
+                    priority,
                 }),
                 SerializableContent::ToolRequest {
                     id,
@@ -197,11 +214,15 @@ pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
                             .collect()),
                     })
                 }
-                SerializableContent::Image { mime_type } => MessageContent::Image(ImageContent {
+                SerializableContent::Image {
+                    mime_type,
+                    audience,
+                    priority,
+                } => MessageContent::Image(ImageContent {
                     mime_type,
                     data: String::new(),
-                    audience: None,
-                    priority: None,
+                    audience,
+                    priority,
                 }),
             })
             .collect();
@@ -243,8 +264,8 @@ mod tests {
             created: now,
             content: vec![MessageContent::Text(TextContent {
                 text: "Hello, world!".to_string(),
-                audience: None,
-                priority: None,
+                audience: Some(vec![Role::User]),
+                priority: Some(1.0),
             })],
         }];
 
@@ -255,6 +276,8 @@ mod tests {
         if let MessageContent::Text(text) = &messages[0].content[0] {
             if let MessageContent::Text(deserialized_text) = &deserialized[0].content[0] {
                 assert_eq!(text.text, deserialized_text.text);
+                assert_eq!(text.audience, deserialized_text.audience);
+                assert_eq!(text.priority, deserialized_text.priority);
             } else {
                 panic!("Deserialized content is not text");
             }
