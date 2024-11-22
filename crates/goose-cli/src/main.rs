@@ -8,7 +8,6 @@ mod inputs;
 mod profile;
 mod prompt;
 mod session {
-    pub mod message_serialize;
     pub mod session;
     pub mod session_file;
 }

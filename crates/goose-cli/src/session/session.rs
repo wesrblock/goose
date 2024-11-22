@@ -10,7 +10,7 @@ use goose::developer::DeveloperSystem;
 use goose::models::message::Message;
 use goose::models::role::Role;
 
-use super::message_serialize::deserialize_messages;
+use super::session_file::deserialize_messages;
 
 pub struct Session<'a> {
     agent: Box<Agent>,
