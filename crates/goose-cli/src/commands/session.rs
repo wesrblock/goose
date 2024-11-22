@@ -16,6 +16,7 @@ use crate::prompt::rustyline::RustylinePrompt;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
+// TODO: Add resume session bool, this will allow a session to match an existing file.
 pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Box<Session<'a>> {
     let session_name = session_name(session);
     let session_file: PathBuf = ensure_session_dir()
@@ -58,7 +59,7 @@ fn session_name(session: Option<String>) -> String {
         Some(name) => name.to_lowercase(),
         None => rand::thread_rng()
             .sample_iter(&Alphanumeric)
-            .take(4)
+            .take(8)
             .map(char::from)
             .collect::<String>()
             .to_lowercase(),

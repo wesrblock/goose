@@ -27,6 +27,7 @@ pub enum SerializableContent {
         text: String,
     },
     ToolRequest {
+        id: String,
         tool_name: String,
         arguments: serde_json::Value,
     },
@@ -59,6 +60,7 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
                     },
                     MessageContent::ToolRequest(req) => match &req.tool_call {
                         Ok(tool_call) => SerializableContent::ToolRequest {
+                            id: req.id.clone(),
                             tool_name: tool_call.name.clone(),
                             arguments: tool_call.arguments.clone(),
                         },
@@ -113,9 +115,9 @@ pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
                         priority: None,
                     })
                 },
-                SerializableContent::ToolRequest { tool_name, arguments } => {
+                SerializableContent::ToolRequest { id, tool_name, arguments } => {
                     MessageContent::ToolRequest(ToolRequest {
-                        id: "test".to_string(),
+                        id,
                         tool_call: Ok(ToolCall {
                             name: tool_name,
                             arguments,
@@ -216,7 +218,7 @@ mod tests {
             role: Role::Assistant,
             created: now,
             content: vec![MessageContent::ToolRequest(ToolRequest {
-                id: "test".to_string(),
+                id: "magic".to_string(),
                 tool_call: Ok(ToolCall {
                     name: "test_tool".to_string(),
                     arguments: json!({"arg": "value"}),
@@ -231,6 +233,7 @@ mod tests {
         if let MessageContent::ToolRequest(req) = &messages[0].content[0] {
             if let MessageContent::ToolRequest(deserialized_req) = &deserialized[0].content[0] {
                 if let (Ok(call), Ok(deserialized_call)) = (&req.tool_call, &deserialized_req.tool_call) {
+                    assert_eq!(req.id, deserialized_req.id);
                     assert_eq!(call.name, deserialized_call.name);
                     assert_eq!(call.arguments, deserialized_call.arguments);
                 } else {
