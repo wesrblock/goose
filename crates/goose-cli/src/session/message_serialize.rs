@@ -40,6 +40,7 @@ pub enum SerializableContent {
     },
 }
 
+// TODO: Handle audience and priority attributes
 impl<'a> From<&'a Message> for SerializableMessage<'a> {
     fn from(msg: &'a Message) -> Self {
         let role = match msg.role {
@@ -92,6 +93,7 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
     }
 }
 
+// TODO: Handle audience and priority attributes
 pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
     let reader = io::BufReader::new(file);
     let mut messages = Vec::new();
