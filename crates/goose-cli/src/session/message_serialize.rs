@@ -5,7 +5,6 @@ use serde_json;
 use std::fs::File;
 use std::io::{self, BufRead};
 
-use goose::errors::AgentError;
 use goose::models::content::{Content, ImageContent, TextContent};
 use goose::models::message::{Message, MessageContent};
 use goose::models::message::{ToolRequest, ToolResponse};
@@ -71,8 +70,14 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
                 MessageContent::ToolResponse(resp) => SerializableContent::ToolResponse {
                     id: resp.id.clone(),
                     tool_result: match &resp.tool_result {
-                        Ok(content) => serde_json::to_string(content).unwrap(),
-                        Err(e) => format!("{{\"error\": \"{}\"}}", e), // TODO: Explore this interaction.
+                        Ok(content) => {
+                            if let Some(Content::Text(text_content)) = content.first() {
+                                text_content.text.clone()
+                            } else {
+                                "".to_string()
+                            }
+                        }
+                        Err(e) => format!("{{\"error\": \"{}\"}}", e),
                     },
                 },
                 MessageContent::Image(img) => SerializableContent::Image {
@@ -127,15 +132,11 @@ pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
                 SerializableContent::ToolResponse { id, tool_result } => {
                     MessageContent::ToolResponse(ToolResponse {
                         id,
-                        tool_result: serde_json::from_str(&tool_result)
-                            .map(|v: serde_json::Value| {
-                                vec![Content::Text(TextContent {
-                                    text: v.to_string(),
-                                    audience: None,
-                                    priority: None,
-                                })]
-                            })
-                            .map_err(|e| AgentError::Internal(e.to_string())),
+                        tool_result: Ok(vec![Content::Text(TextContent {
+                            text: tool_result.trim_matches('"').to_string(),
+                            audience: None,
+                            priority: None,
+                        })]),
                     })
                 }
                 SerializableContent::Image { mime_type } => MessageContent::Image(ImageContent {
@@ -273,7 +274,7 @@ mod tests {
         if let MessageContent::ToolResponse(resp) = &messages[0].content[0] {
             if let MessageContent::ToolResponse(deserialized_resp) = &deserialized[0].content[0] {
                 assert_eq!(resp.id, deserialized_resp.id);
-                assert!(resp.tool_result.is_ok());
+                assert_eq!(resp.tool_result, deserialized_resp.tool_result);
                 assert!(deserialized_resp.tool_result.is_ok());
             } else {
                 panic!("Deserialized content is not a tool response");
