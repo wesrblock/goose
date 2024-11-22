@@ -12,9 +12,6 @@ declare module 'react' {
   }
 }
 
-// Your component code...
-
-
 export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChats }) {
   const navigate = useNavigate()
   const navigateChat = (chatId: number) => {
