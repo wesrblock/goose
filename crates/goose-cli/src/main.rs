@@ -134,7 +134,11 @@ async fn main() -> Result<()> {
                 return Ok(());
             }
         },
-        Some(Command::Session { session, profile, resume }) => {
+        Some(Command::Session {
+            session,
+            profile,
+            resume,
+        }) => {
             let mut session = build_session(session, profile, resume);
             let _ = session.start().await;
             return Ok(());
@@ -143,7 +147,7 @@ async fn main() -> Result<()> {
             instructions,
             profile,
             session,
-            resume
+            resume,
         }) => {
             let file_name =
                 instructions.expect("Instruction file is required (--instructions <file_path>)");

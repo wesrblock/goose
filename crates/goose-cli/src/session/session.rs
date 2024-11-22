@@ -23,7 +23,10 @@ impl<'a> Session<'a> {
     pub fn new(agent: Box<Agent>, prompt: Box<dyn Prompt + 'a>, session_file: PathBuf) -> Self {
         let messages = match readable_session_file(&session_file) {
             Ok(file) => deserialize_messages(file).unwrap_or_else(|e| {
-                eprintln!("Failed to read messages from session file. Starting fresh.\n{}", e);
+                eprintln!(
+                    "Failed to read messages from session file. Starting fresh.\n{}",
+                    e
+                );
                 Vec::<Message>::new()
             }),
             Err(e) => {
@@ -70,7 +73,8 @@ impl<'a> Session<'a> {
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.setup_session();
 
-        self.messages.push(Message::user().with_text(initial_message.as_str()));
+        self.messages
+            .push(Message::user().with_text(initial_message.as_str()));
         persist_messages(&self.session_file, &self.messages)?;
 
         self.agent_process_messages().await;

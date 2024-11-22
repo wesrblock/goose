@@ -25,10 +25,11 @@ pub fn readable_session_file(session_file: &PathBuf) -> Result<File> {
         .write(true)
         .create(true)
         .truncate(false)
-        .open(session_file) {
-            Ok(file) => Ok(file),
-            Err(e) => Err(anyhow::anyhow!("Failed to open session file: {}", e)),
-        }
+        .open(session_file)
+    {
+        Ok(file) => Ok(file),
+        Err(e) => Err(anyhow::anyhow!("Failed to open session file: {}", e)),
+    }
 }
 
 pub fn persist_messages(session_file: &PathBuf, messages: &[Message]) -> Result<()> {

@@ -16,7 +16,11 @@ use crate::prompt::rustyline::RustylinePrompt;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
-pub fn build_session<'a>(session: Option<String>, profile: Option<String>, resume: bool) -> Box<Session<'a>> {
+pub fn build_session<'a>(
+    session: Option<String>,
+    profile: Option<String>,
+    resume: bool,
+) -> Box<Session<'a>> {
     let session_dir = ensure_session_dir().expect("Failed to create session directory");
 
     let session_name = if session.is_none() && !resume {
@@ -28,12 +32,18 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>, resum
 
     // Guard against resuming a non-existent session
     if resume && !session_file.exists() {
-        panic!("Cannot resume session: file {} does not exist", session_file.display());
+        panic!(
+            "Cannot resume session: file {} does not exist",
+            session_file.display()
+        );
     }
 
     // Guard against running a new session with a file that already exists
     if !resume && session_file.exists() {
-        panic!("Session file {} already exists. Use --resume to continue an existing session", session_file.display());
+        panic!(
+            "Session file {} already exists. Use --resume to continue an existing session",
+            session_file.display()
+        );
     }
 
     let loaded_profile = load_profile(profile);
@@ -94,7 +104,10 @@ fn generate_new_session_name(session_dir: &PathBuf) -> String {
 
         attempts += 1;
         if attempts >= max_attempts {
-            panic!("Failed to generate unique session name after {} attempts", max_attempts);
+            panic!(
+                "Failed to generate unique session name after {} attempts",
+                max_attempts
+            );
         }
     }
 }
@@ -138,10 +151,6 @@ mod tests {
         // Set session directory to our temp directory so we don't actually create it.
         std::env::set_var("GOOSE_SESSION_DIR", temp_dir.path());
 
-        build_session(
-            Some("nonexistent-session".to_string()),
-            None,
-            true
-        );
+        build_session(Some("nonexistent-session".to_string()), None, true);
     }
 }
