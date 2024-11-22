@@ -6,8 +6,8 @@ import X from './ui/X';
 
 // Core layout constants
 const TAB_MIN_WIDTH = 80;    // Tabs won't shrink smaller than this
-const TAB_MAX_WIDTH = 135;   // Default/maximum tab width
-const CONTAINER_PADDING = 100; // Left margin for entire tab container
+const TAB_MAX_WIDTH = 140;   // Default/maximum tab width
+const CONTAINER_PADDING = 50; // Left margin for entire tab container
 
 // Calculate how wide each tab should be based on available space
 function calculateTabWidths(containerWidth: number, tabCount: number) {
@@ -152,7 +152,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
       <div 
         ref={containerRef} 
         className={`
-          flex items-center relative pb-0 ml-[100px]
+          flex items-center relative pb-0 ml-[50px]
           ${needsScroll ? 'overflow-x-auto hide-scrollbar' : ''}
         `}
       >
@@ -187,29 +187,21 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
             
               {/* Tab content container - holds title and X button */}
               {/* Adjusted padding on the left side and reduced margin for the close button */}
-              <div className="relative z-10 flex items-center justify-between w-full pl-6 pr-4">
-                {/* Tab title - truncates if too long */}
-                <span className="tab-type truncate">
-                  {chat.title}
-                </span>
-
-                {/* X (Close) Button - only shown when multiple tabs exist */}
-                {/* Position controlled by:
-                * - justify-between on parent div pushes it right
-                * - ml-1 reduces left margin
-                * - flex-shrink-0 prevents button from shrinking
-                */}
-                {chats.length > 1 && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeChat(chat.id);
-                    }}
-                    className="flex items-center justify-center w-[16px] h-[16px] ml-1 flex-shrink-0"
+              <div className="z-10 items-center justify-between w-full m-auto text-center truncate">
+                <span className="tab-type align-middle">
+                  {chat.title}       
+                  {chats.length > 1 && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeChat(chat.id);
+                      }}
+                      className="align-middle ml-[20px] w-[16px] h-[16px]"
                   >
-                    <X size={12} />
-                  </button>
-                )}
+                      <X size={12} />
+                    </button>
+                  )}
+                </span>
               </div>
           </div>
         ))}
@@ -217,7 +209,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
         {/* New tab button - fixed width, positioned after last tab */}
         <button 
           onClick={addChat}
-          className="flex items-center justify-center h-[32px] w-[32px] ml-2"
+          className="flex items-center justify-center h-[32px] w-[32px]"
           aria-label="New chat"
         >
           <Plus size={18} />
