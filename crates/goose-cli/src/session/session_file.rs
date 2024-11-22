@@ -4,7 +4,6 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 
-use crate::session::message_serialize::SerializableMessage;
 use goose::models::message::Message;
 
 pub fn ensure_session_dir() -> Result<PathBuf> {
@@ -42,8 +41,7 @@ pub fn persist_messages_internal(session_file: File, messages: &[Message]) -> Re
     let mut writer = std::io::BufWriter::new(session_file);
 
     for message in messages {
-        let serializable = SerializableMessage::from(message);
-        serde_json::to_writer(&mut writer, &serializable)?;
+        serde_json::to_writer(&mut writer, &message)?;
         writeln!(writer)?;
     }
 

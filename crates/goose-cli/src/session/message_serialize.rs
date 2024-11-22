@@ -1,237 +1,16 @@
 use anyhow::Result;
-use goose::models::tool::ToolCall;
-use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs::File;
 use std::io::{self, BufRead};
 
-use goose::models::content::{Content, ImageContent, TextContent};
-use goose::models::message::{Message, MessageContent};
-use goose::models::message::{ToolRequest, ToolResponse};
-use goose::models::role::Role;
-
-/// A wrapper struct for Message that implements Serialize
-#[derive(Serialize, Deserialize)]
-pub struct SerializableMessage<'a> {
-    pub role: &'a str,
-    pub created: i64,
-    pub content: Vec<SerializableContent>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum SerializableToolResult {
-    Text {
-        text: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        audience: Option<Vec<Role>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        priority: Option<f32>,
-    },
-    Image {
-        mime_type: String,
-        // data: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        audience: Option<Vec<Role>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        priority: Option<f32>,
-    },
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum SerializableContent {
-    Text {
-        text: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        audience: Option<Vec<Role>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        priority: Option<f32>,
-    },
-    ToolRequest {
-        id: String,
-        tool_name: String,
-        arguments: serde_json::Value,
-    },
-    ToolResponse {
-        id: String,
-        tool_results: Vec<SerializableToolResult>,
-    },
-    Image {
-        // data: &'a str, // Don't serialize image data until further discussion.
-        mime_type: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        audience: Option<Vec<Role>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        priority: Option<f32>,
-    },
-}
-
-impl<'a> From<&'a Message> for SerializableMessage<'a> {
-    fn from(msg: &'a Message) -> Self {
-        let role = match msg.role {
-            Role::Assistant => "assistant",
-            Role::User => "user",
-        };
-
-        let created = msg.created;
-
-        // Process all content items
-        let content: Vec<SerializableContent> = msg
-            .content
-            .iter()
-            .map(|content| match content {
-                MessageContent::Text(text) => SerializableContent::Text {
-                    text: text.text.to_string(),
-                    audience: text.audience.clone(),
-                    priority: text.priority,
-                },
-                MessageContent::ToolRequest(req) => match &req.tool_call {
-                    Ok(tool_call) => SerializableContent::ToolRequest {
-                        id: req.id.clone(),
-                        tool_name: tool_call.name.clone(),
-                        arguments: tool_call.arguments.clone(),
-                    },
-                    Err(e) => SerializableContent::Text {
-                        text: format!("{{\"error\": \"{}\"}}", e), // TODO: Explore this interaction.
-                        audience: None,
-                        priority: None,
-                    },
-                },
-                MessageContent::ToolResponse(resp) => SerializableContent::ToolResponse {
-                    id: resp.id.clone(),
-                    tool_results: match &resp.tool_result {
-                        Ok(contents) => contents
-                            .iter()
-                            .filter_map(|content| {
-                                match content {
-                                    Content::Text(text_content) => {
-                                        Some(SerializableToolResult::Text {
-                                            text: text_content.text.clone(),
-                                            audience: text_content.audience.clone(),
-                                            priority: text_content.priority,
-                                        })
-                                    }
-                                    Content::Image(img_content) => {
-                                        Some(SerializableToolResult::Image {
-                                            mime_type: img_content.mime_type.clone(),
-                                            // data: img_content.data.clone(),
-                                            audience: img_content.audience.clone(),
-                                            priority: img_content.priority,
-                                        })
-                                    }
-                                }
-                            })
-                            .collect(),
-                        Err(e) => vec![SerializableToolResult::Text {
-                            text: format!("{{\"error\": \"{}\"}}", e), // TODO: Explore this interaction.
-                            audience: None,
-                            priority: None,
-                        }],
-                    },
-                },
-                MessageContent::Image(img) => SerializableContent::Image {
-                    mime_type: img.mime_type.clone(),
-                    // data: img.data.as_str(),
-                    audience: img.audience.clone(),
-                    priority: img.priority,
-                },
-            })
-            .collect();
-
-        SerializableMessage {
-            role,
-            created,
-            content,
-        }
-    }
-}
+use goose::models::message::Message;
 
 pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
     let reader = io::BufReader::new(file);
     let mut messages = Vec::new();
 
     for line in reader.lines() {
-        let line = line?;
-        let serialized: SerializableMessage = serde_json::from_str(&line)?;
-
-        let role = match serialized.role {
-            "assistant" => Role::Assistant,
-            "user" => Role::User,
-            _ => return Err(anyhow::anyhow!("Invalid role")),
-        };
-
-        let content = serialized
-            .content
-            .into_iter()
-            .map(|c| match c {
-                SerializableContent::Text {
-                    text,
-                    audience,
-                    priority,
-                } => MessageContent::Text(TextContent {
-                    text,
-                    audience,
-                    priority,
-                }),
-                SerializableContent::ToolRequest {
-                    id,
-                    tool_name,
-                    arguments,
-                } => MessageContent::ToolRequest(ToolRequest {
-                    id,
-                    tool_call: Ok(ToolCall {
-                        name: tool_name,
-                        arguments,
-                    }),
-                }),
-                SerializableContent::ToolResponse { id, tool_results } => {
-                    MessageContent::ToolResponse(ToolResponse {
-                        id,
-                        tool_result: Ok(tool_results
-                            .into_iter()
-                            .map(|result| match result {
-                                SerializableToolResult::Text {
-                                    text,
-                                    audience,
-                                    priority,
-                                } => Content::Text(TextContent {
-                                    text,
-                                    audience,
-                                    priority,
-                                }),
-                                SerializableToolResult::Image {
-                                    mime_type,
-                                    audience,
-                                    priority,
-                                } => Content::Image(ImageContent {
-                                    mime_type,
-                                    data: String::new(),
-                                    audience,
-                                    priority,
-                                }),
-                            })
-                            .collect()),
-                    })
-                }
-                SerializableContent::Image {
-                    mime_type,
-                    audience,
-                    priority,
-                } => MessageContent::Image(ImageContent {
-                    mime_type,
-                    data: String::new(),
-                    audience,
-                    priority,
-                }),
-            })
-            .collect();
-
-        messages.push(Message {
-            role,
-            created: serialized.created,
-            content,
-        });
+        messages.push(serde_json::from_str::<Message>(&line?)?);
     }
 
     Ok(messages)
@@ -486,7 +265,7 @@ mod tests {
                         (&original_results[1], &deserialized_results[1])
                     {
                         assert_eq!(original_img.mime_type, deserialized_img.mime_type);
-                        // assert_eq!(original_img.data, deserialized_img.data);
+                        assert_eq!(original_img.data, deserialized_img.data);
                         assert_eq!(original_img.audience, deserialized_img.audience);
                         assert_eq!(original_img.priority, deserialized_img.priority);
                     } else {
@@ -524,7 +303,7 @@ mod tests {
         if let MessageContent::Image(img) = &messages[0].content[0] {
             if let MessageContent::Image(deserialized_img) = &deserialized[0].content[0] {
                 assert_eq!(img.mime_type, deserialized_img.mime_type);
-                // We don't check data since it's not serialized
+                assert_eq!(img.data, deserialized_img.data);
             } else {
                 panic!("Deserialized content is not an image");
             }
