@@ -1,5 +1,7 @@
 use crate::inputs::inputs::get_env_value_or_input;
-use goose::providers::configs::{DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig};
+use goose::providers::configs::{
+    DatabricksAuth, DatabricksProviderConfig, OpenAiProviderConfig, OllamaProviderConfig, ProviderConfig
+};
 use goose::providers::factory::ProviderType;
 use goose::providers::ollama::OLLAMA_HOST;
 use strum::IntoEnumIterator;
@@ -35,21 +37,21 @@ pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig
             temperature: None,
             max_tokens: None,
         }),
-        PROVIDER_DATABRICKS => ProviderConfig::Databricks(DatabricksProviderConfig {
-            host: get_env_value_or_input(
+        PROVIDER_DATABRICKS => {
+            let host = get_env_value_or_input(
                 "DATABRICKS_HOST",
                 "Please enter your Databricks host:",
                 false,
-            ),
-            token: get_env_value_or_input(
-                "DATABRICKS_TOKEN",
-                "Please enter your Databricks token:",
-                true,
-            ),
-            model,
-            temperature: None,
-            max_tokens: None,
-        }),
+            );
+            ProviderConfig::Databricks(DatabricksProviderConfig {
+                host: host.clone(),
+                // TODO revisit configuration
+                auth: DatabricksAuth::oauth(host),
+                model,
+                temperature: None,
+                max_tokens: None,
+            })
+        }
         PROVIDER_OLLAMA => ProviderConfig::Ollama(OllamaProviderConfig {
             host: std::env::var("OLLAMA_HOST")
                 .unwrap_or_else(|_| String::from(OLLAMA_HOST)),

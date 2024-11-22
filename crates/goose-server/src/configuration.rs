@@ -1,7 +1,7 @@
 use crate::error::{to_env_var, ConfigError};
 use config::{Config, Environment};
 use goose::providers::{
-    configs::{DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig},
+    configs::{DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig},
     factory::ProviderType,
     ollama,
 };
@@ -41,7 +41,6 @@ pub enum ProviderSettings {
     Databricks {
         #[serde(default = "default_databricks_host")]
         host: String,
-        token: String,
         #[serde(default = "default_model")]
         model: String,
         #[serde(default)]
@@ -90,13 +89,12 @@ impl ProviderSettings {
             }),
             ProviderSettings::Databricks {
                 host,
-                token,
                 model,
                 temperature,
                 max_tokens,
             } => ProviderConfig::Databricks(DatabricksProviderConfig {
-                host,
-                token,
+                host: host.clone(),
+                auth: DatabricksAuth::oauth(host),
                 model,
                 temperature,
                 max_tokens,
@@ -257,7 +255,6 @@ mod tests {
     fn test_databricks_settings() {
         clean_env();
         env::set_var("GOOSE_PROVIDER__TYPE", "databricks");
-        env::set_var("GOOSE_PROVIDER__TOKEN", "test-token");
         env::set_var("GOOSE_PROVIDER__HOST", "https://custom.databricks.com");
         env::set_var("GOOSE_PROVIDER__MODEL", "llama-2-70b");
         env::set_var("GOOSE_PROVIDER__TEMPERATURE", "0.7");
@@ -266,14 +263,12 @@ mod tests {
         let settings = Settings::new().unwrap();
         if let ProviderSettings::Databricks {
             host,
-            token,
             model,
             temperature,
             max_tokens,
         } = settings.provider
         {
             assert_eq!(host, "https://custom.databricks.com");
-            assert_eq!(token, "test-token");
             assert_eq!(model, "llama-2-70b");
             assert_eq!(temperature, Some(0.7));
             assert_eq!(max_tokens, Some(2000));
@@ -283,7 +278,6 @@ mod tests {
 
         // Clean up
         env::remove_var("GOOSE_PROVIDER__TYPE");
-        env::remove_var("GOOSE_PROVIDER__TOKEN");
         env::remove_var("GOOSE_PROVIDER__HOST");
         env::remove_var("GOOSE_PROVIDER__MODEL");
         env::remove_var("GOOSE_PROVIDER__TEMPERATURE");
