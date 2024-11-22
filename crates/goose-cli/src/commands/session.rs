@@ -16,12 +16,15 @@ use crate::prompt::rustyline::RustylinePrompt;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
-// TODO: Add resume session bool, this will allow a session to match an existing file.
-pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Box<Session<'a>> {
+pub fn build_session<'a>(session: Option<String>, profile: Option<String>, resume: bool) -> Box<Session<'a>> {
     let session_name = session_name(session);
     let session_file: PathBuf = ensure_session_dir()
         .expect("Failed to create session directory")
         .join(format!("{}.jsonl", session_name));
+
+    if resume && !session_file.exists() {
+        panic!("Cannot resume session: file {} does not exist", session_file.display());
+    }
 
     let loaded_profile = load_profile(profile);
 
@@ -91,4 +94,24 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
         }
     };
     loaded_profile
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    #[should_panic(expected = "Cannot resume session: file")]
+    fn test_resume_nonexistent_session_panics() {
+        let temp_dir = tempdir().unwrap();
+        // Set session directory to our temp directory so we don't actually create it.
+        std::env::set_var("GOOSE_SESSION_DIR", temp_dir.path());
+
+        build_session(
+            Some("nonexistent-session".to_string()),
+            None,
+            true
+        );
+    }
 }
