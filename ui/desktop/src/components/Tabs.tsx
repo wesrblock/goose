@@ -4,6 +4,17 @@ import { useNavigate } from 'react-router-dom'
 import Plus from './ui/Plus';
 import X from './ui/X';
 
+
+// Extending React CSSProperties to include custom webkit property
+declare module 'react' {
+  interface CSSProperties {
+    WebkitAppRegion?: string;  // Now TypeScript knows about WebkitAppRegion
+  }
+}
+
+// Your component code...
+
+
 export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChats }) {
   const navigate = useNavigate()
   const navigateChat = (chatId: number) => {
@@ -29,7 +40,8 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
   };
 
   return (
-    <div className="flex flex-0 items-center justify-start relative pb-0 w-full ml-[100px]">
+    <div className="flex flex-0 items-center justify-start relative pb-0 w-full ml-[100px] select-none" 
+         style={{ WebkitAppRegion: 'drag' as React.CSSProperties }}>
       {chats.map((chat, idx) => (
         <div
           key={chat.id}
@@ -39,6 +51,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
           tabIndex={0}
           role="tab"
           aria-selected={selectedChatId === chat.id}
+          style={{ WebkitAppRegion: 'no-drag' as React.CSSProperties }}
         >
           <svg 
             xmlns="http://www.w3.org/2000/svg" 
@@ -64,6 +77,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
                   removeChat(chat.id);
                 }}
                 aria-label={`Close chat ${chat.id}`}
+                style={{ WebkitAppRegion: 'no-drag' }}
               >
                 <X size={12} />
               </button>
@@ -73,6 +87,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
                 onClick={addChat}
                 aria-label="New chat"
                 className="absolute left-[130px]"
+                style={{ WebkitAppRegion: 'no-drag' as React.CSSProperties }}
               >
                 <Plus size={18} />
               </button>
