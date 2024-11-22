@@ -19,12 +19,23 @@ pub struct SerializableMessage<'a> {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct SerializableToolResult {
-    pub text: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub audience: Option<Vec<Role>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub priority: Option<f32>,
+#[serde(tag = "type")]
+pub enum SerializableToolResult {
+    Text {
+        text: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        audience: Option<Vec<Role>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        priority: Option<f32>,
+    },
+    Image {
+        mime_type: String,
+        // data: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        audience: Option<Vec<Role>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        priority: Option<f32>,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -82,18 +93,26 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
                         Ok(contents) => contents
                             .iter()
                             .filter_map(|content| {
-                                if let Content::Text(text_content) = content {
-                                    Some(SerializableToolResult {
-                                        text: text_content.text.clone(),
-                                        audience: text_content.audience.clone(),
-                                        priority: text_content.priority,
-                                    })
-                                } else {
-                                    None // Skip non-text content for now
+                                match content {
+                                    Content::Text(text_content) => {
+                                        Some(SerializableToolResult::Text {
+                                            text: text_content.text.clone(),
+                                            audience: text_content.audience.clone(),
+                                            priority: text_content.priority,
+                                        })
+                                    }
+                                    Content::Image(img_content) => {
+                                        Some(SerializableToolResult::Image {
+                                            mime_type: img_content.mime_type.clone(),
+                                            // data: img_content.data.clone(),
+                                            audience: img_content.audience.clone(),
+                                            priority: img_content.priority,
+                                        })
+                                    }
                                 }
                             })
                             .collect(),
-                        Err(e) => vec![SerializableToolResult {
+                        Err(e) => vec![SerializableToolResult::Text {
                             text: format!("{{\"error\": \"{}\"}}", e), // TODO: Explore this interaction.
                             audience: None,
                             priority: None,
@@ -154,12 +173,26 @@ pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
                         id,
                         tool_result: Ok(tool_results
                             .into_iter()
-                            .map(|result| {
-                                Content::Text(TextContent {
-                                    text: result.text,
-                                    audience: result.audience,
-                                    priority: result.priority,
-                                })
+                            .map(|result| match result {
+                                SerializableToolResult::Text {
+                                    text,
+                                    audience,
+                                    priority,
+                                } => Content::Text(TextContent {
+                                    text,
+                                    audience,
+                                    priority,
+                                }),
+                                SerializableToolResult::Image {
+                                    mime_type,
+                                    audience,
+                                    priority,
+                                } => Content::Image(ImageContent {
+                                    mime_type,
+                                    data: String::new(),
+                                    audience,
+                                    priority,
+                                }),
                             })
                             .collect()),
                     })
@@ -370,6 +403,73 @@ mod tests {
                 }
             } else {
                 panic!("Deserialized content is not a tool response");
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_persist_tool_response_with_image() -> Result<()> {
+        let temp_file = NamedTempFile::new()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let messages = vec![Message {
+            role: Role::Assistant,
+            created: now,
+            content: vec![MessageContent::ToolResponse(ToolResponse {
+                id: "test_id".to_string(),
+                tool_result: Ok(vec![
+                    Content::Text(TextContent {
+                        text: "text result".to_string(),
+                        audience: None,
+                        priority: None,
+                    }),
+                    Content::Image(ImageContent {
+                        mime_type: "image/png".to_string(),
+                        data: "base64data".to_string(),
+                        audience: Some(vec![Role::User]),
+                        priority: Some(1.0),
+                    }),
+                ]),
+            })],
+        }];
+
+        persist_messages_internal(temp_file.reopen()?, &messages)?;
+        let deserialized = deserialize_messages(temp_file.reopen()?)?;
+
+        assert_eq!(messages.len(), deserialized.len());
+        if let MessageContent::ToolResponse(resp) = &messages[0].content[0] {
+            if let MessageContent::ToolResponse(deserialized_resp) = &deserialized[0].content[0] {
+                assert_eq!(resp.id, deserialized_resp.id);
+                if let (Ok(original_results), Ok(deserialized_results)) =
+                    (&resp.tool_result, &deserialized_resp.tool_result)
+                {
+                    assert_eq!(original_results.len(), deserialized_results.len());
+
+                    // Check text content
+                    if let (Content::Text(original_text), Content::Text(deserialized_text)) =
+                        (&original_results[0], &deserialized_results[0])
+                    {
+                        assert_eq!(original_text.text, deserialized_text.text);
+                    } else {
+                        panic!("First result is not text content");
+                    }
+
+                    // Check image content
+                    if let (Content::Image(original_img), Content::Image(deserialized_img)) =
+                        (&original_results[1], &deserialized_results[1])
+                    {
+                        assert_eq!(original_img.mime_type, deserialized_img.mime_type);
+                        // assert_eq!(original_img.data, deserialized_img.data);
+                        assert_eq!(original_img.audience, deserialized_img.audience);
+                        assert_eq!(original_img.priority, deserialized_img.priority);
+                    } else {
+                        panic!("Second result is not image content");
+                    }
+                }
             }
         }
         Ok(())
