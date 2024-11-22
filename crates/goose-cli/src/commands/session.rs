@@ -13,6 +13,7 @@ use crate::profile::provider_helper::PROVIDER_OPEN_AI;
 use crate::prompt::cliclack::CliclackPrompt;
 use crate::prompt::prompt::Prompt;
 use crate::prompt::rustyline::RustylinePrompt;
+use crate::prompt::thinking::get_random_goose_action;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
@@ -65,10 +66,11 @@ pub fn build_session<'a>(
     };
 
     prompt.render(Box::new(Message::assistant().with_text(format!(
-        r#"Stretching wings...
+        r#"{}...
     Provider: {}
     Model: {}
     Session file: {}"#,
+        get_random_goose_action(),
         loaded_profile.provider,
         loaded_profile.model,
         session_file.display()
