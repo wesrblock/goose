@@ -65,16 +65,14 @@ impl<'a> From<&'a Message> for SerializableMessage<'a> {
                         arguments: tool_call.arguments.clone(),
                     },
                     Err(e) => SerializableContent::Text {
-                        text: format!("Tool Request Error: {}", e),
+                        text: format!("{{\"error\": \"{}\"}}", e), // TODO: Fix this interaction.
                     },
                 },
                 MessageContent::ToolResponse(resp) => SerializableContent::ToolResponse {
                     id: resp.id.clone(),
                     tool_result: match &resp.tool_result {
-                        Ok(content) => serde_json::to_string(content).unwrap_or_else(|e| {
-                            format!("{{\"error\": \"Failed to serialize: {}\"}}", e)
-                        }),
-                        Err(e) => format!("{{\"error\": \"{}\"}}", e),
+                        Ok(content) => serde_json::to_string(content).unwrap(),
+                        Err(e) => format!("{{\"error\": \"{}\"}}", e), // TODO: Explore this interaction.
                     },
                 },
                 MessageContent::Image(img) => SerializableContent::Image {
