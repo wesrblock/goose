@@ -88,7 +88,7 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
                     "No '{}' profile found. Run configure to create a profile.",
                     PROFILE_DEFAULT_NAME
                 ),
-            }, // Default to the first profile. TODO: Define a constant name for the default profile.
+            },
         }
     };
     loaded_profile

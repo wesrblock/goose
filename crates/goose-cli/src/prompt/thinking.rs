@@ -91,7 +91,6 @@ pub const THINKING_MESSAGES: &[&str] = &[
     "Honking success signals",
     "Waddling through workflows",
     "Nesting in neural networks",
-    
     // AI thinking actions
     "Consulting the digital oracle",
     "Summoning binary spirits",
@@ -260,15 +259,19 @@ pub const THINKING_MESSAGES: &[&str] = &[
     "Processing memory streams",
     "Evaluating logical paths",
     "Building thought graphs",
-    "Scanning neural pathways"
+    "Scanning neural pathways",
 ];
 
 /// Returns a random thinking message from the extended list
 pub fn get_random_thinking_message() -> &'static str {
-    THINKING_MESSAGES.choose(&mut rand::thread_rng()).unwrap_or(&THINKING_MESSAGES[0])
+    THINKING_MESSAGES
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(&THINKING_MESSAGES[0])
 }
 
 /// Returns a random goose-specific action
 pub fn get_random_goose_action() -> &'static str {
-    GOOSE_ACTIONS.choose(&mut rand::thread_rng()).unwrap_or(&GOOSE_ACTIONS[0])
+    GOOSE_ACTIONS
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(&GOOSE_ACTIONS[0])
 }
