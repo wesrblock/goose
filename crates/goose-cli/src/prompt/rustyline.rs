@@ -7,12 +7,15 @@ use anyhow::Result;
 use bat::WrappingMode;
 use cliclack::spinner;
 use console::style;
-use goose::models::content::Content;
 use goose::models::message::{Message, MessageContent, ToolRequest, ToolResponse};
 use goose::models::role::Role;
+use goose::models::{content::Content, tool::ToolCall};
 use serde_json::Value;
 
-use super::{prompt::{Input, InputType, Prompt, Theme}, thinking::get_random_thinking_message};
+use super::{
+    prompt::{Input, InputType, Prompt, Theme},
+    thinking::get_random_thinking_message,
+};
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
 const MAX_STRING_LENGTH: usize = 40;
@@ -44,6 +47,11 @@ impl RustylinePrompt {
         let mut renderers: HashMap<String, Box<dyn ToolRenderer>> = HashMap::new();
         let default_renderer = DefaultRenderer;
         renderers.insert(default_renderer.tool_name(), Box::new(default_renderer));
+        let bash_dev_system_renderer = BashDeveloperSystemRenderer;
+        renderers.insert(
+            bash_dev_system_renderer.tool_name(),
+            Box::new(bash_dev_system_renderer),
+        );
 
         RustylinePrompt {
             spinner: spinner(),
@@ -70,16 +78,7 @@ impl ToolRenderer for DefaultRenderer {
     fn request(&self, tool_request: &ToolRequest, theme: &str) {
         match &tool_request.tool_call {
             Ok(call) => {
-                // Print the tool name with an emoji
-                let parts: Vec<_> = call.name.split("__").collect();
-
-                let tool_header = format!(
-                    "─── {} | {} ──────────────────────────",
-                    style(parts.get(1).unwrap_or(&"unknown")),
-                    style(parts.first().unwrap_or(&"unknown")).magenta().dim(),
-                );
-                print_newline();
-                println!("{}", tool_header);
+                default_print_request_header(call);
 
                 // Format and print the parameters
                 print_params(&call.arguments, 0);
@@ -90,23 +89,68 @@ impl ToolRenderer for DefaultRenderer {
     }
 
     fn response(&self, tool_response: &ToolResponse, theme: &str) {
-        match &tool_response.tool_result {
-            Ok(contents) => {
-                for content in contents {
-                    if content
-                        .audience()
-                        .is_some_and(|audience| !audience.contains(&Role::User))
-                    {
-                        continue;
-                    }
+        default_response_renderer(tool_response, theme);
+    }
+}
 
-                    if let Content::Text(text) = content {
-                        print_markdown(&text.text, theme);
-                    }
+fn default_response_renderer(tool_response: &ToolResponse, theme: &str) {
+    match &tool_response.tool_result {
+        Ok(contents) => {
+            for content in contents {
+                if content
+                    .audience()
+                    .is_some_and(|audience| !audience.contains(&Role::User))
+                {
+                    continue;
                 }
+
+                if let Content::Text(text) = content {
+                    print_markdown(&text.text, theme);
+                }
+            }
+        }
+        Err(e) => print(&e.to_string(), theme),
+    }
+}
+
+fn default_print_request_header(call: &ToolCall) {
+    // Print the tool name with an emoji
+    let parts: Vec<_> = call.name.split("__").collect();
+
+    let tool_header = format!(
+        "─── {} | {} ──────────────────────────",
+        style(parts.get(1).unwrap_or(&"unknown")),
+        style(parts.first().unwrap_or(&"unknown")).magenta().dim(),
+    );
+    print_newline();
+    println!("{}", tool_header);
+}
+struct BashDeveloperSystemRenderer;
+
+impl ToolRenderer for BashDeveloperSystemRenderer {
+    fn tool_name(&self) -> String {
+        "DeveloperSystem__bash".to_string()
+    }
+
+    fn request(&self, tool_request: &ToolRequest, theme: &str) {
+        match &tool_request.tool_call {
+            Ok(call) => {
+                default_print_request_header(call);
+
+                match call.arguments.get("command") {
+                    Some(Value::String(s)) => {
+                        println!("{}: {}", style("command").dim(), style(s).green());
+                    }
+                    _ => print_params(&call.arguments, 0),
+                }
+                print_newline();
             }
             Err(e) => print(&e.to_string(), theme),
         }
+    }
+
+    fn response(&self, tool_response: &ToolResponse, theme: &str) {
+        default_response_renderer(tool_response, theme);
     }
 }
 
@@ -245,7 +289,8 @@ impl Prompt for RustylinePrompt {
 
     fn show_busy(&mut self) {
         self.spinner = spinner();
-        self.spinner.start(format!("{}...", get_random_thinking_message()));
+        self.spinner
+            .start(format!("{}...", get_random_thinking_message()));
     }
 
     fn hide_busy(&self) {

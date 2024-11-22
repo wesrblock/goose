@@ -1,16 +1,20 @@
 // This is a temporary file to simulate some configuration data from the backend
 
-use crate::profile::provider_helper::PROVIDER_OPEN_AI;
+use crate::profile::provider_helper::{PROVIDER_DATABRICKS, PROVIDER_OLLAMA, PROVIDER_OPEN_AI};
+use goose::providers::ollama::OLLAMA_MODEL;
 
 pub struct RecommendedModels {
     pub model: &'static str,
 }
+
 pub fn get_recommended_models(provider_name: &str) -> RecommendedModels {
     if provider_name == PROVIDER_OPEN_AI {
         RecommendedModels { model: "gpt-4o" }
+    } else if provider_name == PROVIDER_DATABRICKS {
+        RecommendedModels { model: "claude-3-5-sonnet-2" }
+    } else if provider_name == PROVIDER_OLLAMA {
+        RecommendedModels { model: OLLAMA_MODEL }
     } else {
-        RecommendedModels {
-            model: "claude-3-5-sonnet-2",
-        }
+        panic!("Invalid provider name");
     }
 }
