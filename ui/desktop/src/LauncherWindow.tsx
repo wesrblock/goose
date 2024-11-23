@@ -5,7 +5,6 @@ declare global {
     electron: {
       hideWindow: () => void;
       createChatWindow: (query: string) => void;
-      createWingToWingWindow: (query: string) => void;
     };
   }
 }
@@ -18,7 +17,7 @@ export default function SpotlightWindow() {
     e.preventDefault();
     if (query.trim()) {
       // Create a new chat window with the query
-      window.electron.createWingToWingWindow(query);
+      window.electron.createChatWindow(query);
       setQuery('');
       inputRef.current.blur()
     }

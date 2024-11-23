@@ -52,48 +52,6 @@ const createLauncher = () => {
   });
 };
 
-const createWingToWing = (query?: string) => {
-  const windowWidth = 575;
-  const windowHeight = 150;
-  const gap = 40;
-
-  const wingToWingWindow = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
-    frame: false,
-    transparent: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-    },
-    skipTaskbar: true,
-    alwaysOnTop: true,
-  });
-
-  // Center on screen
-  const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width } = primaryDisplay.workAreaSize;
-
-  wingToWingWindow.setPosition(
-    Math.round(width - windowWidth - (gap - 25)), // 25 is menu bar height
-    gap
-  );
-
-  let queryParam = '?window=wingToWing';
-  queryParam += query ? `&initialQuery=${encodeURIComponent(query)}` : '';
-  queryParam += '#/wingToWing';
-
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    wingToWingWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${queryParam}`);
-  } else {
-    wingToWingWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-      { search: queryParam.slice(1) }
-    );
-  }
-
-  // wingToWingWindow.webContents.openDevTools({ mode: 'detach' })
-};
 
 const createChat = (query?: string) => {
   const isDev = process.env.NODE_ENV === 'development';
@@ -226,50 +184,7 @@ app.whenReady().then(() => {
     createChat(query);
   });
 
-  ipcMain.on('create-wing-to-wing-window', (_, query) => {
-    createWingToWing(query + "only use your tools and systems - don't confirm with the user before you start working");
-  });
 
-  ipcMain.on('transition-to-chat', (event, messages) => {
-    // Get the current window that sent the event
-    const currentWindow = BrowserWindow.fromWebContents(event.sender);
-    if (!currentWindow) return;
-
-    // Get the current window position
-    const bounds = currentWindow.getBounds();
-
-    // Create a new chat window at the same position
-    const chatWindow = new BrowserWindow({
-      titleBarStyle: 'hidden',
-      trafficLightPosition: { x: 16, y: 18 },
-      width: 530,
-      height: 800,
-      minWidth: 530,
-      minHeight: 800,
-      transparent: true,
-      useContentSize: true,
-      x: bounds.x,
-      y: bounds.y,
-      icon: path.join(__dirname, '../images/icon'),
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-      },
-    });
-
-    // Load the chat window with the messages
-    const queryParam = `?history=${encodeURIComponent(JSON.stringify(messages))}`;
-    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-      chatWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${queryParam}`);
-    } else {
-      chatWindow.loadFile(
-        path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-        { search: queryParam.slice(1) }
-      );
-    }
-
-    // Close the wing-to-wing window
-    currentWindow.close();
-  });
 });
 
 // Quit when all windows are closed, except on macOS.
