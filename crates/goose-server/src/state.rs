@@ -22,7 +22,7 @@ impl Clone for AppState {
                 ProviderConfig::Databricks(config) => ProviderConfig::Databricks(
                     goose::providers::configs::DatabricksProviderConfig {
                         host: config.host.clone(),
-                        token: config.token.clone(),
+                        auth: config.auth.clone(),
                         model: config.model.clone(),
                         temperature: config.temperature,
                         max_tokens: config.max_tokens,
