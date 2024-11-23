@@ -9,25 +9,63 @@ import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import Tabs from './components/Tabs';
+import ToolInvocation from './components/ToolInvocation';
+import { motion, AnimatePresence } from "framer-motion";
 
 export interface Chat {
   id: number;
   title: string;
-  messages: Array<{ id: string; role: "function" | "system" | "user" | "assistant" | "data" | "tool"; content: string }>;
+  messages: Array<{ id: string; role: "function" | "system" | "user" | "assistant" | "data" | "tool"; content: string; toolInvocations?: any[] }>;
 }
 
-function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center w-full h-full">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+  </div>
+);
+
+const ExpandButton = ({ onClick, isExpanded }: { onClick: () => void; isExpanded: boolean }) => (
+  <motion.button
+    onClick={onClick}
+    className="absolute bottom-6 right-6 px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all duration-200 text-base font-medium shadow-md hover:shadow-lg transform hover:-translate-y-0.5 flex items-center gap-2"
+    whileHover={{ scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M18 10c0 4.418-3.582 8-8 8s-8-3.582-8-8 3.582-8 8-8 8 3.582 8 8zm-2 0c0 3.314-2.686 6-6 6s-6-2.686-6-6 2.686-6 6-6 6 2.686 6 6z" clipRule="evenodd" />
+      <path fillRule="evenodd" d="M10 12a1 1 0 01-1-1V7a1 1 0 112 0v4a1 1 0 01-1 1z" clipRule="evenodd" />
+      <path fillRule="evenodd" d="M7 10a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clipRule="evenodd" />
+    </svg>
+    {isExpanded ? 'Minimize' : 'Expand Chat'}
+  </motion.button>
+);
+
+function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId, isExpanded, setIsExpanded }: {
   chats: Chat[],
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
   selectedChatId: number,
-  setSelectedChatId: React.Dispatch<React.SetStateAction<number>>
+  setSelectedChatId: React.Dispatch<React.SetStateAction<number>>,
+  isExpanded: boolean,
+  setIsExpanded: React.Dispatch<React.SetStateAction<boolean>>
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
+  const [isInitialLoading, setIsInitialLoading] = React.useState(true);
+  const [isFinished, setIsFinished] = React.useState(false);
 
   const { messages, input, handleInputChange, handleSubmit, append } = useChat({
     api: getApiUrl("/reply"),
-    initialMessages: chat?.messages || []
+    initialMessages: chat?.messages || [],
+    onFinish: () => {
+      setIsFinished(true);
+    },
   });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Update chat messages when they change
   useEffect(() => {
@@ -37,7 +75,17 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
     setChats(updatedChats);
   }, [messages, selectedChatId]);
 
-  return (
+  const lastToolInvocation = React.useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (message.toolInvocations?.length) {
+        return message.toolInvocations[message.toolInvocations.length - 1];
+      }
+    }
+    return null;
+  }, [messages]);
+
+  const expandedContent = (
     <div className="flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <Tabs
         chats={chats}
@@ -73,6 +121,47 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
       </Card>
     </div>
   );
+
+  const compactContent = (
+    <Card className="w-full h-full flex flex-col items-center justify-center bg-card-gradient border-none shadow-xl rounded-2xl relative">
+      {isInitialLoading ? (
+        <LoadingSpinner />
+      ) : lastToolInvocation && !isFinished ? (
+        <div className="w-full h-full relative">
+          <ToolInvocation
+            key={lastToolInvocation.toolCallId}
+            toolInvocation={lastToolInvocation}
+          />
+        </div>
+      ) : isFinished ? (
+        <div className="flex flex-col items-center justify-center space-y-6">
+          <div className="flex flex-col items-center justify-center gap-2">
+            <div className="text-lg font-medium text-gray-700">Goose has landed</div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-gray-600 text-lg">Goose is getting a running start...</div>
+      )}
+    </Card>
+  );
+
+  return (
+    <div className={`relative ${isExpanded ? 'w-screen h-screen' : 'w-[600px] h-[400px]'} overflow-hidden bg-transparent flex flex-col transition-all duration-300`}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={isExpanded ? 'expanded' : 'compact'}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ duration: 0.2 }}
+          className="w-full h-full"
+        >
+          {isExpanded ? expandedContent : compactContent}
+        </motion.div>
+      </AnimatePresence>
+      <ExpandButton onClick={() => setIsExpanded(!isExpanded)} isExpanded={isExpanded} />
+    </div>
+  );
 }
 
 export default function ChatWindow() {
@@ -81,6 +170,7 @@ export default function ChatWindow() {
   const initialQuery = searchParams.get('initialQuery');
   const historyParam = searchParams.get('history');
   const initialHistory = historyParam ? JSON.parse(decodeURIComponent(historyParam)) : [];
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const [chats, setChats] = useState<Chat[]>(() => {
     const firstChat = {
@@ -99,22 +189,22 @@ export default function ChatWindow() {
   const [selectedChatId, setSelectedChatId] = useState(1);
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
-      <Routes>
-        <Route
-          path="/chat/:id"
-          element={
-            <ChatContent
-              key={selectedChatId}
-              chats={chats}
-              setChats={setChats}
-              selectedChatId={selectedChatId}
-              setSelectedChatId={setSelectedChatId}
-            />
-          }
-        />
-        <Route path="*" element={<Navigate to="/chat/1" replace />} />
-      </Routes>
-    </div>
+    <Routes>
+      <Route
+        path="/chat/:id"
+        element={
+          <ChatContent
+            key={selectedChatId}
+            chats={chats}
+            setChats={setChats}
+            selectedChatId={selectedChatId}
+            setSelectedChatId={setSelectedChatId}
+            isExpanded={isExpanded}
+            setIsExpanded={setIsExpanded}
+          />
+        }
+      />
+      <Route path="*" element={<Navigate to="/chat/1" replace />} />
+    </Routes>
   );
 }
