@@ -1,10 +1,12 @@
 # Goose App
 
-Work in progress on an electron app for Goose. 
+Mac app for Goose. 
 
 ```
+git clone git@github.com:block/goose.git
+cd goose/ui/desktop
 npm install
-export GOOSE_PROVIDER__API_KEY=...
+export GOOSE_PROVIDER__API_KEY=... # OpenAI API Key
 npm start
 ```
 

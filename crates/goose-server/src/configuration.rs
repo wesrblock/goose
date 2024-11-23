@@ -1,8 +1,9 @@
 use crate::error::{to_env_var, ConfigError};
 use config::{Config, Environment};
 use goose::providers::{
-    configs::{DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig},
+    configs::{DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig},
     factory::ProviderType,
+    ollama,
 };
 use serde::Deserialize;
 use std::net::SocketAddr;
@@ -48,6 +49,16 @@ pub enum ProviderSettings {
         #[serde(default)]
         max_tokens: Option<i32>,
     },
+    Ollama {
+        #[serde(default = "default_ollama_host")]
+        host: String,
+        #[serde(default = "default_ollama_model")]
+        model: String,
+        #[serde(default)]
+        temperature: Option<f32>,
+        #[serde(default)]
+        max_tokens: Option<i32>,
+    },
 }
 
 impl ProviderSettings {
@@ -57,6 +68,7 @@ impl ProviderSettings {
         match self {
             ProviderSettings::OpenAi { .. } => ProviderType::OpenAi,
             ProviderSettings::Databricks { .. } => ProviderType::Databricks,
+            ProviderSettings::Ollama { .. } => ProviderType::Ollama,
         }
     }
 
@@ -85,6 +97,17 @@ impl ProviderSettings {
             } => ProviderConfig::Databricks(DatabricksProviderConfig {
                 host,
                 token,
+                model,
+                temperature,
+                max_tokens,
+            }),
+            ProviderSettings::Ollama {
+                host,
+                model,
+                temperature,
+                max_tokens,
+            } => ProviderConfig::Ollama(OllamaProviderConfig {
+                host,
                 model,
                 temperature,
                 max_tokens,
@@ -172,6 +195,14 @@ fn default_databricks_host() -> String {
     "https://api.databricks.com".to_string()
 }
 
+fn default_ollama_host() -> String {
+    ollama::OLLAMA_HOST.to_string()
+}
+
+fn default_ollama_model() -> String {
+    ollama::OLLAMA_MODEL.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,6 +284,40 @@ mod tests {
         // Clean up
         env::remove_var("GOOSE_PROVIDER__TYPE");
         env::remove_var("GOOSE_PROVIDER__TOKEN");
+        env::remove_var("GOOSE_PROVIDER__HOST");
+        env::remove_var("GOOSE_PROVIDER__MODEL");
+        env::remove_var("GOOSE_PROVIDER__TEMPERATURE");
+        env::remove_var("GOOSE_PROVIDER__MAX_TOKENS");
+    }
+
+    #[test]
+    #[serial]
+    fn test_ollama_settings() {
+        clean_env();
+        env::set_var("GOOSE_PROVIDER__TYPE", "ollama");
+        env::set_var("GOOSE_PROVIDER__HOST", "http://custom.ollama.host");
+        env::set_var("GOOSE_PROVIDER__MODEL", "llama2");
+        env::set_var("GOOSE_PROVIDER__TEMPERATURE", "0.7");
+        env::set_var("GOOSE_PROVIDER__MAX_TOKENS", "2000");
+
+        let settings = Settings::new().unwrap();
+        if let ProviderSettings::Ollama {
+            host,
+            model,
+            temperature,
+            max_tokens,
+        } = settings.provider
+        {
+            assert_eq!(host, "http://custom.ollama.host");
+            assert_eq!(model, "llama2");
+            assert_eq!(temperature, Some(0.7));
+            assert_eq!(max_tokens, Some(2000));
+        } else {
+            panic!("Expected Ollama provider");
+        }
+
+        // Clean up
+        env::remove_var("GOOSE_PROVIDER__TYPE");
         env::remove_var("GOOSE_PROVIDER__HOST");
         env::remove_var("GOOSE_PROVIDER__MODEL");
         env::remove_var("GOOSE_PROVIDER__TEMPERATURE");

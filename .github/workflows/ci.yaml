@@ -54,8 +54,24 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-build-
 
+    - name: Install Ollama
+      run: curl -fsSL https://ollama.com/install.sh | sh
+
+    - name: Start Ollama
+      run: |
+          # Run the background, in a way that survives to the next step
+          nohup ollama serve > ollama.log 2>&1 &
+
+          # Block using the ready endpoint
+          time curl --retry 5 --retry-connrefused --retry-delay 1 -sf http://localhost:11434
+
+    - name: Test Ollama model
+      run: ollama run qwen2.5 hello || cat ollama.log
+
     - name: Build the Rust project
       run: cargo build
 
     - name: Run Tests
       run: cargo test --verbose
+      env:
+        OLLAMA_MODEL: "qwen2.5"

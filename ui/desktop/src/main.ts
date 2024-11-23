@@ -83,13 +83,9 @@ const createChat = (query?: string) => {
   }
 
   // DevTools
-  if (isDev) {
-    mainWindow.webContents.openDevTools(); // always in dev
-  } else {
-    globalShortcut.register('Alt+Command+I', () => {
-      mainWindow.webContents.openDevTools(); // key combo in distributed app
-    });
-  }
+  globalShortcut.register('Alt+Command+I', () => {
+    mainWindow.webContents.openDevTools(); // key combo in distributed app
+  });
 };
 
 const createTray = () => {

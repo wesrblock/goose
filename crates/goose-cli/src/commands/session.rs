@@ -1,5 +1,5 @@
 use rand::{distributions::Alphanumeric, Rng};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use goose::agent::Agent;
 use goose::models::message::Message;
@@ -17,11 +17,29 @@ use crate::prompt::thinking::get_random_goose_action;
 use crate::session::session::Session;
 use crate::session::session_file::ensure_session_dir;
 
-pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Box<Session<'a>> {
-    let session_name = session_name(session);
-    let session_file: PathBuf = ensure_session_dir()
-        .expect("Failed to create session directory")
-        .join(format!("{}.jsonl", session_name));
+pub fn build_session<'a>(
+    session: Option<String>,
+    profile: Option<String>,
+    resume: bool,
+) -> Box<Session<'a>> {
+    let session_dir = ensure_session_dir().expect("Failed to create session directory");
+    let session_file = session_path(session.clone(), &session_dir, session.is_none() && !resume);
+
+    // Guard against resuming a non-existent session
+    if resume && !session_file.exists() {
+        panic!(
+            "Cannot resume session: file {} does not exist",
+            session_file.display()
+        );
+    }
+
+    // Guard against running a new session with a file that already exists
+    if !resume && session_file.exists() {
+        panic!(
+            "Session file {} already exists. Use --resume to continue an existing session",
+            session_file.display()
+        );
+    }
 
     let loaded_profile = load_profile(profile);
 
@@ -55,15 +73,50 @@ pub fn build_session<'a>(session: Option<String>, profile: Option<String>) -> Bo
     Box::new(Session::new(agent, prompt, session_file))
 }
 
-fn session_name(session: Option<String>) -> String {
-    match session {
-        Some(name) => name.to_lowercase(),
-        None => rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(4)
-            .map(char::from)
-            .collect::<String>()
-            .to_lowercase(),
+fn session_path(
+    provided_session_name: Option<String>,
+    session_dir: &Path,
+    retry_on_conflict: bool,
+) -> PathBuf {
+    let session_name = provided_session_name.unwrap_or(random_session_name());
+    let session_file = session_dir.join(format!("{}.jsonl", session_name));
+
+    if session_file.exists() && retry_on_conflict {
+        generate_new_session_path(session_dir)
+    } else {
+        session_file
+    }
+}
+
+fn random_session_name() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(8)
+        .map(char::from)
+        .collect::<String>()
+        .to_lowercase()
+}
+
+// For auto-generated names, try up to 5 times to get a unique name
+fn generate_new_session_path(session_dir: &Path) -> PathBuf {
+    let mut attempts = 0;
+    let max_attempts = 5;
+
+    loop {
+        let generated_name = random_session_name();
+        let generated_file = session_dir.join(format!("{}.jsonl", generated_name));
+
+        if !generated_file.exists() {
+            break generated_file;
+        }
+
+        attempts += 1;
+        if attempts >= max_attempts {
+            panic!(
+                "Failed to generate unique session name after {} attempts",
+                max_attempts
+            );
+        }
     }
 }
 
@@ -88,8 +141,24 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
                     "No '{}' profile found. Run configure to create a profile.",
                     PROFILE_DEFAULT_NAME
                 ),
-            }, // Default to the first profile. TODO: Define a constant name for the default profile.
+            },
         }
     };
     loaded_profile
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    #[should_panic(expected = "Cannot resume session: file")]
+    fn test_resume_nonexistent_session_panics() {
+        let temp_dir = tempdir().unwrap();
+        // Set session directory to our temp directory so we don't actually create it.
+        std::env::set_var("GOOSE_SESSION_DIR", temp_dir.path());
+
+        build_session(Some("nonexistent-session".to_string()), None, true);
+    }
 }
