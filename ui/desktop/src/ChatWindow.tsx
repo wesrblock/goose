@@ -24,6 +24,14 @@ const LoadingSpinner = () => (
   </div>
 );
 
+const handleResize = (isExpanded: boolean) => {
+  if (window.electron) {
+    const width = isExpanded ? window.innerWidth : 600;
+    const height = isExpanded ? window.innerHeight : 400;
+    window.electron.resizeWindow(width, height);
+  }
+};
+
 const ExpandButton = ({ onClick, isExpanded }: { onClick: () => void; isExpanded: boolean }) => (
   <motion.button
     onClick={onClick}
@@ -159,7 +167,14 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId, isExp
           {isExpanded ? expandedContent : compactContent}
         </motion.div>
       </AnimatePresence>
-      <ExpandButton onClick={() => setIsExpanded(!isExpanded)} isExpanded={isExpanded} />
+      <ExpandButton 
+        onClick={() => {
+          const newExpanded = !isExpanded;
+          setIsExpanded(newExpanded);
+          handleResize(newExpanded);
+        }} 
+        isExpanded={isExpanded} 
+      />
     </div>
   );
 }

@@ -53,6 +53,10 @@ const createLauncher = () => {
 };
 
 
+// Track windows by ID
+let windowCounter = 0;
+const windowMap = new Map<number, BrowserWindow>();
+
 const createChat = (query?: string) => {
   const isDev = process.env.NODE_ENV === 'development';
 
@@ -85,6 +89,19 @@ const createChat = (query?: string) => {
   // DevTools
   globalShortcut.register('Alt+Command+I', () => {
     mainWindow.webContents.openDevTools(); // key combo in distributed app
+  });
+
+  // Assign window ID and track it
+  const windowId = ++windowCounter;
+  windowMap.set(windowId, mainWindow);
+  
+  // Send the window ID to the renderer
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.send('set-window-id', windowId);
+  });
+
+  mainWindow.on('closed', () => {
+    windowMap.delete(windowId);
   });
 };
 
@@ -146,6 +163,14 @@ const showWindow = () => {
     win.focus();
   });
 };
+
+// Handle window resize requests
+ipcMain.on('resize-window', (_, { windowId, width, height }) => {
+  const window = windowMap.get(windowId);
+  if (window) {
+    window.setSize(width, height);
+  }
+});
 
 app.whenReady().then(() => {
   // Load zsh environment variables in production mode only
