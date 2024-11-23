@@ -21,7 +21,7 @@ export default function MoreMenu({ onStopGoose, onClearContext, onRestartGoose }
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="z-30 block w-[30px] h-[30px] hover:bg-accent hover:text-accent-foreground"
+          className="z-30 block w-[30px] h-[30px]"
           aria-label="Menu"
         >
           <VertDots size={18} />
