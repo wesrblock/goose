@@ -147,7 +147,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
 
   return (
     // Outer container - full width with relative positioning for scroll buttons
-    <div className="relative w-full" style={{ WebkitAppRegion: 'drag' }}>
+    <div className="relative w-full pr-20" style={{ WebkitAppRegion: 'drag' }}>
       {/* Left scroll button - only visible when tabs overflow */}
       {needsScroll && (
         <button className="absolute left-[70px] top-1/2 -translate-y-1/2 z-20">

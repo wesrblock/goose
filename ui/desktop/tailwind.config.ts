@@ -18,8 +18,8 @@ export default {
       },
       backgroundImage: {
         'prev-goose-gradient': 'linear-gradient(89deg, rgba(85, 95, 231, 0.04) 0.16%, rgba(85, 95, 231, 0.20) 99.77%)',
-        'card-gradient': 'linear-gradient(359deg, rgba(255, 255, 255, 0.90) 9.96%, rgba(226, 245, 251, 0.90) 95.35%);',
-        'window-gradient': 'linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0%, rgba(246, 247, 255, 0.55) 100%);'
+        'card-gradient': 'linear-gradient(359deg, rgba(255, 255, 255, 0.90) 9.96%, rgba(226, 245, 251, 0.90) 95.35%)',
+        'window-gradient': 'linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0%, rgba(246, 247, 255, 0.55) 100%)'
       },
       fontSize: {
         14: '14px'
@@ -33,13 +33,15 @@ export default {
 
         'prev-goose-text': '#4E52C5',
 
-        'tool-bold': 'rgba(0, 0, 0, 0.65);',
-        'tool': 'rgba(0, 0, 0, 0.50);',
+        'more-menu': 'rgba(255, 255, 255, 0.95))',
 
-        'tool-result-green': '#028E00;',
-        'tool-card': 'rgba(255, 255, 255, 0.80);',
-        'user-bubble': 'rgba(85, 95, 231, 0.90);',
-        'goose-bubble': 'rgba(0, 0, 0, 0.12);'
+        'tool-bold': 'rgba(0, 0, 0, 0.65)',
+        'tool': 'rgba(0, 0, 0, 0.50)',
+
+        'tool-result-green': '#028E00',
+        'tool-card': 'rgba(255, 255, 255, 0.80)',
+        'user-bubble': 'rgba(85, 95, 231, 0.90)',
+        'goose-bubble': 'rgba(0, 0, 0, 0.12)'
       },
       borderRadius: {
         lg: 'var(--radius)',

@@ -9,6 +9,7 @@ import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import Tabs from './components/Tabs';
+import MoreMenu from './components/MoreMenu';
 
 export interface Chat {
   id: number;
@@ -24,7 +25,7 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  const { messages, input, handleInputChange, handleSubmit, append } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, append, stop } = useChat({
     api: getApiUrl("/reply"),
     initialMessages: chat?.messages || []
   });
@@ -39,14 +40,40 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
 
   return (
     <div className="flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
-      <Tabs
-        chats={chats}
-        selectedChatId={selectedChatId}
-        setSelectedChatId={setSelectedChatId}
-        setChats={setChats}
-      />
-
-      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl">
+      <div className="flex w-screen">
+        <div className="flex-1">
+          <Tabs
+            chats={chats}
+            selectedChatId={selectedChatId}
+            setSelectedChatId={setSelectedChatId}
+            setChats={setChats}
+          />
+        </div>
+        <div className="flex">
+          <MoreMenu className="absolute top-2 right-2"
+            onStopGoose={() => {
+              stop()
+            }}
+            onClearContext={() => {
+              // TODO - Implement real behavior
+              append({
+                id: Date.now().toString(),
+                role: 'system',
+                content: 'Context cleared'
+              });
+            }}
+            onRestartGoose={() => {
+              // TODO - Implement real behavior
+              append({
+                id: Date.now().toString(),
+                role: 'system',
+                content: 'Goose restarted'
+              });
+            }}
+          />
+        </div>
+      </div>
+      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
         {messages.length === 0 ? (
           <Splash append={append} />
         ) : (
