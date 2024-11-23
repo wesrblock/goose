@@ -48,17 +48,19 @@ const ExpandButton = ({ onClick, isExpanded }: { onClick: () => void; isExpanded
   </motion.button>
 );
 
-function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId, isExpanded, setIsExpanded }: {
+function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId, isExpanded, setIsExpanded, initialQuery }: {
   chats: Chat[],
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
   selectedChatId: number,
   setSelectedChatId: React.Dispatch<React.SetStateAction<number>>,
   isExpanded: boolean,
-  setIsExpanded: React.Dispatch<React.SetStateAction<boolean>>
+  setIsExpanded: React.Dispatch<React.SetStateAction<boolean>>,
+  initialQuery?: string
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
   const [isInitialLoading, setIsInitialLoading] = React.useState(true);
   const [isFinished, setIsFinished] = React.useState(false);
+  const [hasInitialQueryBeenSent, setHasInitialQueryBeenSent] = React.useState(false);
 
   const { messages, input, handleInputChange, handleSubmit, append } = useChat({
     api: getApiUrl("/reply"),
@@ -66,7 +68,30 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId, isExp
     onFinish: () => {
       setIsFinished(true);
     },
+    onResponse: (response) => {
+      // Update the chat messages immediately when we get a response
+      const updatedMessages = [...messages, response];
+      const updatedChats = chats.map(c => 
+        c.id === selectedChatId ? { ...c, messages: updatedMessages } : c
+      );
+      setChats(updatedChats);
+    },
   });
+
+  // Handle initial query when component mounts
+  useEffect(() => {
+    const sendInitialQuery = async () => {
+      if (initialQuery && !hasInitialQueryBeenSent) {
+        setHasInitialQueryBeenSent(true);
+        const message = {
+          content: initialQuery,
+          role: "user",
+        };
+        await append(message);
+      }
+    };
+    sendInitialQuery();
+  }, [initialQuery, append, hasInitialQueryBeenSent]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -191,12 +216,7 @@ export default function ChatWindow() {
     const firstChat = {
       id: 1,
       title: initialQuery || 'Chat 1',
-      messages: initialHistory.length > 0 ? initialHistory : 
-        (initialQuery ? [{
-          id: '0',
-          role: 'user' as const,
-          content: initialQuery
-        }] : [])
+      messages: initialHistory.length > 0 ? initialHistory : []
     };
     return [firstChat];
   });
@@ -216,6 +236,7 @@ export default function ChatWindow() {
             setSelectedChatId={setSelectedChatId}
             isExpanded={isExpanded}
             setIsExpanded={setIsExpanded}
+            initialQuery={initialQuery}
           />
         }
       />
