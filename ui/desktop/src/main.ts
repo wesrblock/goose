@@ -5,6 +5,7 @@ import path from 'node:path';
 import { start as startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
 import log from './utils/logger';
+import { getPort } from './utils/portUtils';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -189,15 +190,18 @@ const showWindow = () => {
   });
 };
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Load zsh environment variables in production mode only
   const isProduction = app.isPackaged;
   loadZshEnv(isProduction);
+
   // Get the server startup configuration
   const shouldStartServer = (process.env.VITE_START_EMBEDDED_SERVER || 'yes').toLowerCase() === 'yes';
   
   if (shouldStartServer) {
     log.info('Starting embedded goosed server');
+    const port = await getPort();
+    process.env.GOOSE_SERVER__PORT = port.toString();
     startGoosed(app);
   } else {
     log.info('Skipping embedded server startup (disabled by configuration)');

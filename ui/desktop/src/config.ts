@@ -2,7 +2,7 @@
 const DEFAULT_HOST = 'http://127.0.0.1:3000';
 
 // Get the host from environment variable or use default
-export const GOOSE_API_HOST = import.meta.env.VITE_GOOSE_HOST || DEFAULT_HOST;
+export const GOOSE_API_HOST = import.meta.env.GOOSE_SERVER__PORT ? `http://127.0.0.1:${import.meta.env.GOOSE_SERVER__PORT}` : (import.meta.env.VITE_GOOSE_HOST || DEFAULT_HOST);
 
 // Control whether to start the embedded server (defaults to yes if not set)
 export const START_EMBEDDED_SERVER = (import.meta.env.VITE_START_EMBEDDED_SERVER || 'yes').toLowerCase() === 'yes';
