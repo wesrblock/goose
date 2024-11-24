@@ -13,6 +13,8 @@ if (started) app.quit();
 declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
 
+let appConfig = { GOOSE_SERVER__PORT: 3000, GOOSE_API_HOST: 'http://127.0.0.1' };
+
 const createLauncher = () => {
   const launcherWindow = new BrowserWindow({
     width: 600,
@@ -21,6 +23,7 @@ const createLauncher = () => {
     transparent: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [JSON.stringify(appConfig)],
     },
     skipTaskbar: true,
     alwaysOnTop: true,
@@ -65,6 +68,8 @@ const createWingToWing = (query?: string) => {
     transparent: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [JSON.stringify(appConfig)],
+      
     },
     skipTaskbar: true,
     alwaysOnTop: true,
@@ -111,6 +116,7 @@ const createChat = (query?: string) => {
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      additionalArguments: [JSON.stringify(appConfig)],
     },
   });
 
@@ -190,6 +196,8 @@ const showWindow = () => {
   });
 };
 
+
+
 app.whenReady().then(async () => {
   // Load zsh environment variables in production mode only
   const isProduction = app.isPackaged;
@@ -202,6 +210,7 @@ app.whenReady().then(async () => {
     log.info('Starting embedded goosed server');
     const port = await getPort();
     process.env.GOOSE_SERVER__PORT = port.toString();
+    appConfig = { ...appConfig, GOOSE_SERVER__PORT: process.env.GOOSE_SERVER__PORT };
     startGoosed(app);
   } else {
     log.info('Skipping embedded server startup (disabled by configuration)');

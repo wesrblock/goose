@@ -1,8 +1,7 @@
-// Configuration has been moved to preload.js and exposed via appConfig.
 
-// Helper to construct API endpoints based on new config
-export const getApiUrl = (endpoint: string): string => {
-  const baseUrl = window.appConfig.DEFAULT_HOST.endsWith('/') ? window.appConfig.DEFAULT_HOST.slice(0, -1) : window.appConfig.DEFAULT_HOST;
+// Helper to construct API endpoints
+export const getApiUrl = (endpoint: string): string => {  
+  const baseUrl = window.appConfig.get('GOOSE_API_HOST') + ':' + window.appConfig.get('GOOSE_SERVER__PORT');
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${baseUrl}${cleanEndpoint}`;
 };
