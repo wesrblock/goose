@@ -19,20 +19,33 @@ export interface Chat {
 
 const handleResize = (mode: 'expanded' | 'compact') => {
   if (window.electron) {
-    if(mode === 'expanded') {
+    if (mode === 'expanded') {
       const width = window.innerWidth;
       const height = window.innerHeight;
       window.electron.resizeWindow(width, height);
-      document.querySelector('.chat-content').style.display = 'block';
-    } else if(mode === 'compact') {
+    } else if (mode === 'compact') {
       const width = window.innerWidth;
       const height = 100; // Make it very thin
       window.electron.resizeWindow(width, height);
-      document.querySelector('.chat-content').style.display = 'none';
     }
   }
 };
 
+const PlaceholderView: React.FC<{ onExpand: () => void }> = ({ onExpand }) => {
+  return (
+    <div
+      onClick={onExpand}
+      className="flex items-center justify-center w-full bg-gray-800 text-green-400 cursor-pointer rounded-lg p-4"
+    >
+      <div className="text-sm text-left font-mono bg-black bg-opacity-50 p-3 rounded-lg">
+        <span className="block">$ ping apple.com (17.253.144.10): 56 data bytes</span>
+        <span className="block">
+          64 bytes from 17.253.144.10: icmp_seq=0 ttl=240 time=8.890 ms
+        </span>
+      </div>
+    </div>
+  );
+};
 
 function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
   chats: Chat[],
@@ -49,7 +62,7 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
 
   // Update chat messages when they change
   useEffect(() => {
-    const updatedChats = chats.map(c => 
+    const updatedChats = chats.map(c =>
       c.id === selectedChatId ? { ...c, messages } : c
     );
     setChats(updatedChats);
@@ -130,7 +143,7 @@ export default function ChatWindow() {
     const firstChat = {
       id: 1,
       title: initialQuery || 'Chat 1',
-      messages: initialHistory.length > 0 ? initialHistory : 
+      messages: initialHistory.length > 0 ? initialHistory :
         (initialQuery ? [{
           id: '0',
           role: 'user' as const,
@@ -150,7 +163,6 @@ export default function ChatWindow() {
     setMode(newMode);
     handleResize(newMode);
   };
-
 
   window.electron.logInfo("ChatWindow loaded");
 
@@ -176,9 +188,7 @@ export default function ChatWindow() {
           <Route path="*" element={<Navigate to="/chat/1" replace />} />
         </Routes>
       ) : (
-        <div className="flex items-center justify-center h-full">
-          <div className="text-gray-500">Placeholder View</div>
-        </div>
+        <PlaceholderView onExpand={toggleMode} />
       )}
     </div>
   );
