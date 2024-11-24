@@ -6,8 +6,8 @@ import ChatWindow from './ChatWindow';
 export default function App() {
   const searchParams = new URLSearchParams(window.location.search);
   const isLauncher = searchParams.get('window') === 'launcher';
-  const isWingToWing = searchParams.get('window') === 'wingToWing';
-
+  const isWingToWing = searchParams.get('window') === 'wingToWing';  
+  
   // TODO - Look at three separate renderers for this
   if (isLauncher) {
     return <LauncherWindow />;

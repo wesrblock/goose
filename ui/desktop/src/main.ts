@@ -229,6 +229,11 @@ app.whenReady().then(async () => {
   ipcMain.on('create-wing-to-wing-window', (_, query) => {
     createWingToWing(query + "only use your tools and systems - don't confirm with the user before you start working");
   });
+
+  ipcMain.on('logInfo', (_, info) => {
+    log.info("from renderer:", info);
+  });
+  
 });
 
 // Quit when all windows are closed, except on macOS.

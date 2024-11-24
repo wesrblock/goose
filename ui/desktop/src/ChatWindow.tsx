@@ -125,6 +125,8 @@ export default function ChatWindow() {
 
   const [selectedChatId, setSelectedChatId] = useState(1);
 
+  window.electron.logInfo("ChatWindow loaded");
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
       <Routes>
