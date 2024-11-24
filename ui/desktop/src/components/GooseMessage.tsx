@@ -2,7 +2,9 @@ import React from 'react'
 import ToolInvocation from './ToolInvocation'
 import ReactMarkdown from 'react-markdown'
 
+
 export default function GooseMessage({ message }) {
+
   return (
     <div className="flex mb-4">
       <div className="bg-goose-bubble w-full text-black rounded-2xl p-4">
@@ -16,7 +18,7 @@ export default function GooseMessage({ message }) {
             ))}
           </div>
         ) : (
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          <ReactMarkdown className="prose">{message.content}</ReactMarkdown>
         )}
       </div>
     </div>

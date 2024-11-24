@@ -5,7 +5,8 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 use super::base::{Provider, Usage};
-use super::configs::DatabricksProviderConfig;
+use super::configs::{DatabricksAuth, DatabricksProviderConfig};
+use super::oauth;
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
     tools_to_openai_spec,
@@ -22,14 +23,25 @@ impl DatabricksProvider {
     pub fn new(config: DatabricksProviderConfig) -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
-            .default_headers({
-                let mut headers = reqwest::header::HeaderMap::new();
-                headers.insert("Authorization", format!("Bearer {}", config.token).parse()?);
-                headers
-            })
             .build()?;
 
         Ok(Self { client, config })
+    }
+
+    async fn ensure_auth_header(&self) -> Result<String> {
+        match &self.config.auth {
+            DatabricksAuth::Token(token) => Ok(format!("Bearer {}", token)),
+            DatabricksAuth::OAuth {
+                host,
+                client_id,
+                redirect_url,
+                scopes,
+            } => {
+                let token =
+                    oauth::get_oauth_token_async(host, client_id, redirect_url, scopes).await?;
+                Ok(format!("Bearer {}", token))
+            }
+        }
     }
 
     fn get_usage(data: &Value) -> Result<Usage> {
@@ -66,7 +78,14 @@ impl DatabricksProvider {
             self.config.model
         );
 
-        let response = self.client.post(&url).json(&payload).send().await?;
+        let auth_header = self.ensure_auth_header().await?;
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", auth_header)
+            .json(&payload)
+            .send()
+            .await?;
 
         match response.status() {
             StatusCode::OK => Ok(response.json().await?),
@@ -152,13 +171,11 @@ impl Provider for DatabricksProvider {
 mod tests {
     use super::*;
     use crate::models::message::MessageContent;
-    use anyhow::Result;
-    use serde_json::json;
     use wiremock::matchers::{body_json, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
-    async fn test_databricks_completion() -> Result<()> {
+    async fn test_databricks_completion_with_token() -> Result<()> {
         // Start a mock server
         let mock_server = MockServer::start().await;
 
@@ -199,8 +216,8 @@ mod tests {
         // Create the DatabricksProvider with the mock server's URL as the host
         let config = DatabricksProviderConfig {
             host: mock_server.uri(),
-            token: "test_token".to_string(),
             model: "my-databricks-model".to_string(),
+            auth: DatabricksAuth::Token("test_token".to_string()),
             temperature: None,
             max_tokens: None,
         };

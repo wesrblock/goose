@@ -7,7 +7,7 @@ use goose::{
     },
     providers::{
         base::Provider,
-        configs::{DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig},
+        configs::{DatabricksAuth, DatabricksProviderConfig, OpenAiProviderConfig, ProviderConfig},
         factory::get_provider,
     },
 };
@@ -91,9 +91,7 @@ impl ProviderTester {
 
     /// Run all provider tests
     async fn run_test_suite(&self) -> Result<()> {
-        println!("Running basic response test...");
         self.test_basic_response().await?;
-        println!("Running tool usage test...");
         self.test_tool_usage().await?;
         Ok(())
     }
@@ -144,8 +142,32 @@ async fn test_databricks_provider() -> Result<()> {
 
     let config = ProviderConfig::Databricks(DatabricksProviderConfig {
         host: std::env::var("DATABRICKS_HOST")?,
-        token: std::env::var("DATABRICKS_TOKEN")?,
         model: std::env::var("DATABRICKS_MODEL")?,
+        auth: DatabricksAuth::Token(std::env::var("DATABRICKS_TOKEN")?),
+        temperature: None,
+        max_tokens: None,
+    });
+
+    let tester = ProviderTester::new(config)?;
+    tester.run_test_suite().await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_databricks_provider_oauth() -> Result<()> {
+    load_env();
+
+    // Skip if credentials aren't available
+    if std::env::var("DATABRICKS_HOST").is_err() || std::env::var("DATABRICKS_MODEL").is_err() {
+        println!("Skipping Databricks OAuth tests - credentials not configured");
+        return Ok(());
+    }
+
+    let config = ProviderConfig::Databricks(DatabricksProviderConfig {
+        host: std::env::var("DATABRICKS_HOST")?,
+        model: std::env::var("DATABRICKS_MODEL")?,
+        auth: DatabricksAuth::oauth(std::env::var("DATABRICKS_HOST")?),
         temperature: None,
         max_tokens: None,
     });

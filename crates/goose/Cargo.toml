@@ -16,6 +16,7 @@ reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_urlencoded = "0.7"
 uuid = { version = "1.0", features = ["v4"] }
 regex = "1.11.1"
 async-trait = "0.1"
@@ -25,11 +26,22 @@ strum_macros = "0.26"
 tera = "1.20.0"
 tokenizers = "0.20.3"
 include_dir = "0.7.4"
-chrono = "0.4.38"
+chrono = { version = "0.4.38", features = ["serde"] }
 indoc = "2.0.5"
+nanoid = "0.4"
+sha2 = "0.10"
+base64 = "0.21"
+url = "2.5"
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors"] }
+webbrowser = "0.8"
+dotenv = "0.15"
 
 [dev-dependencies]
 wiremock = "0.6.0"
 mockito = "1.2"
 tempfile = "3.8"
-dotenv = "0.15"
+
+[[example]]
+name = "databricks_oauth"
+path = "examples/databricks_oauth.rs"
