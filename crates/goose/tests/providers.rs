@@ -183,6 +183,12 @@ async fn test_databricks_provider_oauth() -> Result<()> {
 async fn test_ollama_provider() -> Result<()> {
     load_env();
 
+    // Skip if model isin't set (specified in ci)
+    if std::env::var("OLLAMA_MODEL").is_err() {
+        println!("Skipping Ollama tests - model not configured");
+        return Ok(());
+    }
+
    let config = ProviderConfig::Ollama(OllamaProviderConfig {
         host: std::env::var("OLLAMA_HOST")
             .unwrap_or_else(|_| String::from(OLLAMA_HOST)),
