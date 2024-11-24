@@ -31,7 +31,7 @@ const handleResize = (mode: 'expanded' | 'compact') => {
   }
 };
 
-const PlaceholderView: React.FC<{ onExpand: () => void }> = ({ onExpand }) => {
+const WingView: React.FC<{ onExpand: () => void }> = ({ onExpand }) => {
   return (
     <div
       onClick={onExpand}
@@ -188,7 +188,7 @@ export default function ChatWindow() {
           <Route path="*" element={<Navigate to="/chat/1" replace />} />
         </Routes>
       ) : (
-        <PlaceholderView onExpand={toggleMode} />
+        <WingView onExpand={toggleMode} />
       )}
     </div>
   );
