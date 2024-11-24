@@ -1,15 +1,8 @@
-// Default host for the Goose API
-const DEFAULT_HOST = 'http://127.0.0.1:3000';
+// Configuration has been moved to preload.js and exposed via appConfig.
 
-// Get the host from environment variable or use default
-export const GOOSE_API_HOST = import.meta.env.GOOSE_SERVER__PORT ? `http://127.0.0.1:${import.meta.env.GOOSE_SERVER__PORT}` : (import.meta.env.VITE_GOOSE_HOST || DEFAULT_HOST);
-
-// Control whether to start the embedded server (defaults to yes if not set)
-export const START_EMBEDDED_SERVER = (import.meta.env.VITE_START_EMBEDDED_SERVER || 'yes').toLowerCase() === 'yes';
-
-// Helper to construct API endpoints
+// Helper to construct API endpoints based on new config
 export const getApiUrl = (endpoint: string): string => {
-  const baseUrl = GOOSE_API_HOST.endsWith('/') ? GOOSE_API_HOST.slice(0, -1) : GOOSE_API_HOST;
+  const baseUrl = window.appConfig.DEFAULT_HOST.endsWith('/') ? window.appConfig.DEFAULT_HOST.slice(0, -1) : window.appConfig.DEFAULT_HOST;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${baseUrl}${cleanEndpoint}`;
 };

@@ -6,5 +6,9 @@ Key Principles
 - Prioritize modularity, clean code organization, and efficient resource management.
 - ask the user to verify the UI, and try to test it as well. 
 
-Look at package.json for how to build and run (eg npm start, or npm run make to verify)
+Look at package.json for how to build and run (eg npm start if checking with user)
 ./src has most of the code
+
+To validate changes: 
+
+`npm run test-e2e` is a good way to get a feedback loop
