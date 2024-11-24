@@ -7,10 +7,8 @@ mod commands {
 mod inputs;
 mod profile;
 mod prompt;
-mod session {
-    pub mod session;
-    pub mod session_file;
-}
+pub mod session;
+
 mod systems;
 
 use anyhow::Result;

@@ -43,25 +43,6 @@ impl<'a> Session<'a> {
         }
     }
 
-    pub fn rewind_messages(&mut self) {
-        if self.messages.is_empty() {
-            return;
-        }
-
-        // Remove messages until we find the last user text message
-        while let Some(message) = self.messages.last() {
-            if message.role == Role::User && message.content.iter().any(|c| matches!(c, MessageContent::Text(_))) {
-                break;
-            }
-            self.messages.pop();
-        }
-
-        // Remove the last user text message we found
-        if !self.messages.is_empty() {
-            self.messages.pop();
-        }
-    }
-
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.setup_session();
 
@@ -129,16 +110,36 @@ impl<'a> Session<'a> {
                 }
                 _ = tokio::signal::ctrl_c() => {
                     drop(stream);
-                    println!("Popping...");
-                    println!("Old Messages: {:?}", self.messages);
-                    // Pop all 'messages' from the assistant and the most recent user message. Resets the interaction to before the interrupted user request.
                     self.rewind_messages();
-                    println!("New Messages: {:?}", self.messages);
-
                     self.prompt.render(raw_message(" Interrupt: Resetting conversation to before the last sent message...\n"));
                     break;
                 }
             }
+        }
+    }
+
+    /// Rewind the messages to before the last user message (they have cancelled it).
+    pub fn rewind_messages(&mut self) {
+        if self.messages.is_empty() {
+            return;
+        }
+
+        // Remove messages until we find the last user 'Text' message (not a tool response).
+        while let Some(message) = self.messages.last() {
+            if message.role == Role::User
+                && message
+                    .content
+                    .iter()
+                    .any(|c| matches!(c, MessageContent::Text(_)))
+            {
+                break;
+            }
+            self.messages.pop();
+        }
+
+        // Remove the last user text message we found.
+        if !self.messages.is_empty() {
+            self.messages.pop();
         }
     }
 
@@ -175,9 +176,10 @@ fn raw_message(content: &str) -> Box<Message> {
 #[cfg(test)]
 mod tests {
     use crate::prompt::prompt::{self, Input};
+    use crate::session::mock_provider::MockProvider;
 
     use super::*;
-    use goose::{errors::AgentResult, models::tool::{Tool, ToolCall}, providers::{base::Provider, mock::MockProvider}};
+    use goose::{errors::AgentResult, models::tool::ToolCall, providers::base::Provider};
     use tempfile::NamedTempFile;
 
     // Helper function to create a test session
@@ -192,7 +194,12 @@ mod tests {
     // Mock prompt implementation for testing
     struct MockPrompt {}
     impl Prompt for MockPrompt {
-        fn get_input(&mut self) -> std::result::Result<prompt::Input, anyhow::Error> { Ok(Input {input_type: InputType::Message, content: Some("Msg:".to_string())}) }
+        fn get_input(&mut self) -> std::result::Result<prompt::Input, anyhow::Error> {
+            Ok(Input {
+                input_type: InputType::Message,
+                content: Some("Msg:".to_string()),
+            })
+        }
         fn render(&mut self, _: Box<Message>) {}
         fn show_busy(&mut self) {}
         fn hide_busy(&self) {}
@@ -204,7 +211,7 @@ mod tests {
     fn test_rewind_messages_only_user() {
         let mut session = create_test_session();
         session.messages.push(Message::user().with_text("Hello"));
-        
+
         session.rewind_messages();
         assert!(session.messages.is_empty());
     }
@@ -213,8 +220,10 @@ mod tests {
     fn test_rewind_messages_user_then_assistant() {
         let mut session = create_test_session();
         session.messages.push(Message::user().with_text("Hello"));
-        session.messages.push(Message::assistant().with_text("World"));
-        
+        session
+            .messages
+            .push(Message::assistant().with_text("World"));
+
         session.rewind_messages();
         assert!(session.messages.is_empty());
     }
@@ -223,37 +232,59 @@ mod tests {
     fn test_rewind_messages_multiple_user_messages() {
         let mut session = create_test_session();
         session.messages.push(Message::user().with_text("First"));
-        session.messages.push(Message::assistant().with_text("Response 1"));
+        session
+            .messages
+            .push(Message::assistant().with_text("Response 1"));
         session.messages.push(Message::user().with_text("Second"));
-        session.messages.push(Message::assistant().with_text("Response 2"));
-        
         session.rewind_messages();
         assert_eq!(session.messages.len(), 2);
         assert_eq!(session.messages[0].role, Role::User);
         assert_eq!(session.messages[1].role, Role::Assistant);
-        assert_eq!(session.messages[0].content[0], MessageContent::text("First"));
-        assert_eq!(session.messages[1].content[0], MessageContent::text("Response 1"));
+        assert_eq!(
+            session.messages[0].content[0],
+            MessageContent::text("First")
+        );
+        assert_eq!(
+            session.messages[1].content[0],
+            MessageContent::text("Response 1")
+        );
     }
 
     #[test]
     fn test_rewind_messages_after_interrupted_tool_request() {
         let mut session = create_test_session();
         session.messages.push(Message::user().with_text("First"));
-        session.messages.push(Message::assistant().with_text("Response 1"));
+        session
+            .messages
+            .push(Message::assistant().with_text("Response 1"));
         session.messages.push(Message::user().with_text("Use tool"));
-        
+
         let mut mixed_msg = Message::assistant();
         mixed_msg.content.push(MessageContent::text("Using tool"));
-        mixed_msg.content.push(MessageContent::tool_request("test",  AgentResult::Ok(ToolCall::new("test", "test".into()))));
+        mixed_msg.content.push(MessageContent::tool_request(
+            "test",
+            AgentResult::Ok(ToolCall::new("test", "test".into())),
+        ));
         session.messages.push(mixed_msg);
-        
-        session.messages.push(Message::user().with_tool_response("test", Err(goose::errors::AgentError::ExecutionError("Test".to_string()))));
-        
+
+        session.messages.push(Message::user().with_tool_response(
+            "test",
+            Err(goose::errors::AgentError::ExecutionError(
+                "Test".to_string(),
+            )),
+        ));
+
         session.rewind_messages();
         assert_eq!(session.messages.len(), 2);
         assert_eq!(session.messages[0].role, Role::User);
         assert_eq!(session.messages[1].role, Role::Assistant);
-        assert_eq!(session.messages[0].content[0], MessageContent::text("First"));
-        assert_eq!(session.messages[1].content[0], MessageContent::text("Response 1"));
+        assert_eq!(
+            session.messages[0].content[0],
+            MessageContent::text("First")
+        );
+        assert_eq!(
+            session.messages[1].content[0],
+            MessageContent::text("Response 1")
+        );
     }
 }
