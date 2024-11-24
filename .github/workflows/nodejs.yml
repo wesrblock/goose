@@ -19,10 +19,10 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v2
       with:
-        node-version: '18.x'
+        node-version: '24.x'
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
       working-directory: ui/desktop
 
     - name: Package application
