@@ -12,7 +12,6 @@ if (started) app.quit();
 
 declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
-
 let appConfig = { GOOSE_SERVER__PORT: 3000, GOOSE_API_HOST: 'http://127.0.0.1' };
 
 const createLauncher = () => {
