@@ -2,10 +2,10 @@ use anyhow::Result;
 use futures::StreamExt;
 use std::path::PathBuf;
 
+use crate::agents::agent::Agent;
 use crate::prompt::prompt::{InputType, Prompt};
 use crate::session::session_file::{persist_messages, readable_session_file};
 use crate::systems::goose_hints::GooseHintsSystem;
-use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::models::message::{Message, MessageContent};
 use goose::models::role::Role;
@@ -13,14 +13,14 @@ use goose::models::role::Role;
 use super::session_file::deserialize_messages;
 
 pub struct Session<'a> {
-    agent: Box<Agent>,
+    agent: Box<dyn Agent>,
     prompt: Box<dyn Prompt + 'a>,
     session_file: PathBuf,
     messages: Vec<Message>,
 }
 
 impl<'a> Session<'a> {
-    pub fn new(agent: Box<Agent>, prompt: Box<dyn Prompt + 'a>, session_file: PathBuf) -> Self {
+    pub fn new(agent: Box<dyn Agent>, prompt: Box<dyn Prompt + 'a>, session_file: PathBuf) -> Self {
         let messages = match readable_session_file(&session_file) {
             Ok(file) => deserialize_messages(file).unwrap_or_else(|e| {
                 eprintln!(
@@ -175,18 +175,17 @@ fn raw_message(content: &str) -> Box<Message> {
 
 #[cfg(test)]
 mod tests {
+    use crate::agents::mock_agent::MockAgent;
     use crate::prompt::prompt::{self, Input};
-    use crate::session::mock_provider::MockProvider;
 
     use super::*;
-    use goose::{errors::AgentResult, models::tool::ToolCall, providers::base::Provider};
+    use goose::{errors::AgentResult, models::tool::ToolCall};
     use tempfile::NamedTempFile;
 
     // Helper function to create a test session
     fn create_test_session() -> Session<'static> {
         let temp_file = NamedTempFile::new().unwrap();
-        let provider: Box<dyn Provider> = Box::new(MockProvider::new(Vec::new()));
-        let agent = Box::new(Agent::new(provider));
+        let agent = Box::new(MockAgent {});
         let prompt = Box::new(MockPrompt {});
         Session::new(agent, prompt, temp_file.path().to_path_buf())
     }

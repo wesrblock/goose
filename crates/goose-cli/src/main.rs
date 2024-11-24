@@ -4,6 +4,7 @@ mod commands {
     pub mod session;
     pub mod version;
 }
+pub mod agents;
 mod inputs;
 mod profile;
 mod prompt;
