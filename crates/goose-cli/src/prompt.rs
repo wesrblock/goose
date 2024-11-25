@@ -1,6 +1,10 @@
 use anyhow::Result;
 use goose::models::message::Message;
 
+pub mod cliclack;
+pub mod rustyline;
+pub mod thinking;
+
 pub trait Prompt {
     fn render(&mut self, message: Box<Message>);
     fn get_input(&mut self) -> Result<Input>;

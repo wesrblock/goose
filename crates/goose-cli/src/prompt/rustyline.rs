@@ -12,10 +12,7 @@ use goose::models::role::Role;
 use goose::models::{content::Content, tool::ToolCall};
 use serde_json::Value;
 
-use super::{
-    prompt::{Input, InputType, Prompt, Theme},
-    thinking::get_random_thinking_message,
-};
+use super::{thinking::get_random_thinking_message, Input, InputType, Prompt, Theme};
 
 const PROMPT: &str = "\x1b[1m\x1b[38;5;30m( O)> \x1b[0m";
 const MAX_STRING_LENGTH: usize = 40;

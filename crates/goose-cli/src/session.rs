@@ -1,17 +1,71 @@
 use anyhow::Result;
 use futures::StreamExt;
+use serde_json;
+use std::fs::{self, File};
+use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
 use crate::agents::agent::Agent;
-use crate::prompt::prompt::{InputType, Prompt};
-use crate::session::session_file::{persist_messages, readable_session_file};
+use crate::prompt::{InputType, Prompt};
 use crate::systems::goose_hints::GooseHintsSystem;
 use goose::developer::DeveloperSystem;
 use goose::models::message::{Message, MessageContent};
 use goose::models::role::Role;
 
-use super::session_file::deserialize_messages;
+// File management functions
+pub fn ensure_session_dir() -> Result<PathBuf> {
+    let home_dir = dirs::home_dir().ok_or(anyhow::anyhow!("Could not determine home directory"))?;
+    let config_dir = home_dir.join(".config").join("goose").join("sessions");
 
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)?;
+    }
+
+    Ok(config_dir)
+}
+
+pub fn readable_session_file(session_file: &PathBuf) -> Result<File> {
+    match fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(session_file)
+    {
+        Ok(file) => Ok(file),
+        Err(e) => Err(anyhow::anyhow!("Failed to open session file: {}", e)),
+    }
+}
+
+pub fn persist_messages(session_file: &PathBuf, messages: &[Message]) -> Result<()> {
+    let file = fs::File::create(session_file)?; // Create or truncate the file
+    persist_messages_internal(file, messages)
+}
+
+fn persist_messages_internal(session_file: File, messages: &[Message]) -> Result<()> {
+    let mut writer = std::io::BufWriter::new(session_file);
+
+    for message in messages {
+        serde_json::to_writer(&mut writer, &message)?;
+        writeln!(writer)?;
+    }
+
+    writer.flush()?;
+    Ok(())
+}
+
+pub fn deserialize_messages(file: File) -> Result<Vec<Message>> {
+    let reader = io::BufReader::new(file);
+    let mut messages = Vec::new();
+
+    for line in reader.lines() {
+        messages.push(serde_json::from_str::<Message>(&line?)?);
+    }
+
+    Ok(messages)
+}
+
+// Session management
 pub struct Session<'a> {
     agent: Box<dyn Agent>,
     prompt: Box<dyn Prompt + 'a>,
@@ -176,7 +230,7 @@ fn raw_message(content: &str) -> Box<Message> {
 #[cfg(test)]
 mod tests {
     use crate::agents::mock_agent::MockAgent;
-    use crate::prompt::prompt::{self, Input};
+    use crate::prompt::{self, Input};
 
     use super::*;
     use goose::{errors::AgentResult, models::tool::ToolCall};

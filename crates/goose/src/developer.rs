@@ -197,10 +197,11 @@ impl DeveloperSystem {
             .output()
             .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
 
-        let output_str = String::from_utf8_lossy(&output.stdout).to_string();
-        if !output.status.success() {
-            return Err(AgentError::ExecutionError(output_str));
-        }
+        let output_str = format!(
+            "Finished with Status Code: {}\nOutput:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout)
+        );
         Ok(vec![
             Content::text(output_str).with_audience(vec![Role::Assistant])
         ])
@@ -456,13 +457,10 @@ impl DeveloperSystem {
         let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
         if insert_line > lines.len() {
-            return Err(AgentError::InvalidParameters(
-                format!(
-                    "The insert line is greater than the length of the file ({} lines)",
-                    lines.len()
-                )
-                .into(),
-            ));
+            return Err(AgentError::InvalidParameters(format!(
+                "The insert line is greater than the length of the file ({} lines)",
+                lines.len()
+            )));
         }
 
         // Save history for undo
@@ -537,14 +535,13 @@ impl DeveloperSystem {
         // Capture the screenshot using xcap
         let monitors = Monitor::all()
             .map_err(|_| AgentError::ExecutionError("Failed to access monitors".into()))?;
-        let monitor = monitors.get(display).ok_or(AgentError::ExecutionError(
-            format!(
+        let monitor = monitors
+            .get(display)
+            .ok_or(AgentError::ExecutionError(format!(
                 "{} was not an available monitor, {} found.",
                 display,
                 monitors.len()
-            )
-            .into(),
-        ))?;
+            )))?;
 
         let mut image = monitor.capture_image().map_err(|e| {
             AgentError::ExecutionError(format!("Failed to capture display {}: {}", display, e))

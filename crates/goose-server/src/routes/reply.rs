@@ -235,7 +235,8 @@ async fn stream_message(
                     }
                     MessageContent::Text(text) => {
                         for line in text.text.lines() {
-                            tx.send(ProtocolFormatter::format_text(&format!("{}\\n", line))).await?;
+                            tx.send(ProtocolFormatter::format_text(&format!("{}\\n", line)))
+                                .await?;
                         }
                     }
                     MessageContent::Image(_) => {
@@ -314,8 +315,6 @@ async fn handler(
     Ok(SseResponse::new(stream))
 }
 
-
-
 #[derive(Debug, Deserialize)]
 struct AskRequest {
     prompt: String,
@@ -326,13 +325,11 @@ struct AskResponse {
     response: String,
 }
 
-
 // simple ask an AI for a response, non streaming
 async fn ask_handler(
     State(state): State<AppState>,
     Json(request): Json<AskRequest>,
 ) -> Result<Json<AskResponse>, StatusCode> {
-    
     let provider = factory::get_provider(state.provider_config)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
