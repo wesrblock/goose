@@ -1,14 +1,24 @@
 use anyhow::{anyhow, Result};
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::errors::AgentError;
+use crate::models::content::{Content, ImageContent};
 use crate::models::message::{Message, MessageContent};
 use crate::models::role::Role;
 use crate::models::tool::{Tool, ToolCall};
 
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+pub enum ImageFormat {
+    OpenAi,
+    Anthropic,
+}
+
 /// Convert internal Message format to OpenAI's API message specification
-pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
+///   some openai compatible endpoints use the anthropic image spec at the content level
+///   even though the message structure is otherwise following openai, the enum switches this
+pub fn messages_to_openai_spec(messages: &[Message], image_format: &ImageFormat) -> Vec<Value> {
     let mut messages_spec = Vec::new();
 
     for message in messages {
@@ -58,25 +68,50 @@ pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
                             let abridged: Vec<_> = contents
                                 .iter()
                                 .filter(|content| {
-                                    content.audience().is_none()
-                                        || content
-                                            .audience()
-                                            .expect("has audience")
-                                            .contains(&Role::Assistant)
+                                    content
+                                        .audience()
+                                        .is_none_or(|audience| audience.contains(&Role::Assistant))
                                 })
                                 .map(|content| content.unannotated())
                                 .collect();
 
+                            // Process all content, replacing images with placeholder text
+                            let mut tool_content = Vec::new();
+                            let mut image_messages = Vec::new();
+
+                            for content in abridged {
+                                match content {
+                                    Content::Image(image) => {
+                                        // Add placeholder text in the tool response
+                                        tool_content.push(Content::text("This tool result included an image that is uploaded in the next message."));
+
+                                        // Create a separate image message
+                                        image_messages.push(json!({
+                                            "role": "user",
+                                            "content": [convert_image(&image, image_format)]
+                                        }));
+                                    }
+                                    _ => {
+                                        tool_content.push(content);
+                                    }
+                                }
+                            }
+
+                            // First add the tool response with all content
                             output.push(json!({
                                 "role": "tool",
-                                "content": abridged,
+                                "content": tool_content,
                                 "tool_call_id": response.id
                             }));
+
+                            // Then add any image messages that need to follow
+                            output.extend(image_messages);
                         }
                         Err(e) => {
+                            // A tool result error is shown as output so the model can interpret the error message
                             output.push(json!({
                                 "role": "tool",
-                                "content": format!("Error: {}", e),
+                                "content": format!("The tool call returned the following error:\n{}", e),
                                 "tool_call_id": response.id
                             }));
                         }
@@ -84,12 +119,7 @@ pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
                 }
                 MessageContent::Image(image) => {
                     // Handle direct image content
-                    converted["content"] = json!([{
-                        "type": "image_url",
-                        "image_url": {
-                            "url": format!("data:{};base64,{}", image.mime_type, image.data)
-                        }
-                    }]);
+                    converted["content"] = json!([convert_image(image, image_format)]);
                 }
             }
         }
@@ -101,6 +131,26 @@ pub fn messages_to_openai_spec(messages: &[Message]) -> Vec<Value> {
     }
 
     messages_spec
+}
+
+/// Convert an image content into an image json based on format
+pub fn convert_image(image: &ImageContent, image_format: &ImageFormat) -> Value {
+    match image_format {
+        ImageFormat::OpenAi => json!({
+            "type": "image_url",
+            "image_url": {
+                "url": format!("data:{};base64,{}", image.mime_type, image.data)
+            }
+        }),
+        ImageFormat::Anthropic => json!({
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": image.mime_type,
+                "data": image.data,
+            }
+        }),
+    }
 }
 
 /// Convert internal Tool format to OpenAI's API tool specification
@@ -241,7 +291,7 @@ mod tests {
     #[test]
     fn test_messages_to_openai_spec() -> Result<()> {
         let message = Message::user().with_text("Hello");
-        let spec = messages_to_openai_spec(&[message]);
+        let spec = messages_to_openai_spec(&[message], &ImageFormat::OpenAi);
 
         assert_eq!(spec.len(), 1);
         assert_eq!(spec[0]["role"], "user");
@@ -310,7 +360,7 @@ mod tests {
         messages
             .push(Message::user().with_tool_response(tool_id, Ok(vec![Content::text("Result")])));
 
-        let spec = messages_to_openai_spec(&messages);
+        let spec = messages_to_openai_spec(&messages, &ImageFormat::OpenAi);
 
         assert_eq!(spec.len(), 4);
         assert_eq!(spec[0]["role"], "assistant");

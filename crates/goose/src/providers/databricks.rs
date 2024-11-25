@@ -111,7 +111,7 @@ impl Provider for DatabricksProvider {
         tools: &[Tool],
     ) -> Result<(Message, Usage)> {
         // Prepare messages and tools
-        let messages_spec = messages_to_openai_spec(messages);
+        let messages_spec = messages_to_openai_spec(messages, &self.config.image_format);
         let tools_spec = if !tools.is_empty() {
             tools_to_openai_spec(tools)?
         } else {
@@ -220,6 +220,7 @@ mod tests {
             auth: DatabricksAuth::Token("test_token".to_string()),
             temperature: None,
             max_tokens: None,
+            image_format: crate::providers::utils::ImageFormat::Anthropic,
         };
 
         let provider = DatabricksProvider::new(config)?;

@@ -1,3 +1,4 @@
+use super::utils::ImageFormat;
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_CLIENT_ID: &str = "databricks-cli";
@@ -41,6 +42,7 @@ pub struct DatabricksProviderConfig {
     pub auth: DatabricksAuth,
     pub temperature: Option<f32>,
     pub max_tokens: Option<i32>,
+    pub image_format: ImageFormat,
 }
 
 impl DatabricksProviderConfig {
@@ -52,6 +54,7 @@ impl DatabricksProviderConfig {
             auth: DatabricksAuth::Token(token),
             temperature: None,
             max_tokens: None,
+            image_format: ImageFormat::Anthropic,
         }
     }
 
@@ -63,6 +66,7 @@ impl DatabricksProviderConfig {
             auth: DatabricksAuth::oauth(host),
             temperature: None,
             max_tokens: None,
+            image_format: ImageFormat::Anthropic,
         }
     }
 }

@@ -9,7 +9,7 @@ use super::base::{Provider, Usage};
 use super::configs::OpenAiProviderConfig;
 use super::utils::{
     check_openai_context_length_error, messages_to_openai_spec, openai_response_to_message,
-    tools_to_openai_spec,
+    tools_to_openai_spec, ImageFormat,
 };
 use crate::models::message::Message;
 use crate::models::tool::Tool;
@@ -99,7 +99,7 @@ impl Provider for OpenAiProvider {
         });
 
         // Convert messages and tools to OpenAI format
-        let messages_spec = messages_to_openai_spec(messages);
+        let messages_spec = messages_to_openai_spec(messages, &ImageFormat::OpenAi);
         let tools_spec = if !tools.is_empty() {
             tools_to_openai_spec(tools)?
         } else {

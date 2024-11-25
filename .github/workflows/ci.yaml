@@ -16,6 +16,10 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v3
 
+    - name: Install Libs
+      run: |
+        sudo apt install libdbus-1-dev pkg-config
+
     - name: Install UV
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh

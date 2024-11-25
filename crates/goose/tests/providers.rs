@@ -1,5 +1,7 @@
 use anyhow::Result;
 use dotenv::dotenv;
+use goose::providers::configs::OllamaProviderConfig;
+use goose::providers::ollama::{OLLAMA_HOST, OLLAMA_MODEL};
 use goose::{
     models::{
         message::{Message, MessageContent},
@@ -11,8 +13,6 @@ use goose::{
         factory::get_provider,
     },
 };
-use goose::providers::configs::OllamaProviderConfig;
-use goose::providers::ollama::{OLLAMA_HOST, OLLAMA_MODEL};
 
 /// Generic test harness for any Provider implementation
 struct ProviderTester {
@@ -146,6 +146,7 @@ async fn test_databricks_provider() -> Result<()> {
         auth: DatabricksAuth::Token(std::env::var("DATABRICKS_TOKEN")?),
         temperature: None,
         max_tokens: None,
+        image_format: goose::providers::utils::ImageFormat::Anthropic,
     });
 
     let tester = ProviderTester::new(config)?;
@@ -170,6 +171,7 @@ async fn test_databricks_provider_oauth() -> Result<()> {
         auth: DatabricksAuth::oauth(std::env::var("DATABRICKS_HOST")?),
         temperature: None,
         max_tokens: None,
+        image_format: goose::providers::utils::ImageFormat::Anthropic,
     });
 
     let tester = ProviderTester::new(config)?;
@@ -189,11 +191,9 @@ async fn test_ollama_provider() -> Result<()> {
         return Ok(());
     }
 
-   let config = ProviderConfig::Ollama(OllamaProviderConfig {
-        host: std::env::var("OLLAMA_HOST")
-            .unwrap_or_else(|_| String::from(OLLAMA_HOST)),
-        model: std::env::var("OLLAMA_MODEL")
-            .unwrap_or_else(|_| String::from(OLLAMA_MODEL)),
+    let config = ProviderConfig::Ollama(OllamaProviderConfig {
+        host: std::env::var("OLLAMA_HOST").unwrap_or_else(|_| String::from(OLLAMA_HOST)),
+        model: std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| String::from(OLLAMA_MODEL)),
         temperature: None,
         max_tokens: None,
     });

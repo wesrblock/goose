@@ -104,6 +104,10 @@ fn default_response_renderer(tool_response: &ToolResponse, theme: &str) {
                     continue;
                 }
 
+                if content.priority().is_some_and(|priority| priority == 0.0) {
+                    continue;
+                }
+
                 if let Content::Text(text) = content {
                     print_markdown(&text.text, theme);
                 }

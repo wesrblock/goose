@@ -2,12 +2,15 @@ mod lang;
 
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
+use base64::Engine;
 use indoc::{formatdoc, indoc};
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
+use xcap::Monitor;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
@@ -31,7 +34,6 @@ impl Default for DeveloperSystem {
 
 impl DeveloperSystem {
     pub fn new() -> Self {
-        // TODO i suggest we make working_dir required, we're seeing abs paths are more clear
         let bash_tool = Tool::new(
             "bash",
             indoc! {r#"
@@ -48,13 +50,33 @@ impl DeveloperSystem {
             "#},
             json!({
                 "type": "object",
-                "required": [],
+                "required": ["command"],
                 "properties": {
                     "command": {
                         "type": "string",
                         "default": null,
                         "description": "The bash shell command to run."
                     },
+                }
+            }),
+        );
+
+        let screen_capture_tool = Tool::new(
+            "screen_capture",
+            indoc! {r#"
+                Capture a screenshot of a specified display.
+                The display parameter defaults to 0 (main display).
+                For multiple displays, use 1, 2, etc.
+            "#},
+            json!({
+                "type": "object",
+                "required": [],
+                "properties": {
+                    "display": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "The display number to capture (0 is main display)"
+                    }
                 }
             }),
         );
@@ -125,7 +147,7 @@ impl DeveloperSystem {
             os=std::env::consts::OS,
         };
         Self {
-            tools: vec![bash_tool, text_editor_tool],
+            tools: vec![bash_tool, text_editor_tool, screen_capture_tool],
             cwd: Mutex::new(std::env::current_dir().unwrap()),
             active_files: Mutex::new(HashSet::new()),
             file_history: Mutex::new(HashMap::new()),
@@ -153,7 +175,7 @@ impl DeveloperSystem {
                 .get("command")
                 .and_then(|v| v.as_str())
                 .ok_or(AgentError::InvalidParameters(
-                    "command argument as a string is required".into(),
+                    "The command string is required".into(),
                 ))?;
 
         // Disallow commands that should use other tools
@@ -179,18 +201,9 @@ impl DeveloperSystem {
         if !output.status.success() {
             return Err(AgentError::ExecutionError(output_str));
         }
-
-        let formatted = formatdoc! {"
-            ## Output
-
-            ```
-            {}
-            ```
-            ",
-            output_str
-        };
-
-        Ok(vec![Content::text(formatted)])
+        Ok(vec![
+            Content::text(output_str).with_audience(vec![Role::Assistant])
+        ])
     }
 
     // Implement text_editor tool functionality
@@ -340,7 +353,7 @@ impl DeveloperSystem {
                 content=file_text,
             })
             .with_audience(vec![Role::User])
-            .with_priority(0.0),
+            .with_priority(0.2),
         ])
     }
 
@@ -369,9 +382,15 @@ impl DeveloperSystem {
             .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
 
         // Ensure 'old_str' appears exactly once
-        if content.matches(old_str).count() != 1 {
+        if content.matches(old_str).count() > 1 {
             return Err(AgentError::InvalidParameters(
-                "'old_str' must appear exactly once in the file".into(),
+                "'old_str' must appear exactly once in the file, but it appears multiple times"
+                    .into(),
+            ));
+        }
+        if content.matches(old_str).count() == 0 {
+            return Err(AgentError::InvalidParameters(
+                "'old_str' must appear exactly once in the file, but it does not appear in the file. Make sure the string exactly matches existing file content, including spacing.".into(),
             ));
         }
 
@@ -407,7 +426,7 @@ impl DeveloperSystem {
                 new_str=new_str,
             })
             .with_audience(vec![Role::User])
-            .with_priority(0.0),
+            .with_priority(0.2),
         ])
     }
 
@@ -438,7 +457,11 @@ impl DeveloperSystem {
 
         if insert_line > lines.len() {
             return Err(AgentError::InvalidParameters(
-                "Insert line number is out of range".into(),
+                format!(
+                    "The insert line is greater than the length of the file ({} lines)",
+                    lines.len()
+                )
+                .into(),
             ));
         }
 
@@ -506,6 +529,52 @@ impl DeveloperSystem {
         history.entry(path.clone()).or_default().push(content);
         Ok(())
     }
+
+    // Implement screen capture functionality
+    async fn screen_capture(&self, params: Value) -> AgentResult<Vec<Content>> {
+        let display = params.get("display").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+
+        // Capture the screenshot using xcap
+        let monitors = Monitor::all()
+            .map_err(|_| AgentError::ExecutionError("Failed to access monitors".into()))?;
+        let monitor = monitors.get(display).ok_or(AgentError::ExecutionError(
+            format!(
+                "{} was not an available monitor, {} found.",
+                display,
+                monitors.len()
+            )
+            .into(),
+        ))?;
+
+        let mut image = monitor.capture_image().map_err(|e| {
+            AgentError::ExecutionError(format!("Failed to capture display {}: {}", display, e))
+        })?;
+
+        // Resize the image to a reasonable width while maintaining aspect ratio
+        let max_width = 768;
+        if image.width() > max_width {
+            let scale = max_width as f32 / image.width() as f32;
+            let new_height = (image.height() as f32 * scale) as u32;
+            image = xcap::image::imageops::resize(
+                &image,
+                max_width,
+                new_height,
+                xcap::image::imageops::FilterType::Lanczos3,
+            )
+        };
+
+        let mut bytes: Vec<u8> = Vec::new();
+        image
+            .write_to(&mut Cursor::new(&mut bytes), xcap::image::ImageFormat::Png)
+            .map_err(|e| {
+                AgentError::ExecutionError(format!("Failed to write image buffer {}", e))
+            })?;
+
+        // Convert to base64
+        let data = base64::prelude::BASE64_STANDARD.encode(bytes);
+
+        Ok(vec![Content::image(data, "image/png")])
+    }
 }
 
 #[async_trait]
@@ -559,6 +628,7 @@ running commands on the shell."
         match tool_call.name.as_str() {
             "bash" => self.bash(tool_call.arguments).await,
             "text_editor" => self.text_editor(tool_call.arguments).await,
+            "screen_capture" => self.screen_capture(tool_call.arguments).await,
             _ => Err(AgentError::ToolNotFound(tool_call.name)),
         }
     }

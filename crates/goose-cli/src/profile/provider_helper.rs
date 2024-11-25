@@ -50,6 +50,7 @@ pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig
                 model,
                 temperature: None,
                 max_tokens: None,
+                image_format: goose::providers::utils::ImageFormat::Anthropic,
             })
         }
         PROVIDER_OLLAMA => ProviderConfig::Ollama(OllamaProviderConfig {
