@@ -4,9 +4,8 @@ import LinkPreview from './LinkPreview'
 import { extractUrls } from '../utils/urlUtils'
 
 export default function UserMessage({ message }) {
-  // Extract URLs from current message
-  const urls = extractUrls(message.content, []);  // No previous URLs to check against
-  console.log('User message URLs:', urls);
+  // Extract URLs which explicitly contain the http:// or https:// protocol
+  const urls = extractUrls(message.content, []);
 
   return (
     <div className="flex justify-end mb-[16px]">

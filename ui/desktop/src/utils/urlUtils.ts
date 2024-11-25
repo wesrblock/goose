@@ -1,5 +1,3 @@
-import * as linkify from 'linkifyjs';
-
 // Helper to normalize URLs for comparison
 function normalizeUrl(url: string): string {
   try {
@@ -13,21 +11,18 @@ function normalizeUrl(url: string): string {
 }
 
 export function extractUrls(content: string, previousUrls: string[] = []): string[] {
-  // First extract markdown-style links using regex
-  const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  // Modified regex to only match markdown links with http:// or https://
+  const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
   const markdownMatches = Array.from(content.matchAll(markdownLinkRegex));
   const markdownUrls = markdownMatches.map(match => match[2]);
 
-  // Then use linkifyjs to find regular URLs
-  const links = linkify.find(content);
+  // Modified regex for standalone URLs with http:// or https://
+  const urlRegex = /(https?:\/\/[^\s<>"']+)/g;
+  const urlMatches = Array.from(content.matchAll(urlRegex));
+  const standardUrls = urlMatches.map(match => match[1]);
 
-  // Get URLs from current content
-  const linkifyUrls = links
-    .filter(link => link.type === 'url')
-    .map(link => link.href);
-
-  // Combine markdown URLs with linkify URLs
-  const currentUrls = [...new Set([...markdownUrls, ...linkifyUrls])];
+  // Combine markdown URLs with standard URLs
+  const currentUrls = [...new Set([...markdownUrls, ...standardUrls])];
   
   // Normalize all URLs for comparison
   const normalizedPreviousUrls = previousUrls.map(normalizeUrl);

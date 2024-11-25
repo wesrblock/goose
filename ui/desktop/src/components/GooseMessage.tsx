@@ -13,23 +13,20 @@ interface GooseMessageProps {
 }
 
 export default function GooseMessage({ message, metadata, messages, append }: GooseMessageProps) {
-  // Find the preceding user message
+  // Extract URLs under a few conditions
+  // 1. The message is purely text
+  // 2. The link wasn't also present in the previous message
+  // 3. The message contains the explicit http:// or https:// protocol at the beginning
   const messageIndex = messages?.findIndex(msg => msg.id === message.id);
   const previousMessage = messageIndex > 0 ? messages[messageIndex - 1] : null;
-
-  // Get URLs from previous user message (if it exists)
-  const previousUrls = previousMessage
-    ? extractUrls(previousMessage.content)
-    : [];
-
-  // Extract URLs from current message, excluding those from the previous user message
-  const urls = extractUrls(message.content, previousUrls);
+  const previousUrls = previousMessage ? extractUrls(previousMessage.content) : [];
+  const urls = !message.toolInvocations ? extractUrls(message.content, previousUrls) : [];
 
   return (
-    <div className="flex mb-[16px]">
+    <div className="flex">
       <div className="flex flex-col">
-        <div className="bg-goose-bubble text-white rounded-2xl p-4">
-          {message.toolInvocations ? (
+        {message.toolInvocations && (
+          <div className="bg-goose-bubble text-white rounded-2xl p-4 mb-[16px]">
             <div className="space-y-4">
               {message.toolInvocations.map((toolInvocation) => (
                 <ToolInvocation
@@ -38,24 +35,30 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
                 />
               ))}
             </div>
-          ) : (
-            metadata ? (
-              <GooseResponseForm 
-                message={message.content}
-                metadata={metadata}
-                append={append}
-              />
-            ) : (
-              <ReactMarkdown className="prose">{message.content}</ReactMarkdown>
-            )
-          )}
-        </div>
+          </div>
+        )}
+
+        {message.content && (
+          <div className="bg-goose-bubble text-white rounded-2xl p-4 mb-[16px]">
+            <ReactMarkdown className="prose">{message.content}</ReactMarkdown>
+          </div>
+        )}
 
         {urls.length > 0 && (
           <div className="mt-2">
             {urls.map((url, index) => (
               <LinkPreview key={index} url={url} />
             ))}
+          </div>
+        )}
+
+        {false && metadata && (
+          <div className="bg-goose-bubble text-white rounded-2xl p-4 mb-[16px]">
+            <GooseResponseForm
+              message={message.content}
+              metadata={metadata}
+              append={append}
+            />
           </div>
         )}
       </div>
