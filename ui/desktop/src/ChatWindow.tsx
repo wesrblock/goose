@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useChat } from 'ai/react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { getApiUrl } from './config';
@@ -23,6 +23,14 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
   selectedChatId: number,
   setSelectedChatId: React.Dispatch<React.SetStateAction<number>>
 }) {
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    }
+  };
+
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
   const {
@@ -45,6 +53,7 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
       c.id === selectedChatId ? { ...c, messages } : c
     );
     setChats(updatedChats);
+    scrollToBottom();
   }, [messages, selectedChatId]);
 
   return (
@@ -86,7 +95,7 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
         {messages.length === 0 ? (
           <Splash append={append} />
         ) : (
-          <ScrollArea className="flex-1 px-[10px]">
+          <ScrollArea ref={scrollAreaRef} className="flex-1 px-[10px]">
             <div className="block h-10" />
             {messages.map((message) => (
               <div key={message.id}>
