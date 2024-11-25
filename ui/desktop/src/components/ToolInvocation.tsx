@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card } from './ui/card';
-import { Button } from './ui/button';
-import { BoxIcon, GPSIcon } from './ui/icons'
+import { BoxIcon } from './ui/icons'
 import ReactMarkdown from 'react-markdown'
 
 export default function ToolInvocation({ toolInvocation }) {
@@ -26,6 +25,8 @@ interface ToolCallProps {
 }
 
 function ToolCall({ call }: ToolCallProps) {
+  const argsMarkdownContent = convertArgsToMarkdown(call.args);
+
   return (
     <Card className="bg-tool-card p-4 mt-2">
       <div className="flex items-center space-x-2">
@@ -34,9 +35,9 @@ function ToolCall({ call }: ToolCallProps) {
       </div>
 
       {call.args && (
-        <pre className="mt-1 text-tool-result-green whitespace-pre-wrap">
-          {JSON.stringify(call.args, null, 2)}
-        </pre>
+        <ReactMarkdown className="p4">
+          {argsMarkdownContent}
+        </ReactMarkdown>
       )}
     </Card>
   )
@@ -129,146 +130,36 @@ function ToolResult({ result }: ToolResultProps) {
   )
 }
 
+// Utils
 
-
-
-interface ToolResponseFormProps {
-  result: {
-    message?: string
-    result?: string
-    state?: string
-    toolCallId?: string
-    toolName?: string
-    args?: any
-    input_todo?: any
-  }
-  onSubmitInput?: (input: string) => void
-}
-
-interface JsonSchemaProperty {
-  type: string
-  title?: string
-  description?: string
-  enum?: string[]
-  format?: string
-  minimum?: number
-  maximum?: number
-  minLength?: number
-  maxLength?: number
-}
-
-function getIconForSchemaType(schema: JsonSchemaProperty) {
-  if (schema.enum) return BoxIcon
-  if (schema.type === 'integer' || schema.type === 'number') return BoxIcon
-  if (schema.format === 'date' || schema.format === 'date-time') return BoxIcon
-  return BoxIcon
-}
-
-function ToolResponseForm({ result, onSubmitInput }: ToolResponseFormProps) {
-  const [inputValues, setInputValues] = useState<Record<string, string>>({})
-  const [submitted, setSubmitted] = useState(false)
-
-  const handleSubmit = () => {
-    setSubmitted(true)
-    const inputString = Object.entries(inputValues)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join('\n')
-    if (onSubmitInput) {
-      onSubmitInput(inputString)
+const convertArgsToMarkdown = (args: Record<string, any>): string => {
+  const lines: string[] = [];
+  
+  Object.entries(args).forEach(([key, value]) => {
+    // Add the parameter name as a heading
+    lines.push(`### ${key}`);
+    lines.push('');
+    
+    // Handle different value types
+    if (typeof value === 'string') {
+      lines.push('```');
+      lines.push(value);
+      lines.push('```');
+    } else if (Array.isArray(value)) {
+      value.forEach((item, index) => {
+        lines.push(`${index + 1}. ${JSON.stringify(item)}`);
+      });
+    } else if (typeof value === 'object' && value !== null) {
+      lines.push('```json');
+      lines.push(JSON.stringify(value, null, 2));
+      lines.push('```');
+    } else {
+      lines.push('```');
+      lines.push(String(value));
+      lines.push('```');
     }
-  }
+    lines.push('');
+  });
 
-  {result.input_todo && !submitted && (
-    <div>
-      <div className="mt-4 p-4 bg-gray-800 rounded-md">
-        {Object.entries(result.input_todo.properties).map(([key, schema]: [key: string, schema: JsonSchemaProperty]) => {
-          const value = inputValues[key] || ''
-          const Icon = getIconForSchemaType(schema as JsonSchemaProperty)
-            
-          if (schema.enum) {
-            return (
-              <div key={key} className="mb-4">
-                <div className="text-white mb-2 flex items-center gap-2">
-                  <BoxIcon size={16} />
-                  <span>{schema.title || key}</span>
-                </div>
-                <div className="flex flex-col space-y-2">
-                  {schema.enum.map((option) => (
-                    <div key={option} className="flex items-center space-x-2">
-                      <div
-                        className={`cursor-pointer px-3 py-2 rounded-md ${
-                          value === option ? 'bg-blue-500' : 'bg-gray-700'
-                        }`}
-                        onClick={() => setInputValues({ ...inputValues, [key]: option })}>
-                        <span className="text-white">{option}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {schema.description && (
-                  <div className="text-gray-400 text-sm mt-1">{schema.description}</div>
-                )}
-              </div>
-            )
-          }
-
-          return (
-            <div key={key} className="w-full">
-              <div className="text-white mb-2 flex items-center gap-2">
-                <Icon size={16} />
-                <span>{schema.title || key}</span>
-              </div>
-              {schema.type === 'integer' || schema.type === 'number' ? (
-                <input
-                  type="number"
-                  className="w-full p-2 bg-gray-700 text-white rounded-md"
-                  min={schema.minimum}
-                  max={schema.maximum}
-                  step={schema.type === 'integer' ? 1 : 0.1}
-                  onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
-                />
-              ) : schema.format === 'date' ? (
-                <input
-                  type="date"
-                  className="w-full p-2 bg-gray-700 text-white rounded-md"
-                  onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
-                />
-              ) : schema.format === 'date-time' ? (
-                <input
-                  type="datetime-local"
-                  className="w-full p-2 bg-gray-700 text-white rounded-md"
-                  onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
-                />
-              ) : (
-                schema.type === 'string' && (
-                  !schema.maxLength || schema.maxLength > 100 ? (
-                    <div
-                      className="w-full p-2 bg-gray-700 text-white rounded-md min-h-[100px]"
-                      contentEditable
-                      onBlur={(e) => setInputValues({ ...inputValues, [key]: e.currentTarget.textContent || '' })}
-                      suppressContentEditableWarning
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      className="w-full p-2 bg-gray-700 text-white rounded-md"
-                      minLength={schema.minLength}
-                      maxLength={schema.maxLength}
-                      onChange={(e) => setInputValues({ ...inputValues, [key]: e.target.value })}
-                    />
-                  )
-                )
-              )}
-              {schema.description && (
-                <div className="text-gray-400 text-sm mt-1">{schema.description}</div>
-              )}
-          </div>
-        )})}
-      </div>
-      <Button onClick={handleSubmit} className="w-full transition-colors tool-form-button">
-        <GPSIcon size={14} />
-        <span>Submit</span>
-      </Button>
-    </div>
-  )}
-}
+  return lines.join('\n');
+};
