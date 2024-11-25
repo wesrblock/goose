@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ToolInvocation from './ToolInvocation';
 import ReactMarkdown from 'react-markdown';
+import { GPSIcon } from './ui/icons';
 
 export default function GooseMessage({ message, metadata }) {
   console.log("GooseMessage", metadata);
@@ -40,9 +41,23 @@ export default function GooseMessage({ message, metadata }) {
     }
   }
 
+  const [selectedOption, setSelectedOption] = useState(null);
+
+  const handleOptionClick = (index) => {
+    setSelectedOption(index);
+  };
+
+  const handleSubmit = () => {
+    if (selectedOption !== null) {
+      console.log("Selected Option:", options[selectedOption]);
+    } else {
+      console.log("No option selected");
+    }
+  };
+
   return (
     <div className="flex mb-4">
-      <div className="bg-goose-bubble w-full text-black rounded-2xl p-4">
+      <div className="bg-white w-full text-black rounded-2xl p-4 shadow-md">
         {message.toolInvocations ? (
           <div className="space-y-4">
             {message.toolInvocations.map((toolInvocation) => (
@@ -54,17 +69,18 @@ export default function GooseMessage({ message, metadata }) {
           </div>
         ) : (
           <>
-            {!isOptions && (
+            {(!isOptions || options.length == 0) && (
               <ReactMarkdown className="prose">{message.content}</ReactMarkdown>
             )}
             {isQuestion && (
-              <div className="mt-4 bg-zinc-100 p-4 rounded-lg shadow-md">
-                <p className="font-semibold text-lg mb-2">Question</p>
+              <div className="mt-4 bg-gray-100 p-4 rounded-lg shadow-lg">
                 <div className="space-x-2">
-                  <button className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">
-                    Ok
+                  <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition mt-4">
+                    <GPSIcon size={14} />
+                    Accept Plan
                   </button>
-                  <button className="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition">
+                  <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition mt-4">
+                    <GPSIcon size={14} />
                     Cancel
                   </button>
                 </div>
@@ -75,7 +91,12 @@ export default function GooseMessage({ message, metadata }) {
                 {options.map((opt, index) => (
                   <div
                     key={index}
-                    className="p-4 bg-zinc-100 rounded-lg shadow-md"
+                    onClick={() => handleOptionClick(index)}
+                    className={`p-4 rounded-lg shadow-md cursor-pointer ${
+                      selectedOption === index
+                        ? 'bg-blue-100 border border-blue-500'
+                        : 'bg-gray-100'
+                    }`}
                   >
                     <h3 className="font-semibold text-lg">{opt.optionTitle}</h3>
                     <ReactMarkdown className="prose">
@@ -83,7 +104,11 @@ export default function GooseMessage({ message, metadata }) {
                     </ReactMarkdown>
                   </div>
                 ))}
-                <button className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition mt-4">
+                <button
+                  onClick={handleSubmit}
+                  className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition mt-4"
+                >
+                  <GPSIcon size={14} />
                   Submit
                 </button>
               </div>
