@@ -31,17 +31,18 @@ const handleResize = (mode: 'expanded' | 'compact') => {
   }
 };
 
-const WingView: React.FC<{ onExpand: () => void }> = ({ onExpand }) => {
+const WingView: React.FC<{ onExpand: () => void; lastMessage: any }> = ({ onExpand, lastMessage }) => {
   return (
     <div
       onClick={onExpand}
       className="flex items-center justify-center w-full bg-gray-800 text-green-400 cursor-pointer rounded-lg p-4"
     >
       <div className="text-sm text-left font-mono bg-black bg-opacity-50 p-3 rounded-lg">
-        <span className="block">$ ping apple.com (17.253.144.10): 56 data bytes</span>
-        <span className="block">
-          64 bytes from 17.253.144.10: icmp_seq=0 ttl=240 time=8.890 ms
-        </span>
+        {lastMessage ? (
+          <span className="block">{lastMessage.content}</span>
+        ) : (
+          <span className="block">goose is ready</span>
+        )}
       </div>
     </div>
   );
@@ -163,6 +164,11 @@ export default function ChatWindow() {
 
   const [mode, setMode] = useState<'expanded' | 'compact'>(initialQuery ? 'compact' : 'expanded');
 
+  const selectedChat = chats.find(c => c.id === selectedChatId);
+  // Extract the last message where role is not 'user'
+  const lastGooseMessage = selectedChat?.messages.slice().reverse().find(m => m.role !== 'user');
+
+
   const toggleMode = () => {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
     console.log(`Toggle to ${newMode}`);
@@ -200,7 +206,7 @@ export default function ChatWindow() {
 
       {/* Always render WingView but control its visibility */}
       <div style={{ display: mode === 'expanded' ? 'none' : 'flex' }}>
-        <WingView onExpand={toggleMode} />
+        <WingView onExpand={toggleMode} lastMessage={lastGooseMessage} />
       </div>
     </div>
   );
