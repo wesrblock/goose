@@ -176,18 +176,28 @@ impl DeveloperSystem {
             .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
 
         let output_str = String::from_utf8_lossy(&output.stdout).to_string();
-        if !output.status.success() {
-            return Err(AgentError::ExecutionError(output_str));
-        }
 
-        let formatted = formatdoc! {"
-            ## Output
+        let formatted = if !output.status.success() {
+            formatdoc! {"
+                ## Command Errored with exit code: {}
 
-            ```
-            {}
-            ```
-            ",
-            output_str
+                ```
+                {}
+                ```
+                ",
+                output.status.code().unwrap_or(1),
+                output_str
+            }
+        } else {
+            formatdoc! {"
+                ## Output
+
+                ```
+                {}
+                ```
+                ",
+                output_str
+            }
         };
 
         Ok(vec![Content::text(formatted)])
@@ -598,6 +608,18 @@ mod tests {
             .as_text()
             .unwrap()
             .contains(&std::env::current_dir().unwrap().display().to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_bash_failed_command_result_is_not_tool_error() {
+        let system = get_system().await;
+
+        let tool_call = ToolCall::new("bash", json!({ "working_dir": ".", "command": "false" }));
+        let result = system.call(tool_call).await.unwrap();
+        assert!(result[0]
+            .as_text()
+            .unwrap()
+            .starts_with("## Command Errored with exit code"));
     }
 
     #[tokio::test]
