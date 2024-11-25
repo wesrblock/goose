@@ -69,6 +69,8 @@ function ChatContent({
 
   //window.electron.logInfo('chats' + JSON.stringify(chats, null, 2));
 
+  const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});
+
   const {
     messages,
     input,
@@ -107,6 +109,7 @@ function ChatContent({
       ];
 
       const fetchResponses = await askAi(promptTemplates);
+      setMessageMetadata(prev => ({ ...prev, [message.id]: fetchResponses }));
 
       console.log('All responses:', fetchResponses);
     },
@@ -173,7 +176,7 @@ function ChatContent({
                 {message.role === 'user' ? (
                   <UserMessage message={message} />
                 ) : (
-                  <GooseMessage message={message} />
+                  <GooseMessage metadata={messageMetadata[message.id]} message={message} />
                 )}
               </div>
             ))}
@@ -276,6 +279,9 @@ export default function ChatWindow() {
 
 }
 
+/**
+ * Utillity to ask the LLM any question to clarify without wider context.
+ */
 async function askAi(promptTemplates: string[]) {
   console.log('askAi called...');
   const responses = await Promise.all(promptTemplates.map(async (template) => {
