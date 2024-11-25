@@ -1,15 +1,16 @@
+use super::base::{Provider, Usage};
+use super::configs::OllamaProviderConfig;
+use super::utils::{
+    messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec, ImageFormat,
+};
+use crate::models::message::Message;
+use crate::models::tool::Tool;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use reqwest::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
-use crate::models::message::Message;
-use crate::models::tool::Tool;
-use super::base::{Provider, Usage};
-use super::configs::OllamaProviderConfig;
-use super::utils::{messages_to_openai_spec, openai_response_to_message, tools_to_openai_spec};
-
 
 pub const OLLAMA_HOST: &str = "http://localhost:11434";
 pub const OLLAMA_MODEL: &str = "qwen2.5";
@@ -61,26 +62,25 @@ impl OllamaProvider {
             self.config.host.trim_end_matches('/')
         );
 
-        let response = self
-            .client
-            .post(&url)
-            .json(&payload)
-            .send()
-            .await?;
+        let response = self.client.post(&url).json(&payload).send().await?;
 
         match response.status() {
             StatusCode::OK => Ok(response.json().await?),
             status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
                 Err(anyhow!("Server error: {}", status))
             }
-            _ => Err(anyhow!("Request failed: {}\nPayload: {}", response.status(), payload)),
+            _ => Err(anyhow!(
+                "Request failed: {}\nPayload: {}",
+                response.status(),
+                payload
+            )),
         }
     }
 }
 
 #[async_trait]
 impl Provider for OllamaProvider {
-     async fn complete(
+    async fn complete(
         &self,
         system: &str,
         messages: &[Message],
@@ -91,7 +91,7 @@ impl Provider for OllamaProvider {
             "content": system
         });
 
-        let messages_spec = messages_to_openai_spec(messages);
+        let messages_spec = messages_to_openai_spec(messages, &ImageFormat::OpenAi);
         let tools_spec = tools_to_openai_spec(tools)?;
 
         let mut messages_array = vec![system_message];
@@ -263,10 +263,7 @@ mod tests {
         if let MessageContent::ToolRequest(tool_request) = &message.content[0] {
             let tool_call = tool_request.tool_call.as_ref().unwrap();
             assert_eq!(tool_call.name, "read_file");
-            assert_eq!(
-                tool_call.arguments,
-                json!({"filename": "test.txt"})
-            );
+            assert_eq!(tool_call.arguments, json!({"filename": "test.txt"}));
         } else {
             panic!("Expected ToolCall content");
         }
@@ -296,10 +293,15 @@ mod tests {
 
         let provider = OllamaProvider::new(config)?;
         let messages = vec![Message::user().with_text("Hello?")];
-        let result = provider.complete("You are a helpful assistant.", &messages, &[]).await;
+        let result = provider
+            .complete("You are a helpful assistant.", &messages, &[])
+            .await;
 
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Server error: 500"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Server error: 500"));
 
         Ok(())
     }

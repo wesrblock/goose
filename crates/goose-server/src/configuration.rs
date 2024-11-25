@@ -1,9 +1,13 @@
 use crate::error::{to_env_var, ConfigError};
 use config::{Config, Environment};
 use goose::providers::{
-    configs::{DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig, ProviderConfig},
+    configs::{
+        DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig,
+        ProviderConfig,
+    },
     factory::ProviderType,
     ollama,
+    utils::ImageFormat,
 };
 use serde::Deserialize;
 use std::net::SocketAddr;
@@ -47,6 +51,8 @@ pub enum ProviderSettings {
         temperature: Option<f32>,
         #[serde(default)]
         max_tokens: Option<i32>,
+        #[serde(default = "default_image_format")]
+        image_format: ImageFormat,
     },
     Ollama {
         #[serde(default = "default_ollama_host")]
@@ -92,12 +98,14 @@ impl ProviderSettings {
                 model,
                 temperature,
                 max_tokens,
+                image_format,
             } => ProviderConfig::Databricks(DatabricksProviderConfig {
                 host: host.clone(),
                 auth: DatabricksAuth::oauth(host),
                 model,
                 temperature,
                 max_tokens,
+                image_format,
             }),
             ProviderSettings::Ollama {
                 host,
@@ -201,6 +209,10 @@ fn default_ollama_model() -> String {
     ollama::OLLAMA_MODEL.to_string()
 }
 
+fn default_image_format() -> ImageFormat {
+    ImageFormat::Anthropic
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,6 +278,7 @@ mod tests {
             model,
             temperature,
             max_tokens,
+            image_format: _,
         } = settings.provider
         {
             assert_eq!(host, "https://custom.databricks.com");

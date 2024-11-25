@@ -36,6 +36,7 @@ axum = "0.7"
 tower-http = { version = "0.5", features = ["cors"] }
 webbrowser = "0.8"
 dotenv = "0.15"
+xcap = "0.0.14"
 
 [dev-dependencies]
 wiremock = "0.6.0"

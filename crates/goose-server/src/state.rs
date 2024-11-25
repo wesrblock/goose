@@ -26,16 +26,17 @@ impl Clone for AppState {
                         model: config.model.clone(),
                         temperature: config.temperature,
                         max_tokens: config.max_tokens,
+                        image_format: config.image_format,
                     },
                 ),
-                ProviderConfig::Ollama(config) => ProviderConfig::Ollama(
-                    goose::providers::configs::OllamaProviderConfig {
+                ProviderConfig::Ollama(config) => {
+                    ProviderConfig::Ollama(goose::providers::configs::OllamaProviderConfig {
                         host: config.host.clone(),
                         model: config.model.clone(),
                         temperature: config.temperature,
                         max_tokens: config.max_tokens,
-                    },
-                ),
+                    })
+                }
             },
         }
     }
