@@ -212,12 +212,7 @@ export default function ChatWindow() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
-      <button
-        onClick={toggleMode}
-        className="absolute top-4 right-4 bg-blue-500 text-white py-2 px-4 rounded z-10"
-      >
-        {mode === 'expanded' ? 'Compact View' : 'Expand Chat'}
-      </button>
+      
 
       {/* Always render ChatContent but control its visibility */}
       <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
