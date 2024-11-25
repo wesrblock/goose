@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useChat } from 'ai/react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { getApiUrl } from './config';
@@ -47,13 +47,15 @@ const WingView: React.FC<{ onExpand: () => void }> = ({ onExpand }) => {
   );
 };
 
-function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
+function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId, initialQuery }: {
   chats: Chat[],
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
   selectedChatId: number,
   setSelectedChatId: React.Dispatch<React.SetStateAction<number>>
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
+
+  window.electron.logInfo("chats" + JSON.stringify(chats, null, 2));
 
   const { messages, input, handleInputChange, handleSubmit, append, stop } = useChat({
     api: getApiUrl("/reply"),
@@ -67,6 +69,14 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
     );
     setChats(updatedChats);
   }, [messages, selectedChatId]);
+
+  const initialQueryAppended = useRef(false);
+  useEffect(() => {
+    if (initialQuery && !initialQueryAppended.current) {
+      append({ role: 'user', content: initialQuery });
+      initialQueryAppended.current = true;
+    }
+  }, [initialQuery]);
 
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
@@ -144,12 +154,7 @@ export default function ChatWindow() {
     const firstChat = {
       id: 1,
       title: initialQuery || 'Chat 1',
-      messages: initialHistory.length > 0 ? initialHistory :
-        (initialQuery ? [{
-          id: '0',
-          role: 'user' as const,
-          content: initialQuery
-        }] : [])
+      messages: initialHistory.length > 0 ? initialHistory : []
     };
     return [firstChat];
   });
@@ -183,6 +188,7 @@ export default function ChatWindow() {
                 setChats={setChats}
                 selectedChatId={selectedChatId}
                 setSelectedChatId={setSelectedChatId}
+                initialQuery={initialQuery}
               />
             }
           />
