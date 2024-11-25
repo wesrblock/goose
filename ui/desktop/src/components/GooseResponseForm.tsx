@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { GPSIcon } from './ui/icons';
 import ReactMarkdown from 'react-markdown';
+import { Button } from './ui/button';
+import { cn } from '../utils';
 
 interface GooseResponseFormProps {
   message: string;
@@ -78,57 +80,62 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
   }
 
   return (
-    <>
+    <div className="space-y-4">
       {(!isOptions || options.length === 0) && (
-        <ReactMarkdown className="prose">{message}</ReactMarkdown>
+        <div className="prose max-w-none">
+          <ReactMarkdown>{message}</ReactMarkdown>
+        </div>
       )}
       {isQuestion && (
-        <div className="mt-4 bg-gray-100 p-4 rounded-lg shadow-lg">
-          <div className="flex space-x-4">
-            <button
-              onClick={handleAccept}
-              className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
-            >
-              <GPSIcon size={14} />
-              Take flight with this direction
-            </button>
-            <button
-              onClick={handleCancel}
-              className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
-            >
-              <GPSIcon size={14} />
-              Cancel
-            </button>
-          </div>
+        <div className="flex items-center gap-4 p-4 rounded-lg bg-tool-card border">
+          <Button
+            onClick={handleAccept}
+            variant="default"
+            className="w-full sm:w-auto"
+          >
+            <GPSIcon size={14} />
+            Take flight with this direction
+          </Button>
+          <Button
+            onClick={handleCancel}
+            variant="destructive"
+            className="w-full sm:w-auto"
+          >
+            <GPSIcon size={14} />
+            Cancel
+          </Button>
         </div>
       )}
       {isOptions && options.length > 0 && (
-        <div className="mt-4 space-y-4">
+        <div className="space-y-4">
           {options.map((opt, index) => (
             <div
               key={index}
               onClick={() => handleOptionClick(index)}
-              className={`p-4 rounded-lg shadow-md cursor-pointer ${
+              className={cn(
+                "p-4 rounded-lg border transition-colors cursor-pointer",
                 selectedOption === index
-                  ? 'bg-blue-100 border border-blue-500'
-                  : 'bg-gray-100'
-              }`}
+                  ? "bg-primary/10 border-primary"
+                  : "bg-tool-card hover:bg-accent"
+              )}
             >
-              <h3 className="font-semibold text-lg">{opt.optionTitle}</h3>
-              <ReactMarkdown className="prose">
-                {opt.optionDescription}
-              </ReactMarkdown>
+              <h3 className="font-semibold text-lg mb-2">{opt.optionTitle}</h3>
+              <div className="prose max-w-none">
+                <ReactMarkdown>{opt.optionDescription}</ReactMarkdown>
+              </div>
             </div>
           ))}
-          <button
+          <Button
             onClick={handleSubmit}
-            className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition mt-4"
+            variant="default"
+            className="w-full sm:w-auto"
+            disabled={selectedOption === null}
           >
             <GPSIcon size={14} />
             Submit
-          </button>
+          </Button>
         </div>
       )}
-    </>
+    </div>
   );
 }
