@@ -153,14 +153,11 @@ async fn main() -> Result<()> {
             resume,
         }) => {
             let contents = if let Some(file_name) = instructions {
-                // Read from file if instructions provided
                 let file_path = std::path::Path::new(&file_name);
                 std::fs::read_to_string(file_path).expect("Failed to read the instruction file")
             } else if let Some(input_text) = input_text {
-                // Use text directly if provided
                 input_text
             } else {
-                // Piped input mode (default to stdin if no instructions or text is provided)
                 use std::io::{self, Read};
                 let mut stdin = String::new();
                 io::stdin().read_to_string(&mut stdin).expect("Failed to read from stdin");
