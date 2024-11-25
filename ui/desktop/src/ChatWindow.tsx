@@ -104,6 +104,7 @@ function ChatContent({
       ];
 
       const fetchResponses = await askAi(promptTemplates);
+
       setMessageMetadata(prev => ({ ...prev, [message.id]: fetchResponses }));
 
       console.log('All responses:', fetchResponses);

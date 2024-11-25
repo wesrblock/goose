@@ -40,7 +40,7 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
 
         {message.content && (
           <div className="bg-goose-bubble text-white rounded-2xl p-4 mb-[16px]">
-            <ReactMarkdown className="prose">{message.content}</ReactMarkdown>
+            <ReactMarkdown className="prose prose-xs">{message.content}</ReactMarkdown>
           </div>
         )}
 

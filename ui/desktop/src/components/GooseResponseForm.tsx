@@ -82,7 +82,7 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
   return (
     <div className="space-y-4">
       {(!isOptions || options.length === 0) && (
-        <div className="prose max-w-none">
+        <div className="prose prose-xs max-w-none">
           <ReactMarkdown>{message}</ReactMarkdown>
         </div>
       )}
@@ -120,7 +120,7 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
               )}
             >
               <h3 className="font-semibold text-lg mb-2">{opt.optionTitle}</h3>
-              <div className="prose max-w-none">
+              <div className="prose prose-xs max-w-none">
                 <ReactMarkdown>{opt.optionDescription}</ReactMarkdown>
               </div>
             </div>

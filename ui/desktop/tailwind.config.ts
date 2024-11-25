@@ -5,8 +5,31 @@ export default {
     "./src/**/*.{js,jsx,ts,tsx}",
     "./index.html",
   ],
+  plugins: [
+    require("tailwindcss-animate"),
+    require('@tailwindcss/typography')
+  ],
   theme: {
     extend: {
+      typography: {
+        xs: {
+          css: {
+            fontSize: '12px',
+            h1: {
+              fontSize: '1.5em'
+            },
+            h2: {
+              fontSize: '1.25em'
+            },
+            h3: {
+              fontSize: '1.125em'
+            },
+            h4: {
+              fontSize: '1em'
+            }
+          }
+        }
+      },
       spacing: {
         '8': '8px',
         '10': '10px',
@@ -50,8 +73,5 @@ export default {
         sm: 'calc(var(--radius) - 4px)'
       }
     }
-  },
-  plugins: [
-    require("tailwindcss-animate"),
-    require('@tailwindcss/typography'),],
+  }
 }
