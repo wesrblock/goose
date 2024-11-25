@@ -1,9 +1,7 @@
 use rand::{distributions::Alphanumeric, Rng};
 use std::path::{Path, PathBuf};
 
-use goose::agent::Agent;
 use goose::models::message::Message;
-use goose::providers::factory;
 
 use crate::commands::expected_config::get_recommended_models;
 use crate::profile::profile::Profile;
@@ -47,9 +45,6 @@ pub fn build_session<'a>(
     let provider_config =
         set_provider_config(&loaded_profile.provider, loaded_profile.model.clone());
 
-    // TODO: Odd to be prepping the provider rather than having that done in the agent?
-    let provider = factory::get_provider(provider_config).unwrap();
-    let agent = Box::new(Agent::new(provider));
     let mut prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
             "cliclack" => Box::new(CliclackPrompt::new()) as Box<dyn Prompt>,
@@ -70,7 +65,7 @@ pub fn build_session<'a>(
         session_file.display()
     ))));
 
-    Box::new(Session::new(agent, prompt, session_file))
+    Box::new(Session::new(provider_config.clone(), prompt, session_file))
 }
 
 fn session_path(

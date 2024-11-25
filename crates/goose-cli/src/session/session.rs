@@ -1,11 +1,14 @@
 use anyhow::Result;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
+use goose::providers::configs::ProviderConfig;
+use goose::providers::factory;
 use std::path::PathBuf;
+use tokio::sync::mpsc;
 
-use crate::agents::agent::Agent;
 use crate::prompt::prompt::{InputType, Prompt};
 use crate::session::session_file::{persist_messages, readable_session_file};
 use crate::systems::goose_hints::GooseHintsSystem;
+use goose::agent::Agent;
 use goose::developer::DeveloperSystem;
 use goose::models::message::{Message, MessageContent};
 use goose::models::role::Role;
@@ -13,14 +16,18 @@ use goose::models::role::Role;
 use super::session_file::deserialize_messages;
 
 pub struct Session<'a> {
-    agent: Box<dyn Agent>,
+    provider_config: ProviderConfig,
     prompt: Box<dyn Prompt + 'a>,
     session_file: PathBuf,
     messages: Vec<Message>,
 }
 
 impl<'a> Session<'a> {
-    pub fn new(agent: Box<dyn Agent>, prompt: Box<dyn Prompt + 'a>, session_file: PathBuf) -> Self {
+    pub fn new(
+        provider_config: ProviderConfig,
+        prompt: Box<dyn Prompt + 'a>,
+        session_file: PathBuf,
+    ) -> Self {
         let messages = match readable_session_file(&session_file) {
             Ok(file) => deserialize_messages(file).unwrap_or_else(|e| {
                 eprintln!(
@@ -36,7 +43,7 @@ impl<'a> Session<'a> {
         };
 
         Session {
-            agent,
+            provider_config,
             prompt,
             session_file,
             messages,
@@ -84,36 +91,72 @@ impl<'a> Session<'a> {
     }
 
     async fn agent_process_messages(&mut self) {
-        let mut stream = match self.agent.reply(&self.messages).await {
-            Ok(stream) => stream,
-            Err(e) => {
-                eprintln!("Error starting reply stream: {}", e);
-                return;
+        let (tx, mut rx) = mpsc::channel::<Option<Result<Message>>>(1);
+
+        let messages = self.messages.clone();
+        let provider_config = self.provider_config.clone();
+        let (abort_tx, abort_rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let abort_rx = abort_rx.fuse();
+            futures::pin_mut!(abort_rx);
+            let provider = factory::get_provider(provider_config).unwrap();
+            let mut agent = Box::new(Agent::new(provider));
+
+            let system = Box::new(DeveloperSystem::new());
+            agent.add_system(system);
+            let goosehints_system = Box::new(GooseHintsSystem::new());
+            agent.add_system(goosehints_system);
+
+            let mut stream = match agent.reply(&messages).await {
+                Ok(stream) => stream,
+                Err(e) => {
+                    eprintln!("Error starting reply stream: {}", e);
+                    return;
+                }
+            };
+            let mut done = false;
+            loop {
+                tokio::select! {
+                    response = stream.next() => {
+                        match response {
+                            Some(something)=>{tx.send(Some(something)).await.unwrap();}
+                            None => break
+                        }
+                    }
+                    _ = &mut abort_rx => {
+                        done = true;
+                        eprintln!("Agent thread aborted");
+                    }
+                }
+                if done {
+                    drop(stream);
+                    break;
+                }
             }
-        };
-        loop {
-            tokio::select! {
-                response = stream.next() => {
-                    match response {
+        });
+
+        tokio::select! {
+            _ = async {
+                while let Some(res) = rx.recv().await {
+                    match res {
                         Some(Ok(message)) => {
                             self.messages.push(message.clone());
                             persist_messages(&self.session_file, &self.messages).unwrap_or_else(|e| eprintln!("Failed to persist messages: {}", e));
+                            self.prompt.hide_busy();
                             self.prompt.render(Box::new(message.clone()));
-                        }
+                            self.prompt.show_busy();
+                        },
                         Some(Err(e)) => {
-                            // TODO: Handle error display through prompt
                             eprintln!("Error: {}", e);
-                            break;
-                        }
-                        None => break,
+                        },
+                        None => {}
                     }
                 }
-                _ = tokio::signal::ctrl_c() => {
-                    drop(stream);
-                    self.rewind_messages();
-                    self.prompt.render(raw_message(" Interrupt: Resetting conversation to before the last sent message...\n"));
-                    break;
-                }
+            } => {}
+            _ = tokio::signal::ctrl_c() => {
+                let _ = abort_tx.send(());
+                self.rewind_messages();
+                self.prompt.render(raw_message(" Interrupt: Resetting conversation to before the last sent message...\n"));
             }
         }
     }
@@ -144,16 +187,6 @@ impl<'a> Session<'a> {
     }
 
     fn setup_session(&mut self) {
-        let system = Box::new(DeveloperSystem::new());
-        self.agent.add_system(system);
-        self.prompt
-            .render(raw_message("Connected developer system."));
-
-        let goosehints_system = Box::new(GooseHintsSystem::new());
-        self.agent.add_system(goosehints_system);
-        self.prompt
-            .render(raw_message("Connected .goosehints system."));
-
         self.prompt.goose_ready();
     }
 
@@ -175,19 +208,25 @@ fn raw_message(content: &str) -> Box<Message> {
 
 #[cfg(test)]
 mod tests {
-    use crate::agents::mock_agent::MockAgent;
     use crate::prompt::prompt::{self, Input};
 
     use super::*;
-    use goose::{errors::AgentResult, models::tool::ToolCall};
+    use goose::{
+        errors::AgentResult, models::tool::ToolCall, providers::configs::OllamaProviderConfig,
+    };
     use tempfile::NamedTempFile;
 
     // Helper function to create a test session
     fn create_test_session() -> Session<'static> {
         let temp_file = NamedTempFile::new().unwrap();
-        let agent = Box::new(MockAgent {});
         let prompt = Box::new(MockPrompt {});
-        Session::new(agent, prompt, temp_file.path().to_path_buf())
+        let provider_config = ProviderConfig::Ollama(OllamaProviderConfig {
+            model: "test".to_string(),
+            host: "".to_string(),
+            temperature: None,
+            max_tokens: None,
+        });
+        Session::new(provider_config, prompt, temp_file.path().to_path_buf())
     }
 
     // Mock prompt implementation for testing
