@@ -67,7 +67,9 @@ function ChatContent({
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  window.electron.logInfo('chats' + JSON.stringify(chats, null, 2));
+  //window.electron.logInfo('chats' + JSON.stringify(chats, null, 2));
+
+  const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});
 
   const {
     messages,
@@ -92,8 +94,22 @@ function ChatContent({
         setStatus('Receiving response...');
       }
     },
-    onFinish: (message, options) => {
+    onFinish: async (message, options) => {
       setStatus('Goose is ready');
+
+
+  
+
+      const promptTemplates = [
+        "Take a look at this content, if this looks like it could be asking for a confirmation, return QUESTION. If it looks like it is a list of options or plans to choose from, return OPTIONS, otherwise return READY. \n ### Message Content:\n" + message.content,
+        "If the content is clearly a list of distinct options or plans of action to choose from, and not just a list of things, but clearly a list of things to choose one from from, take into account the Message Content alone, try to format it in a json array, like this JSON array of objects of the form optionTitle:string, optionDescription:string (markdown).\n If is not a list of options or plans to choose from, then return empty list.\n ### Message Content:\n" + message.content,
+        "If the content is a request for input from the user, taking into account the Message Content alone, try to format it in as JSON object that fields in it of the form: fieldName:{type: string, number, email or date, title:string, description:optional markdown, required: true or false}:\n If it does not match, then return empty object.\n ### Message Content:\n" + message.content,
+      ];
+
+      const fetchResponses = await askAi(promptTemplates);
+      setMessageMetadata(prev => ({ ...prev, [message.id]: fetchResponses }));
+
+      console.log('All responses:', fetchResponses);
     },
   });
 
@@ -112,6 +128,10 @@ function ChatContent({
       initialQueryAppended.current = true;
     }
   }, [initialQuery]);
+
+  if (error) {
+    console.log('Error:', error);
+  }
 
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
@@ -158,7 +178,7 @@ function ChatContent({
                 {message.role === 'user' ? (
                   <UserMessage message={message} />
                 ) : (
-                  <GooseMessage message={message} messages={messages} />
+                  <GooseMessage message={message} messages={messages} metadata={messageMetadata[message.id]} onInputChange={handleInputChange} />
                 )}
               </div>
             ))}
@@ -170,7 +190,7 @@ function ChatContent({
             {error && (
               <div className="flex items-center justify-center p-4">
                 <div className="text-red-500 bg-red-100 p-3 rounded-lg">
-                  {error.message || 'An error occurred while processing your request'}
+                  {error.message|| 'An error occurred while processing your request'}
                 </div>
               </div>
             )}
@@ -193,7 +213,7 @@ export default function ChatWindow() {
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
-  window.electron.logInfo('initialQuery: ' + initialQuery);
+  //window.electron.logInfo('initialQuery: ' + initialQuery);
   const historyParam = searchParams.get('history');
   const initialHistory = historyParam
     ? JSON.parse(decodeURIComponent(historyParam))
@@ -256,4 +276,35 @@ export default function ChatWindow() {
       </div>
     </div>
   );
+
+
+
 }
+
+/**
+ * Utillity to ask the LLM any question to clarify without wider context.
+ */
+async function askAi(promptTemplates: string[]) {
+  console.log('askAi called...');
+  const responses = await Promise.all(promptTemplates.map(async (template) => {
+    const response = await fetch(getApiUrl('/ask'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt: template })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get response');
+    }
+
+    const data = await response.json();
+    console.log('ask Response:', data.response);
+
+    return data.response;
+  }));
+
+  return responses;
+}
+

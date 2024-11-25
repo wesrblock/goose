@@ -20,8 +20,8 @@ contextBridge.exposeInMainWorld('electron', {
   resizeWindow: (width, height) => ipcRenderer.send('resize-window', { windowId, width, height }),
   getWindowId: () => windowId,
   logInfo: (txt) => ipcRenderer.send('logInfo', txt),
+  showNotification: (data) => ipcRenderer.send('notify', data),
   createWingToWingWindow: (query) => ipcRenderer.send('create-wing-to-wing-window', query),
   openInChrome: (url) => ipcRenderer.send('open-in-chrome', url),
   fetchMetadata: (url) => ipcRenderer.invoke('fetch-metadata', url),
 })
-  
