@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('electron', {
   createChatWindow: (query) => ipcRenderer.send('create-chat-window', query),
   resizeWindow: (width, height) => ipcRenderer.send('resize-window', { windowId, width, height }),
   getWindowId: () => windowId,
-  logInfo: (txt) => ipcRenderer.send('logInfo', txt),
+  logInfo: (txt) => ipcRenderer.send('logInfo', txt),  
+  showNotification: (data) => ipcRenderer.send('notify', data),
+  
 })
   

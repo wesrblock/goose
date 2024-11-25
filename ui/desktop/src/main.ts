@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { loadZshEnv } from './utils/loadEnv';
-import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain } from 'electron';
+import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification } from 'electron';
 import path from 'node:path';
 import { start as startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
@@ -218,7 +218,11 @@ app.whenReady().then(async () => {
   });
 
 
-
+  ipcMain.on('notify', (event, data) => {
+    console.log("NOTIFY", data);
+    new Notification({ title: data.title, body: data.body }).show();
+  });
+   
   ipcMain.on('logInfo', (_, info) => {
     log.info("from renderer:", info);
   });

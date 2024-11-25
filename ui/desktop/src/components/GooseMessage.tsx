@@ -71,6 +71,13 @@ export default function GooseMessage({ message, metadata, onInputChange }: Goose
     }
   };
 
+  if (isQuestion || isOptions) {    
+    window.electron.showNotification({
+      title: 'Goose has a question for you',
+      body: `please check with goose to approve the plan of action`,
+    });
+  }
+
   return (
     <div className="flex mb-4">
       <div className="bg-white w-full text-black rounded-2xl p-4 shadow-md">
