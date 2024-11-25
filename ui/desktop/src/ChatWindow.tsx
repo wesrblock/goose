@@ -177,7 +177,9 @@ export default function ChatWindow() {
       <button onClick={toggleMode} className="absolute top-4 right-4 bg-blue-500 text-white py-2 px-4 rounded z-10">
         {mode === 'expanded' ? 'Compact View' : 'Expand Chat'}
       </button>
-      {mode === 'expanded' ? (
+
+      {/* Always render ChatContent but control its visibility */}
+      <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
         <Routes>
           <Route
             path="/chat/:id"
@@ -194,9 +196,12 @@ export default function ChatWindow() {
           />
           <Route path="*" element={<Navigate to="/chat/1" replace />} />
         </Routes>
-      ) : (
+      </div>
+
+      {/* Always render WingView but control its visibility */}
+      <div style={{ display: mode === 'expanded' ? 'none' : 'flex' }}>
         <WingView onExpand={toggleMode} />
-      )}
+      </div>
     </div>
   );
 }
