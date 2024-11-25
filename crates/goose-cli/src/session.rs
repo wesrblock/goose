@@ -152,7 +152,9 @@ impl<'a> Session<'a> {
                         Some(Ok(message)) => {
                             self.messages.push(message.clone());
                             persist_messages(&self.session_file, &self.messages).unwrap_or_else(|e| eprintln!("Failed to persist messages: {}", e));
+                            self.prompt.hide_busy();
                             self.prompt.render(Box::new(message.clone()));
+                            self.prompt.show_busy();
                         }
                         Some(Err(e)) => {
                             // TODO: Handle error display through prompt
