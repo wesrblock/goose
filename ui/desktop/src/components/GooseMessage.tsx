@@ -3,7 +3,13 @@ import ToolInvocation from './ToolInvocation';
 import ReactMarkdown from 'react-markdown';
 import { GPSIcon } from './ui/icons';
 
-export default function GooseMessage({ message, metadata }) {
+interface GooseMessageProps {
+  message: any;
+  metadata: any;
+  onInputChange?: (value: string) => void;
+}
+
+export default function GooseMessage({ message, metadata, onInputChange }: GooseMessageProps) {
   console.log("GooseMessage", metadata);
 
   let isReady = false;
@@ -48,20 +54,20 @@ export default function GooseMessage({ message, metadata }) {
   };
 
   const handleAccept = () => {
-    console.log("Plan accepted");
-    // Add additional logic for accepting the plan here
+    if (onInputChange) {
+      onInputChange({ target: { value: "accept" } } as React.ChangeEvent<HTMLInputElement>);
+    }
   };
 
   const handleCancel = () => {
-    console.log("Plan canceled");
-    // Add additional logic for canceling the plan here
+    if (onInputChange) {
+      onInputChange({ target: { value: "No thanks" } } as React.ChangeEvent<HTMLInputElement>);
+    }
   };
 
   const handleSubmit = () => {
-    if (selectedOption !== null) {
-      console.log("Selected Option:", options[selectedOption]);
-    } else {
-      console.log("No option selected");
+    if (selectedOption !== null && onInputChange) {
+      onInputChange({ target: { value: options[selectedOption].optionTitle } } as React.ChangeEvent<HTMLInputElement>);
     }
   };
 

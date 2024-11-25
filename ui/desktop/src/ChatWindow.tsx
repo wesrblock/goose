@@ -178,7 +178,11 @@ function ChatContent({
                 {message.role === 'user' ? (
                   <UserMessage message={message} />
                 ) : (
-                  <GooseMessage metadata={messageMetadata[message.id]} message={message} />
+                  <GooseMessage 
+                    metadata={messageMetadata[message.id]} 
+                    message={message} 
+                    onInputChange={handleInputChange}
+                  />
                 )}
               </div>
             ))}
