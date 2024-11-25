@@ -99,8 +99,6 @@ function ChatContent({
 
 
   
-       const optionExample = [{"name": "Option 1", "description": "markdown longer description of option"}, {"name": "...", "description": "..."}];       
-
 
       const promptTemplates = [
         "Take a look at this content, if this looks like it could be asking for a confirmation, return QUESTION. If it looks like it is a list of options or plans to choose from, return OPTIONS, otherwise return READY. \n ### Message Content:\n" + message.content,
@@ -130,6 +128,10 @@ function ChatContent({
       initialQueryAppended.current = true;
     }
   }, [initialQuery]);
+
+  if (error) {
+    console.log('Error:', error);
+  }
 
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
@@ -188,7 +190,7 @@ function ChatContent({
             {error && (
               <div className="flex items-center justify-center p-4">
                 <div className="text-red-500 bg-red-100 p-3 rounded-lg">
-                  {error.message || 'An error occurred while processing your request'}
+                  {error.message|| 'An error occurred while processing your request'}
                 </div>
               </div>
             )}
