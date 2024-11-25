@@ -234,8 +234,12 @@ async fn stream_message(
                         }
                     }
                     MessageContent::Text(text) => {
-                        for line in text.text.lines() {
-                            tx.send(ProtocolFormatter::format_text(&format!("{}\\n", line))).await?;
+                            for line in text.text.lines() {
+                            // Append a literal '\n' to each line
+                            
+                            // Manually escape backslashes for transmission
+                            let escaped_line = line.replace("\\", "\\\\");
+                            tx.send(ProtocolFormatter::format_text(&format!("{}\\n", escaped_line))).await?;
                         }
                     }
                     MessageContent::Image(_) => {

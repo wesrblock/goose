@@ -47,6 +47,16 @@ export default function GooseMessage({ message, metadata }) {
     setSelectedOption(index);
   };
 
+  const handleAccept = () => {
+    console.log("Plan accepted");
+    // Add additional logic for accepting the plan here
+  };
+
+  const handleCancel = () => {
+    console.log("Plan canceled");
+    // Add additional logic for canceling the plan here
+  };
+
   const handleSubmit = () => {
     if (selectedOption !== null) {
       console.log("Selected Option:", options[selectedOption]);
@@ -74,12 +84,18 @@ export default function GooseMessage({ message, metadata }) {
             )}
             {isQuestion && (
               <div className="mt-4 bg-gray-100 p-4 rounded-lg shadow-lg">
-                <div className="space-x-2">
-                  <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition mt-4">
+                <div className="flex space-x-4">
+                  <button
+                    onClick={handleAccept}
+                    className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
+                  >
                     <GPSIcon size={14} />
                     Accept Plan
                   </button>
-                  <button className="flex items-center gap-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition mt-4">
+                  <button
+                    onClick={handleCancel}
+                    className="flex items-center gap-2 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition"
+                  >
                     <GPSIcon size={14} />
                     Cancel
                   </button>
