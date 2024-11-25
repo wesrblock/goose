@@ -8,6 +8,7 @@ use goose::models::content::Content;
 use goose::models::tool::{Tool, ToolCall};
 use goose::systems::System;
 
+#[derive(Clone)]
 /// A simple system that echoes input back to the caller
 pub struct EchoSystem {
     tools: Vec<Tool>,

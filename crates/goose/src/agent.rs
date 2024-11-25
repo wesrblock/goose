@@ -283,6 +283,7 @@ mod tests {
     use serde_json::json;
     use std::collections::HashMap;
 
+    #[derive(Clone)]
     // Mock system for testing
     struct MockSystem {
         name: String,

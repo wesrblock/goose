@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use xcap::Monitor;
 
 use crate::errors::{AgentError, AgentResult};
@@ -18,11 +18,12 @@ use crate::models::role::Role;
 use crate::models::tool::{Tool, ToolCall};
 use crate::systems::System;
 
+#[derive(Clone)]
 pub struct DeveloperSystem {
     tools: Vec<Tool>,
-    cwd: Mutex<PathBuf>,
-    active_files: Mutex<HashSet<PathBuf>>,
-    file_history: Mutex<HashMap<PathBuf, Vec<String>>>,
+    cwd: Arc<Mutex<PathBuf>>,
+    active_files: Arc<Mutex<HashSet<PathBuf>>>,
+    file_history: Arc<Mutex<HashMap<PathBuf, Vec<String>>>>,
     instructions: String,
 }
 
@@ -148,9 +149,9 @@ impl DeveloperSystem {
         };
         Self {
             tools: vec![bash_tool, text_editor_tool, screen_capture_tool],
-            cwd: Mutex::new(std::env::current_dir().unwrap()),
-            active_files: Mutex::new(HashSet::new()),
-            file_history: Mutex::new(HashMap::new()),
+            cwd: Arc::new(Mutex::new(std::env::current_dir().unwrap())),
+            active_files: Arc::new(Mutex::new(HashSet::new())),
+            file_history: Arc::new(Mutex::new(HashMap::new())),
             instructions,
         }
     }

@@ -10,6 +10,7 @@ use goose::models::tool::Tool;
 use goose::models::tool::ToolCall;
 use goose::systems::System;
 
+#[derive(Clone)]
 pub struct GooseHintsSystem {
     instructions: String,
 }
