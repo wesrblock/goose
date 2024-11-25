@@ -10,11 +10,17 @@ import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import Tabs from './components/Tabs';
 import MoreMenu from './components/MoreMenu';
+import { BoxIcon } from './components/ui/icons';
+import ReactMarkdown from 'react-markdown';
 
 export interface Chat {
   id: number;
   title: string;
-  messages: Array<{ id: string; role: "function" | "system" | "user" | "assistant" | "data" | "tool"; content: string }>;
+  messages: Array<{
+    id: string;
+    role: 'function' | 'system' | 'user' | 'assistant' | 'data' | 'tool';
+    content: string;
+  }>;
 }
 
 const handleResize = (mode: 'expanded' | 'compact') => {
@@ -31,41 +37,67 @@ const handleResize = (mode: 'expanded' | 'compact') => {
   }
 };
 
-const WingView: React.FC<{ onExpand: () => void; lastMessage: any }> = ({ onExpand, lastMessage }) => {
+const WingView: React.FC<{ onExpand: () => void; status: string }> = ({ onExpand, status }) => {
   return (
     <div
       onClick={onExpand}
       className="flex items-center justify-center w-full bg-gray-800 text-green-400 cursor-pointer rounded-lg p-4"
     >
       <div className="text-sm text-left font-mono bg-black bg-opacity-50 p-3 rounded-lg">
-        {lastMessage ? (
-          <span className="block">{lastMessage.content}</span>
-        ) : (
-          <span className="block">goose is ready</span>
-        )}
+        <span className="block">{status}</span>
       </div>
     </div>
   );
 };
 
-function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId, initialQuery }: {
-  chats: Chat[],
-  setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
-  selectedChatId: number,
-  setSelectedChatId: React.Dispatch<React.SetStateAction<number>>
+function ChatContent({
+  chats,
+  setChats,
+  selectedChatId,
+  setSelectedChatId,
+  initialQuery,
+  setStatus,
+}: {
+  chats: Chat[];
+  setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
+  selectedChatId: number;
+  setSelectedChatId: React.Dispatch<React.SetStateAction<number>>;
+  initialQuery: string | null;
+  setStatus: React.Dispatch<React.SetStateAction<string>>;
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  window.electron.logInfo("chats" + JSON.stringify(chats, null, 2));
+  window.electron.logInfo('chats' + JSON.stringify(chats, null, 2));
 
-  const { messages, input, handleInputChange, handleSubmit, append, stop } = useChat({
-    api: getApiUrl("/reply"),
-    initialMessages: chat?.messages || []
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    append,
+    stop,
+  } = useChat({
+    api: getApiUrl('/reply'),
+    initialMessages: chat?.messages || [],
+    onToolCall: ({ toolCall }) => {
+      setStatus(`Executing tool: ${toolCall.toolName}`);
+      // Optionally handle tool call result here
+    },
+    onResponse: (response) => {
+      if (!response.ok) {
+        setStatus('An error occurred while receiving the response.');
+      } else {
+        setStatus('Receiving response...');
+      }
+    },
+    onFinish: (message, options) => {
+      setStatus('Goose is ready');
+    },
   });
 
   // Update chat messages when they change
   useEffect(() => {
-    const updatedChats = chats.map(c =>
+    const updatedChats = chats.map((c) =>
       c.id === selectedChatId ? { ...c, messages } : c
     );
     setChats(updatedChats);
@@ -91,24 +123,23 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId, initi
           />
         </div>
         <div className="flex">
-          <MoreMenu className="absolute top-2 right-2"
+          <MoreMenu
+            className="absolute top-2 right-2"
             onStopGoose={() => {
-              stop()
+              stop();
             }}
             onClearContext={() => {
-              // TODO - Implement real behavior
               append({
                 id: Date.now().toString(),
                 role: 'system',
-                content: 'Context cleared'
+                content: 'Context cleared',
               });
             }}
             onRestartGoose={() => {
-              // TODO - Implement real behavior
               append({
                 id: Date.now().toString(),
                 role: 'system',
-                content: 'Goose restarted'
+                content: 'Goose restarted',
               });
             }}
           />
@@ -147,27 +178,28 @@ export default function ChatWindow() {
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
-  window.electron.logInfo("initialQuery: " + initialQuery);
+  window.electron.logInfo('initialQuery: ' + initialQuery);
   const historyParam = searchParams.get('history');
-  const initialHistory = historyParam ? JSON.parse(decodeURIComponent(historyParam)) : [];
+  const initialHistory = historyParam
+    ? JSON.parse(decodeURIComponent(historyParam))
+    : [];
 
   const [chats, setChats] = useState<Chat[]>(() => {
     const firstChat = {
       id: 1,
       title: initialQuery || 'Chat 1',
-      messages: initialHistory.length > 0 ? initialHistory : []
+      messages: initialHistory.length > 0 ? initialHistory : [],
     };
     return [firstChat];
   });
 
   const [selectedChatId, setSelectedChatId] = useState(1);
 
-  const [mode, setMode] = useState<'expanded' | 'compact'>(initialQuery ? 'compact' : 'expanded');
+  const [mode, setMode] = useState<'expanded' | 'compact'>(
+    initialQuery ? 'compact' : 'expanded'
+  );
 
-  const selectedChat = chats.find(c => c.id === selectedChatId);
-  // Extract the last message where role is not 'user'
-  const lastGooseMessage = selectedChat?.messages.slice().reverse().find(m => m.role !== 'user');
-
+  const [status, setStatus] = useState('Goose is ready');
 
   const toggleMode = () => {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
@@ -176,11 +208,14 @@ export default function ChatWindow() {
     handleResize(newMode);
   };
 
-  window.electron.logInfo("ChatWindow loaded");
+  window.electron.logInfo('ChatWindow loaded');
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
-      <button onClick={toggleMode} className="absolute top-4 right-4 bg-blue-500 text-white py-2 px-4 rounded z-10">
+      <button
+        onClick={toggleMode}
+        className="absolute top-4 right-4 bg-blue-500 text-white py-2 px-4 rounded z-10"
+      >
         {mode === 'expanded' ? 'Compact View' : 'Expand Chat'}
       </button>
 
@@ -197,6 +232,7 @@ export default function ChatWindow() {
                 selectedChatId={selectedChatId}
                 setSelectedChatId={setSelectedChatId}
                 initialQuery={initialQuery}
+                setStatus={setStatus} // Pass setStatus to ChatContent
               />
             }
           />
@@ -206,7 +242,7 @@ export default function ChatWindow() {
 
       {/* Always render WingView but control its visibility */}
       <div style={{ display: mode === 'expanded' ? 'none' : 'flex' }}>
-        <WingView onExpand={toggleMode} lastMessage={lastGooseMessage} />
+        <WingView onExpand={toggleMode} status={status} />
       </div>
     </div>
   );
