@@ -81,6 +81,20 @@ const createChat = (query?: string) => {
 
   // Load the index.html of the app.
   const queryParam = query ? `?initialQuery=${encodeURIComponent(query)}` : '';
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width } = primaryDisplay.workAreaSize;
+
+  // Increment window counter to track number of windows
+  const windowId = ++windowCounter;
+  const direction = windowId % 2 === 0 ? 1 : -1; // Alternate direction
+  const initialOffset = 50;
+
+  // Set window position with alternating offset strategy
+  const baseXPosition = Math.round(width / 2 - mainWindow.getSize()[0] / 2);
+  const xOffset = direction * initialOffset * Math.floor(windowId / 2);
+  mainWindow.setPosition(baseXPosition + xOffset, 100);
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${queryParam}`);
   } else {
@@ -92,18 +106,10 @@ const createChat = (query?: string) => {
 
   // DevTools
   globalShortcut.register('Alt+Command+I', () => {
-    mainWindow.webContents.openDevTools(); // key combo in distributed app
+    mainWindow.webContents.openDevTools();
   });
 
-  // Assign window ID and track it
-  const windowId = ++windowCounter;
   windowMap.set(windowId, mainWindow);
-  
-  // Send the window ID to the renderer
-  mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.send('set-window-id', windowId);
-  });
-
   mainWindow.on('closed', () => {
     windowMap.delete(windowId);
   });
