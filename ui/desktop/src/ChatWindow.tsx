@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useChat } from 'ai/react';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { getApiUrl } from './config';
@@ -10,20 +10,64 @@ import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import Tabs from './components/Tabs';
 import MoreMenu from './components/MoreMenu';
+import { BoxIcon } from './components/ui/icons';
+import ReactMarkdown from 'react-markdown';
 
 export interface Chat {
   id: number;
   title: string;
-  messages: Array<{ id: string; role: "function" | "system" | "user" | "assistant" | "data" | "tool"; content: string }>;
+  messages: Array<{
+    id: string;
+    role: 'function' | 'system' | 'user' | 'assistant' | 'data' | 'tool';
+    content: string;
+  }>;
 }
 
-function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
-  chats: Chat[],
-  setChats: React.Dispatch<React.SetStateAction<Chat[]>>,
-  selectedChatId: number,
-  setSelectedChatId: React.Dispatch<React.SetStateAction<number>>
+const handleResize = (mode: 'expanded' | 'compact') => {
+  if (window.electron) {
+    if (mode === 'expanded') {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      window.electron.resizeWindow(width, height);
+    } else if (mode === 'compact') {
+      const width = window.innerWidth;
+      const height = 100; // Make it very thin
+      window.electron.resizeWindow(width, height);
+    }
+  }
+};
+
+const WingView: React.FC<{ onExpand: () => void; status: string }> = ({ onExpand, status }) => {
+  return (
+    <div
+      onClick={onExpand}
+      className="flex items-center justify-center w-full bg-gray-800 text-green-400 cursor-pointer rounded-lg p-4"
+    >
+      <div className="text-sm text-left font-mono bg-black bg-opacity-50 p-3 rounded-lg">
+        <span className="block">{status}</span>
+      </div>
+    </div>
+  );
+};
+
+function ChatContent({
+  chats,
+  setChats,
+  selectedChatId,
+  setSelectedChatId,
+  initialQuery,
+  setStatus,
+}: {
+  chats: Chat[];
+  setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
+  selectedChatId: number;
+  setSelectedChatId: React.Dispatch<React.SetStateAction<number>>;
+  initialQuery: string | null;
+  setStatus: React.Dispatch<React.SetStateAction<string>>;
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
+
+  window.electron.logInfo('chats' + JSON.stringify(chats, null, 2));
 
   const {
     messages,
@@ -35,20 +79,42 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
     isLoading,
     error
   } = useChat({
-    api: getApiUrl("/reply"),
-    initialMessages: chat?.messages || []
+    api: getApiUrl('/reply'),
+    initialMessages: chat?.messages || [],
+    onToolCall: ({ toolCall }) => {
+      setStatus(`Executing tool: ${toolCall.toolName}`);
+      // Optionally handle tool call result here
+    },
+    onResponse: (response) => {
+      if (!response.ok) {
+        setStatus('An error occurred while receiving the response.');
+      } else {
+        setStatus('Receiving response...');
+      }
+    },
+    onFinish: (message, options) => {
+      setStatus('Goose is ready');
+    },
   });
 
   // Update chat messages when they change
   useEffect(() => {
-    const updatedChats = chats.map(c => 
+    const updatedChats = chats.map((c) =>
       c.id === selectedChatId ? { ...c, messages } : c
     );
     setChats(updatedChats);
   }, [messages, selectedChatId]);
 
+  const initialQueryAppended = useRef(false);
+  useEffect(() => {
+    if (initialQuery && !initialQueryAppended.current) {
+      append({ role: 'user', content: initialQuery });
+      initialQueryAppended.current = true;
+    }
+  }, [initialQuery]);
+
   return (
-    <div className="flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
+    <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <div className="flex w-screen">
         <div className="flex-1">
           <Tabs
@@ -59,24 +125,23 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
           />
         </div>
         <div className="flex">
-          <MoreMenu className="absolute top-2 right-2"
+          <MoreMenu
+            className="absolute top-2 right-2"
             onStopGoose={() => {
-              stop()
+              stop();
             }}
             onClearContext={() => {
-              // TODO - Implement real behavior
               append({
                 id: Date.now().toString(),
                 role: 'system',
-                content: 'Context cleared'
+                content: 'Context cleared',
               });
             }}
             onRestartGoose={() => {
-              // TODO - Implement real behavior
               append({
                 id: Date.now().toString(),
                 role: 'system',
-                content: 'Goose restarted'
+                content: 'Goose restarted',
               });
             }}
           />
@@ -128,44 +193,67 @@ export default function ChatWindow() {
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
+  window.electron.logInfo('initialQuery: ' + initialQuery);
   const historyParam = searchParams.get('history');
-  const initialHistory = historyParam ? JSON.parse(decodeURIComponent(historyParam)) : [];
+  const initialHistory = historyParam
+    ? JSON.parse(decodeURIComponent(historyParam))
+    : [];
 
   const [chats, setChats] = useState<Chat[]>(() => {
     const firstChat = {
       id: 1,
       title: initialQuery || 'Chat 1',
-      messages: initialHistory.length > 0 ? initialHistory : 
-        (initialQuery ? [{
-          id: '0',
-          role: 'user' as const,
-          content: initialQuery
-        }] : [])
+      messages: initialHistory.length > 0 ? initialHistory : [],
     };
     return [firstChat];
   });
 
   const [selectedChatId, setSelectedChatId] = useState(1);
 
-  window.electron.logInfo("ChatWindow loaded");
+  const [mode, setMode] = useState<'expanded' | 'compact'>(
+    initialQuery ? 'compact' : 'expanded'
+  );
+
+  const [status, setStatus] = useState('Goose is ready');
+
+  const toggleMode = () => {
+    const newMode = mode === 'expanded' ? 'compact' : 'expanded';
+    console.log(`Toggle to ${newMode}`);
+    setMode(newMode);
+    handleResize(newMode);
+  };
+
+  window.electron.logInfo('ChatWindow loaded');
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
-      <Routes>
-        <Route
-          path="/chat/:id"
-          element={
-            <ChatContent
-              key={selectedChatId}
-              chats={chats}
-              setChats={setChats}
-              selectedChatId={selectedChatId}
-              setSelectedChatId={setSelectedChatId}
-            />
-          }
-        />
-        <Route path="*" element={<Navigate to="/chat/1" replace />} />
-      </Routes>
+      
+
+      {/* Always render ChatContent but control its visibility */}
+      <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
+        <Routes>
+          <Route
+            path="/chat/:id"
+            element={
+              <ChatContent
+                key={selectedChatId}
+                chats={chats}
+                setChats={setChats}
+                selectedChatId={selectedChatId}
+                setSelectedChatId={setSelectedChatId}
+                initialQuery={initialQuery}
+                setStatus={setStatus} // Pass setStatus to ChatContent
+              />
+            }
+          />
+          <Route path="*" element={<Navigate to="/chat/1" replace />} />
+        </Routes>
+      </div>
+
+      {/* Always render WingView but control its visibility */}
+      <div style={{ display: mode === 'expanded' ? 'none' : 'flex' }}>
+        <WingView onExpand={toggleMode} status={status} />
+      </div>
     </div>
   );
 }

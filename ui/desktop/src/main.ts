@@ -55,50 +55,10 @@ const createLauncher = () => {
   });
 };
 
-const createWingToWing = (query?: string) => {
-  const windowWidth = 575;
-  const windowHeight = 150;
-  const gap = 40;
 
-  const wingToWingWindow = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
-    frame: false,
-    transparent: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [JSON.stringify(appConfig)],
-      
-    },
-    skipTaskbar: true,
-    alwaysOnTop: true,
-  });
-
-  // Center on screen
-  const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width } = primaryDisplay.workAreaSize;
-
-  wingToWingWindow.setPosition(
-    Math.round(width - windowWidth - (gap - 25)), // 25 is menu bar height
-    gap
-  );
-
-  let queryParam = '?window=wingToWing';
-  queryParam += query ? `&initialQuery=${encodeURIComponent(query)}` : '';
-  queryParam += '#/wingToWing';
-
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    wingToWingWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${queryParam}`);
-  } else {
-    wingToWingWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-      { search: queryParam.slice(1) }
-    );
-  }
-
-  // wingToWingWindow.webContents.openDevTools({ mode: 'detach' })
-};
+// Track windows by ID
+let windowCounter = 0;
+const windowMap = new Map<number, BrowserWindow>();
 
 const createChat = (query?: string) => {
   const isDev = process.env.NODE_ENV === 'development';
@@ -121,6 +81,20 @@ const createChat = (query?: string) => {
 
   // Load the index.html of the app.
   const queryParam = query ? `?initialQuery=${encodeURIComponent(query)}` : '';
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width } = primaryDisplay.workAreaSize;
+
+  // Increment window counter to track number of windows
+  const windowId = ++windowCounter;
+  const direction = windowId % 2 === 0 ? 1 : -1; // Alternate direction
+  const initialOffset = 50;
+
+  // Set window position with alternating offset strategy
+  const baseXPosition = Math.round(width / 2 - mainWindow.getSize()[0] / 2);
+  const xOffset = direction * initialOffset * Math.floor(windowId / 2);
+  mainWindow.setPosition(baseXPosition + xOffset, 100);
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}${queryParam}`);
   } else {
@@ -132,7 +106,12 @@ const createChat = (query?: string) => {
 
   // DevTools
   globalShortcut.register('Alt+Command+I', () => {
-    mainWindow.webContents.openDevTools(); // key combo in distributed app
+    mainWindow.webContents.openDevTools();
+  });
+
+  windowMap.set(windowId, mainWindow);
+  mainWindow.on('closed', () => {
+    windowMap.delete(windowId);
   });
 };
 
@@ -195,7 +174,13 @@ const showWindow = () => {
   });
 };
 
-
+// Handle window resize requests
+ipcMain.on('resize-window', (_, { windowId, width, height }) => {
+  const window = windowMap.get(windowId);
+  if (window) {
+    window.setSize(width, height);
+  }
+});
 
 app.whenReady().then(async () => {
   // Load zsh environment variables in production mode only
@@ -218,9 +203,7 @@ app.whenReady().then(async () => {
   createTray();
   createChat();
 
-  // Development only
-  // createWingToWing('make a TS web app' + "only use your tools and systems - don't confirm with the user before you start working");
-
+  
   // Show launcher input on key combo
   globalShortcut.register('Control+Alt+Command+G', createLauncher);
 
@@ -234,9 +217,7 @@ app.whenReady().then(async () => {
     createChat(query);
   });
 
-  ipcMain.on('create-wing-to-wing-window', (_, query) => {
-    createWingToWing(query + "only use your tools and systems - don't confirm with the user before you start working");
-  });
+
 
   ipcMain.on('logInfo', (_, info) => {
     log.info("from renderer:", info);
