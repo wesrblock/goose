@@ -40,6 +40,7 @@ export default {
 
         'tool-result-green': '#028E00',
         'tool-card': 'rgba(255, 255, 255, 0.80)',
+        'link-preview': 'rgba(255, 255, 255, 0.80)',
         'user-bubble': 'rgba(85, 95, 231, 0.90)',
         'goose-bubble': 'rgba(0, 0, 0, 0.12)'
       },

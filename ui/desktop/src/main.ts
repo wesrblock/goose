@@ -6,6 +6,7 @@ import { start as startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
 import log from './utils/logger';
 import { getPort } from './utils/portUtils';
+import { exec } from 'child_process';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -61,8 +62,6 @@ let windowCounter = 0;
 const windowMap = new Map<number, BrowserWindow>();
 
 const createChat = (query?: string) => {
-  const isDev = process.env.NODE_ENV === 'development';
-
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 18 },
@@ -203,7 +202,6 @@ app.whenReady().then(async () => {
   createTray();
   createChat();
 
-  
   // Show launcher input on key combo
   globalShortcut.register('Control+Alt+Command+G', createLauncher);
 
@@ -217,12 +215,42 @@ app.whenReady().then(async () => {
     createChat(query);
   });
 
-
-
   ipcMain.on('logInfo', (_, info) => {
     log.info("from renderer:", info);
   });
-  
+
+  // Handle metadata fetching from main process
+  ipcMain.handle('fetch-metadata', async (_, url) => {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Goose/1.0)'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.text();
+    } catch (error) {
+      console.error('Error fetching metadata:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.on('open-in-chrome', (_, url) => {
+    // On macOS, use the 'open' command with Chrome
+    if (process.platform === 'darwin') {
+      exec(`open -a "Google Chrome" "${url}"`);
+    } else if (process.platform === 'win32') {
+      // On Windows, use start command
+      exec(`start chrome "${url}"`);
+    } else {
+      // On Linux, use xdg-open with chrome
+      exec(`xdg-open "${url}"`);
+    }
+  });
 });
 
 // Quit when all windows are closed, except on macOS.

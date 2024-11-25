@@ -158,7 +158,7 @@ function ChatContent({
                 {message.role === 'user' ? (
                   <UserMessage message={message} />
                 ) : (
-                  <GooseMessage message={message} />
+                  <GooseMessage message={message} messages={messages} />
                 )}
               </div>
             ))}
