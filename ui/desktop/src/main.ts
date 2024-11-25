@@ -5,6 +5,7 @@ import path from 'node:path';
 import { start as startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
 import log from './utils/logger';
+import { exec } from 'child_process';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -228,6 +229,19 @@ app.whenReady().then(() => {
 
   ipcMain.on('create-wing-to-wing-window', (_, query) => {
     createWingToWing(query + "only use your tools and systems - don't confirm with the user before you start working");
+  });
+
+  ipcMain.on('open-in-chrome', (_, url) => {
+    // On macOS, use the 'open' command with Chrome
+    if (process.platform === 'darwin') {
+      exec(`open -a "Google Chrome" "${url}"`);
+    } else if (process.platform === 'win32') {
+      // On Windows, use start command
+      exec(`start chrome "${url}"`);
+    } else {
+      // On Linux, use xdg-open with chrome
+      exec(`xdg-open "${url}"`);
+    }
   });
 });
 

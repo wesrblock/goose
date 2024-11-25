@@ -55,9 +55,9 @@ function ChatContent({ chats, setChats, selectedChatId, setSelectedChatId }: {
             {messages.map((message) => (
               <div key={message.id}>
                 {message.role === 'user' ? (
-                  <UserMessage message={message} />
+                  <UserMessage message={message} messages={messages} />
                 ) : (
-                  <GooseMessage message={message} />
+                  <GooseMessage message={message} messages={messages} />
                 )}
               </div>
             ))}
