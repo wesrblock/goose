@@ -4,19 +4,17 @@ mod commands {
     pub mod session;
     pub mod version;
 }
+pub mod agents;
 mod inputs;
 mod profile;
 mod prompt;
-mod session {
-    pub mod session;
-    pub mod session_file;
-}
+pub mod session;
+
 mod systems;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use commands::session::build_session;
-use futures::StreamExt;
 
 use crate::systems::system_handler::{add_system, remove_system};
 use commands::configure::handle_configure;

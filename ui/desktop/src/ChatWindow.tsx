@@ -76,6 +76,8 @@ function ChatContent({
     handleSubmit,
     append,
     stop,
+    isLoading,
+    error
   } = useChat({
     api: getApiUrl('/reply'),
     initialMessages: chat?.messages || [],
@@ -160,6 +162,18 @@ function ChatContent({
                 )}
               </div>
             ))}
+            {isLoading && (
+              <div className="flex items-center justify-center p-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+              </div>
+            )}
+            {error && (
+              <div className="flex items-center justify-center p-4">
+                <div className="text-red-500 bg-red-100 p-3 rounded-lg">
+                  {error.message || 'An error occurred while processing your request'}
+                </div>
+              </div>
+            )}
             <div className="block h-10" />
           </ScrollArea>
         )}
@@ -168,6 +182,7 @@ function ChatContent({
           handleSubmit={handleSubmit}
           handleInputChange={handleInputChange}
           input={input}
+          disabled={isLoading}
         />
       </Card>
     </div>
