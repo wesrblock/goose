@@ -95,10 +95,15 @@ function ChatContent({
     onFinish: async (message, options) => {
       setStatus('Goose is ready');
 
+
+  
+       const optionExample = [{"name": "Option 1", "description": "markdown longer description of option"}, {"name": "...", "description": "..."}];       
+
+
       const promptTemplates = [
-        "hello",
-        "how are you",
-        "what is updog"
+        "Take a look at this content, if this looks like it could be asking for a confirmation, return QUESTION. If it looks like it is a list of options or plans to choose from, return OPTIONS, otherwise return READY. \n ### Message Content:\n" + message.content,
+        "If the content is clearly a list of distinct options or plans of action to choose from, and not just a list of things, but clearly a list of things to choose one from from, take into account the Message Content alone, try to format it in a json array, like this JSON array of objects of the form optionTitle:string, optionDescription:string (markdown).\n If is not a list of options or plans to choose from, then return empty list.\n ### Message Content:\n" + message.content,
+        "If the content is a request for input from the user, taking into account the Message Content alone, try to format it in as JSON object that fields in it of the form: fieldName:{type: string, number, email or date, title:string, description:optional markdown, required: true or false}:\n If it does not match, then return empty object.\n ### Message Content:\n" + message.content,
       ];
 
       const fetchResponses = await askAi(promptTemplates);
@@ -272,6 +277,7 @@ export default function ChatWindow() {
 }
 
 async function askAi(promptTemplates: string[]) {
+  console.log('askAi called...');
   const responses = await Promise.all(promptTemplates.map(async (template) => {
     const response = await fetch(getApiUrl('/ask'), {
       method: 'POST',
@@ -286,7 +292,7 @@ async function askAi(promptTemplates: string[]) {
     }
 
     const data = await response.json();
-    console.log('Raw response from /ask:', data.response);
+    console.log('ask Response:', data.response);
 
     return data.response;
   }));
