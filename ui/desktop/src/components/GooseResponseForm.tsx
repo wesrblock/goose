@@ -94,7 +94,7 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
             className="w-full sm:w-auto"
           >
             <GPSIcon size={14} />
-            Take flight with this direction
+            Take flight with this plan
           </Button>
           <Button
             onClick={handleCancel}
@@ -132,7 +132,7 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
             disabled={selectedOption === null}
           >
             <GPSIcon size={14} />
-            Submit
+            Select plan
           </Button>
         </div>
       )}
