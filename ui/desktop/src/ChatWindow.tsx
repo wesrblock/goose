@@ -97,9 +97,6 @@ function ChatContent({
     onFinish: async (message, options) => {
       setStatus('Goose is ready');
 
-
-  
-
       const promptTemplates = [
         "Take a look at this content, if this looks like it could be asking for a confirmation, return QUESTION. If it looks like it is a list of options or plans to choose from, return OPTIONS, otherwise return READY. \n ### Message Content:\n" + message.content,
         "If the content is clearly a list of distinct options or plans of action to choose from, and not just a list of things, but clearly a list of things to choose one from from, take into account the Message Content alone, try to format it in a json array, like this JSON array of objects of the form optionTitle:string, optionDescription:string (markdown).\n If is not a list of options or plans to choose from, then return empty list.\n ### Message Content:\n" + message.content,
@@ -178,7 +175,12 @@ function ChatContent({
                 {message.role === 'user' ? (
                   <UserMessage message={message} />
                 ) : (
-                  <GooseMessage message={message} messages={messages} metadata={messageMetadata[message.id]} onInputChange={handleInputChange} />
+                  <GooseMessage
+                    message={message}
+                    messages={messages}
+                    metadata={messageMetadata[message.id]}
+                    append={append}
+                  />
                 )}
               </div>
             ))}
@@ -247,8 +249,6 @@ export default function ChatWindow() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
-      
-
       {/* Always render ChatContent but control its visibility */}
       <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
         <Routes>
@@ -276,9 +276,6 @@ export default function ChatWindow() {
       </div>
     </div>
   );
-
-
-
 }
 
 /**
@@ -307,4 +304,3 @@ async function askAi(promptTemplates: string[]) {
 
   return responses;
 }
-

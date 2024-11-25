@@ -14,8 +14,6 @@ interface LinkPreviewProps {
 }
 
 async function fetchMetadata(url: string): Promise<Metadata> {
-  console.log('🔄 Fetching metadata for URL:', url);
-  
   try {
     // Fetch the HTML content using the main process
     const html = await window.electron.fetchMetadata(url);
@@ -54,8 +52,6 @@ async function fetchMetadata(url: string): Promise<Metadata> {
       image = new URL(image, baseUrl).toString();
     }
 
-    console.log('✨ Extracted metadata:', { title, description, favicon, image });
-
     return {
       title: title || url,
       description,
@@ -81,14 +77,12 @@ export default function LinkPreview({ url }: LinkPreviewProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('🔄 LinkPreview mounting for URL:', url);
     let mounted = true;
 
     const fetchData = async () => {
       try {
         const data = await fetchMetadata(url);
         if (mounted) {
-          console.log('✨ Received metadata:', data);
           setMetadata(data);
         }
       } catch (error) {
@@ -123,7 +117,6 @@ export default function LinkPreview({ url }: LinkPreviewProps) {
     <Card 
       className="max-w-[300px] truncate flex items-center bg-link-preview p-3 transition-colors cursor-pointer"
       onClick={() => {
-        console.log('🔗 Opening URL in Chrome:', url);
         window.electron.openInChrome(url);
       }}
     >
