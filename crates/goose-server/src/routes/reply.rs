@@ -332,7 +332,7 @@ async fn ask_handler(
     State(state): State<AppState>,
     Json(request): Json<AskRequest>,
 ) -> Result<Json<AskResponse>, StatusCode> {
-    // Setup agent with developer system
+    
     let provider = factory::get_provider(state.provider_config)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

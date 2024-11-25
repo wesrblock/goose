@@ -67,7 +67,7 @@ function ChatContent({
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
-  window.electron.logInfo('chats' + JSON.stringify(chats, null, 2));
+  //window.electron.logInfo('chats' + JSON.stringify(chats, null, 2));
 
   const {
     messages,
@@ -92,8 +92,18 @@ function ChatContent({
         setStatus('Receiving response...');
       }
     },
-    onFinish: (message, options) => {
+    onFinish: async (message, options) => {
       setStatus('Goose is ready');
+
+      const promptTemplates = [
+        "hello",
+        "how are you",
+        "what is updog"
+      ];
+
+      const fetchResponses = await askAi(promptTemplates);
+
+      console.log('All responses:', fetchResponses);
     },
   });
 
@@ -193,7 +203,7 @@ export default function ChatWindow() {
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
-  window.electron.logInfo('initialQuery: ' + initialQuery);
+  //window.electron.logInfo('initialQuery: ' + initialQuery);
   const historyParam = searchParams.get('history');
   const initialHistory = historyParam
     ? JSON.parse(decodeURIComponent(historyParam))
@@ -256,4 +266,31 @@ export default function ChatWindow() {
       </div>
     </div>
   );
+
+
+
 }
+
+async function askAi(promptTemplates: string[]) {
+  const responses = await Promise.all(promptTemplates.map(async (template) => {
+    const response = await fetch(getApiUrl('/ask'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt: template })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get response');
+    }
+
+    const data = await response.json();
+    console.log('Raw response from /ask:', data.response);
+
+    return data.response;
+  }));
+
+  return responses;
+}
+
