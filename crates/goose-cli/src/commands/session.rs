@@ -6,16 +6,14 @@ use goose::models::message::Message;
 use goose::providers::factory;
 
 use crate::commands::expected_config::get_recommended_models;
-use crate::profile::profile::Profile;
-use crate::profile::profile_handler::{load_profiles, PROFILE_DEFAULT_NAME};
-use crate::profile::provider_helper::set_provider_config;
-use crate::profile::provider_helper::PROVIDER_OPEN_AI;
+use crate::profile::{
+    load_profiles, set_provider_config, Profile, PROFILE_DEFAULT_NAME, PROVIDER_OPEN_AI,
+};
 use crate::prompt::cliclack::CliclackPrompt;
-use crate::prompt::prompt::Prompt;
 use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::thinking::get_random_goose_action;
-use crate::session::session::Session;
-use crate::session::session_file::ensure_session_dir;
+use crate::prompt::Prompt;
+use crate::session::{ensure_session_dir, Session};
 
 pub fn build_session<'a>(
     session: Option<String>,

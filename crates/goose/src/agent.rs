@@ -81,13 +81,16 @@ impl Agent {
     }
 
     /// Find the appropriate system for a tool call based on the prefixed name
-    fn get_system_for_tool(&self, prefixed_name: &str) -> Option<&Box<dyn System>> {
+    fn get_system_for_tool(&self, prefixed_name: &str) -> Option<&dyn System> {
         let parts: Vec<&str> = prefixed_name.split("__").collect();
         if parts.len() != 2 {
             return None;
         }
         let system_name = parts[0];
-        self.systems.iter().find(|sys| sys.name() == system_name)
+        self.systems
+            .iter()
+            .find(|sys| sys.name() == system_name)
+            .map(|v| &**v)
     }
 
     /// Dispatch a single tool call to the appropriate system

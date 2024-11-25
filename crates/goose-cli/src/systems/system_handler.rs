@@ -1,5 +1,4 @@
-use crate::profile::profile::AdditionalSystem;
-use crate::profile::profile_handler::{load_profiles, save_profile};
+use crate::profile::{load_profiles, save_profile, AdditionalSystem};
 use serde_json::Value;
 use std::error::Error;
 

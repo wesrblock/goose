@@ -107,7 +107,7 @@ enum SystemCommands {
 enum CliProviderVariant {
     OpenAi,
     Databricks,
-    Ollama
+    Ollama,
 }
 
 #[tokio::main]

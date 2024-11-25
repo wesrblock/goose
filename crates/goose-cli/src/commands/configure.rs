@@ -1,9 +1,8 @@
 use crate::commands::expected_config::{get_recommended_models, RecommendedModels};
-use crate::inputs::inputs::get_user_input;
-use crate::profile::profile::Profile;
-use crate::profile::profile_handler::{find_existing_profile, profile_path, save_profile};
-use crate::profile::provider_helper::{
-    select_provider_lists, set_provider_config, PROVIDER_OPEN_AI,
+use crate::inputs::get_user_input;
+use crate::profile::{
+    find_existing_profile, profile_path, save_profile, select_provider_lists, set_provider_config,
+    Profile, PROVIDER_OPEN_AI,
 };
 use cliclack::spinner;
 use console::style;
@@ -58,8 +57,8 @@ async fn check_configuration(provider_config: ProviderConfig) -> Result<(), Box<
     Ok(())
 }
 
-fn get_existing_profile(profile_name: &String) -> Option<Profile> {
-    let existing_profile_result = find_existing_profile(profile_name.as_str());
+fn get_existing_profile(profile_name: &str) -> Option<Profile> {
+    let existing_profile_result = find_existing_profile(profile_name);
     if existing_profile_result.is_some() {
         println!("Profile already exists. We are going to overwriting the existing profile...");
     } else {
