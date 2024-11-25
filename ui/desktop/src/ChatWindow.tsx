@@ -136,6 +136,7 @@ export default function ChatWindow() {
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
+  window.electron.logInfo("initialQuery: " + initialQuery);
   const historyParam = searchParams.get('history');
   const initialHistory = historyParam ? JSON.parse(decodeURIComponent(historyParam)) : [];
 
@@ -155,7 +156,7 @@ export default function ChatWindow() {
 
   const [selectedChatId, setSelectedChatId] = useState(1);
 
-  const [mode, setMode] = useState<'expanded' | 'compact'>('expanded');
+  const [mode, setMode] = useState<'expanded' | 'compact'>(initialQuery ? 'compact' : 'expanded');
 
   const toggleMode = () => {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
