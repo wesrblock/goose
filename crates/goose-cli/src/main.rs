@@ -14,12 +14,12 @@ mod systems;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use commands::configure::handle_configure;
 use commands::session::build_session;
+use commands::version::print_version;
+use std::io::{self, Read};
 
 use crate::systems::system_handler::{add_system, remove_system};
-use commands::configure::handle_configure;
-
-use commands::version::print_version;
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -158,9 +158,10 @@ async fn main() -> Result<()> {
             } else if let Some(input_text) = input_text {
                 input_text
             } else {
-                use std::io::{self, Read};
                 let mut stdin = String::new();
-                io::stdin().read_to_string(&mut stdin).expect("Failed to read from stdin");
+                io::stdin()
+                    .read_to_string(&mut stdin)
+                    .expect("Failed to read from stdin");
                 stdin
             };
             let mut session = build_session(session, profile, resume);
