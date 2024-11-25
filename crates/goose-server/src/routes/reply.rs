@@ -1,3 +1,4 @@
+use crate::state::AppState;
 use axum::{
     extract::State,
     http::{self, HeaderMap, StatusCode},
@@ -7,6 +8,7 @@ use axum::{
 };
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
+use goose::memory::MemorySystem;
 use goose::{
     agent::Agent,
     developer::DeveloperSystem,
@@ -24,8 +26,6 @@ use std::{
 };
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-
-use crate::state::AppState;
 
 // Types matching the incoming JSON structure
 #[derive(Debug, Deserialize)]
@@ -272,11 +272,13 @@ async fn handler(
 
     // Setup agent with developer system
     let system = Box::new(DeveloperSystem::new());
+    let memory = Box::new(MemorySystem::new());
     let provider = factory::get_provider(state.provider_config)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut agent = Agent::new(provider);
     agent.add_system(system);
+    agent.add_system(memory);
 
     // Convert incoming messages
     let messages = convert_messages(request.messages);

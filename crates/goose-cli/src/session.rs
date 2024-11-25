@@ -9,6 +9,7 @@ use crate::agents::agent::Agent;
 use crate::prompt::{InputType, Prompt};
 use crate::systems::goose_hints::GooseHintsSystem;
 use goose::developer::DeveloperSystem;
+use goose::memory::MemorySystem;
 use goose::models::message::{Message, MessageContent};
 use goose::models::role::Role;
 
@@ -202,7 +203,9 @@ impl<'a> Session<'a> {
         self.agent.add_system(system);
         self.prompt
             .render(raw_message("Connected developer system."));
-
+        let memory = Box::new(MemorySystem::new());
+        self.agent.add_system(memory);
+        self.prompt.render(raw_message("Connected memory system."));
         let goosehints_system = Box::new(GooseHintsSystem::new());
         self.agent.add_system(goosehints_system);
         self.prompt
