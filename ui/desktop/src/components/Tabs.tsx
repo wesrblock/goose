@@ -199,7 +199,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
               {/* Adjusted padding on the left side and reduced margin for the close button */}
               <div className="z-10 items-center justify-between w-full m-auto text-center truncate">
                 <span className="tab-type align-middle">
-                  {chat.title}       
+                  {chat.title.length > 8 ? `${chat.title.slice(0, 7)}...` : chat.title}
                   {chats.length > 1 && (
                     <button 
                       onClick={(e) => {
