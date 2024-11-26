@@ -10,8 +10,7 @@ import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import Tabs from './components/Tabs';
 import MoreMenu from './components/MoreMenu';
-import { BoxIcon } from './components/ui/icons';
-import ReactMarkdown from 'react-markdown';
+import LoadingGoose from './components/LoadingGoose';
 
 export interface Chat {
   id: number;
@@ -186,7 +185,7 @@ function ChatContent({
             ))}
             {isLoading && (
               <div className="flex items-center justify-center p-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+                <LoadingGoose />
               </div>
             )}
             {error && (
