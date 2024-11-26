@@ -25,8 +25,6 @@ struct TokenCache {
     cache_path: PathBuf,
 }
 
-
-
 fn get_base_path() -> PathBuf {
     const BASE_PATH: &str = ".config/goose/databricks/oauth";
     let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
