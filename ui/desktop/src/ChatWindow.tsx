@@ -175,22 +175,28 @@ function ChatContent({
         {messages.length === 0 ? (
           <Splash append={append} />
         ) : (
-          <ScrollArea className="flex-1 px-[10px]">
+          <ScrollArea className="flex-1 px-[10px]" id="chat-scroll-area">
             <div className="block h-10" />
-            {messages.map((message) => (
-              <div key={message.id}>
-                {message.role === 'user' ? (
-                  <UserMessage message={message} />
-                ) : (
-                  <GooseMessage
-                    message={message}
-                    messages={messages}
-                    metadata={messageMetadata[message.id]}
-                    append={append}
-                  />
-                )}
-              </div>
-            ))}
+            <div ref={(el) => {
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+              }
+            }}>
+              {messages.map((message) => (
+                <div key={message.id}>
+                  {message.role === 'user' ? (
+                    <UserMessage message={message} />
+                  ) : (
+                    <GooseMessage
+                      message={message}
+                      messages={messages}
+                      metadata={messageMetadata[message.id]}
+                      append={append}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
             {isLoading && (
               <div className="flex items-center justify-center p-4">
                 <LoadingGoose />
