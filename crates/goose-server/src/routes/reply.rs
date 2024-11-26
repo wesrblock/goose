@@ -1,3 +1,4 @@
+use crate::state::AppState;
 use axum::{
     extract::State,
     http::{self, HeaderMap, StatusCode},
@@ -24,8 +25,6 @@ use std::{
 };
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-
-use crate::state::AppState;
 
 // Types matching the incoming JSON structure
 #[derive(Debug, Deserialize)]

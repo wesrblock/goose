@@ -204,7 +204,6 @@ impl<'a> Session<'a> {
         self.agent.add_system(system);
         self.prompt
             .render(raw_message("Connected developer system."));
-
         let goosehints_system = Box::new(GooseHintsSystem::new());
         self.agent.add_system(goosehints_system);
         self.prompt
