@@ -22,9 +22,11 @@ export default function ToolInvocations({ toolInvocations }) {
 
 function ToolInvocation({ toolInvocation }) {
   return (
-    <div key={toolInvocation.toolCallId} className="w-full h-full flex flex-col text-tool">
-      <ToolCall call={toolInvocation} />
-      {toolInvocation.state === 'result' && <ToolResult result={toolInvocation} />}
+    <div className="flex bg-goose-bubble text-white rounded-2xl p-4 pb-0 mb-[16px]">
+      <div key={toolInvocation.toolCallId} className="w-full h-full flex flex-col text-tool">
+        <ToolCall call={toolInvocation} />
+        {toolInvocation.state === 'result' && <ToolResult result={toolInvocation} />}
+      </div>
     </div>
   )
 }

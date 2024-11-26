@@ -26,9 +26,7 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
     <div className="flex justify-start mb-[16px]">
       <div className="flex-col">
         {message.toolInvocations && (
-          <div className="flex bg-goose-bubble text-white rounded-2xl p-4 pb-0 mb-[16px]">
-            <ToolInvocations toolInvocations={message.toolInvocations} />
-          </div>
+          <ToolInvocations toolInvocations={message.toolInvocations} />
         )}
 
         {message.content && (
