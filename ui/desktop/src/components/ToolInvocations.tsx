@@ -177,24 +177,25 @@ const convertArgsToMarkdown = (args: Record<string, any>): string => {
   const lines: string[] = [];
   
   Object.entries(args).forEach(([key, value]) => {
-    // Add the parameter name as a heading
-    lines.push(`### ${key}`);
-    lines.push('');
-    
-    // Handle different value types
     if (typeof value === 'string') {
       lines.push('```');
-      lines.push(value);
+      lines.push(`${key}: ${value}`);
       lines.push('```');
     } else if (Array.isArray(value)) {
+      lines.push(`### ${key}`);
+      lines.push('');
       value.forEach((item, index) => {
         lines.push(`${index + 1}. ${JSON.stringify(item)}`);
       });
     } else if (typeof value === 'object' && value !== null) {
+      lines.push(`### ${key}`);
+      lines.push('');
       lines.push('```json');
       lines.push(JSON.stringify(value, null, 2));
       lines.push('```');
     } else {
+      lines.push(`### ${key}`);
+      lines.push('');
       lines.push('```');
       lines.push(String(value));
       lines.push('```');
