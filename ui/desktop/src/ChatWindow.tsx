@@ -12,7 +12,7 @@ import Tabs from './components/Tabs';
 import MoreMenu from './components/MoreMenu';
 import { Bird } from './components/ui/icons';
 import LoadingGoose from './components/LoadingGoose';
-
+// import fakeToolInvocations from './fixtures/tool-calls-and-results.json';
 
 export interface Chat {
   id: number;
@@ -114,6 +114,8 @@ function ChatContent({
       console.log('All responses:', fetchResponses);
     },
   });
+
+  // const messages = fakeToolInvocations;
 
   // Update chat messages when they change
   useEffect(() => {

@@ -1,6 +1,6 @@
 import React from 'react';
-import ToolInvocation from './ToolInvocation';
 import ReactMarkdown from 'react-markdown';
+import ToolInvocations from './ToolInvocations';
 import LinkPreview from './LinkPreview';
 import GooseResponseForm from './GooseResponseForm';
 import { extractUrls } from '../utils/urlUtils';
@@ -22,32 +22,23 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
   const previousUrls = previousMessage ? extractUrls(previousMessage.content) : [];
   const urls = !message.toolInvocations ? extractUrls(message.content, previousUrls) : [];
 
-  console.log("message", message.content)
-
   return (
-    <div className="flex">
-      <div className="flex flex-col">
+    <div className="flex justify-start mb-[16px]">
+      <div className="flex-col">
         {message.toolInvocations && (
-          <div className="bg-goose-bubble max-w-[100%] overflow-hidden text-white rounded-2xl p-4 mb-[16px]">
-            <div className="space-y-4">
-              {message.toolInvocations.map((toolInvocation) => (
-                <ToolInvocation
-                  key={toolInvocation.toolCallId}
-                  toolInvocation={toolInvocation}
-                />
-              ))}
-            </div>
+          <div className="flex bg-goose-bubble text-white rounded-2xl p-4 pb-0 mb-[16px]">
+            <ToolInvocations toolInvocations={message.toolInvocations} />
           </div>
         )}
 
         {message.content && (
-          <div className="bg-goose-bubble max-w-[100%] overflow-hidden text-white rounded-2xl p-4 mb-[16px]">
+          <div className="flex bg-goose-bubble text-white rounded-2xl p-4 mb-[16px]">
             <ReactMarkdown className="prose prose-xs">{message.content}</ReactMarkdown>
           </div>
         )}
 
         {urls.length > 0 && (
-          <div className="mt-2">
+          <div className="flex mb-[16px]">
             {urls.map((url, index) => (
               <LinkPreview key={index} url={url} />
             ))}
@@ -55,11 +46,13 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
         )}
 
         {metadata && (
+          <div className="flex mb-[16px]">
             <GooseResponseForm
               message={message.content}
               metadata={metadata}
               append={append}
             />
+          </div>
         )}
       </div>
     </div>
