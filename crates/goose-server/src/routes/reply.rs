@@ -361,7 +361,7 @@ async fn ask_handler(
                 }
             }
             Err(e) => {
-                tracing::error!("Error processing message: {}", e);
+                tracing::error!("Error processing as_ai message: {}", e);
                 return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
         }
