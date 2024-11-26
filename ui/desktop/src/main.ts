@@ -119,9 +119,9 @@ const createTray = () => {
   let iconPath: string;
 
   if (isDev) {
-    iconPath = path.join(process.cwd(), 'images', 'iconTemplate.png');
+    iconPath = path.join(process.cwd(), 'src', 'images', 'iconTemplate.png');
   } else {
-    iconPath = path.join(process.resourcesPath, 'images', 'iconTemplate.png');
+    iconPath = path.join(process.resourcesPath, 'src', 'images', 'iconTemplate.png');
   }
 
   const tray = new Tray(iconPath);

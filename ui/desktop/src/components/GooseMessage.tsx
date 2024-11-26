@@ -26,7 +26,7 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
     <div className="flex">
       <div className="flex flex-col">
         {message.toolInvocations && (
-          <div className="bg-goose-bubble text-white rounded-2xl p-4 mb-[16px]">
+          <div className="bg-goose-bubble max-w-[100%] overflow-hidden text-white rounded-2xl p-4 mb-[16px]">
             <div className="space-y-4">
               {message.toolInvocations.map((toolInvocation) => (
                 <ToolInvocation
@@ -39,7 +39,7 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
         )}
 
         {message.content && (
-          <div className="bg-goose-bubble text-white rounded-2xl p-4 mb-[16px]">
+          <div className="bg-goose-bubble max-w-[100%] overflow-hidden text-white rounded-2xl p-4 mb-[16px]">
             <ReactMarkdown className="prose prose-xs">{message.content}</ReactMarkdown>
           </div>
         )}
