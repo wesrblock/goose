@@ -113,7 +113,11 @@ export default {
       'goose-text': {
           DEFAULT: '#000000',
           dark: '#9d9d9d',
-          }
+          },
+        'goose-text-light': {
+                  DEFAULT: '#FFFFFF',
+                  dark: '#2F2F2F',
+                  }
       },
       borderRadius: {
         lg: 'var(--radius)',
