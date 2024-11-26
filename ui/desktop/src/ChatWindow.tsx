@@ -23,20 +23,6 @@ export interface Chat {
   }>;
 }
 
-const handleResize = (mode: 'expanded' | 'compact') => {
-  if (window.electron) {
-    if (mode === 'expanded') {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      window.electron.resizeWindow(width, height);
-    } else if (mode === 'compact') {
-      const width = window.innerWidth;
-      const height = 100; // Make it very thin
-      window.electron.resizeWindow(width, height);
-    }
-  }
-};
-
 const WingView: React.FC<{ onExpand: () => void; status: string }> = ({ onExpand, status }) => {
   return (
     <div
@@ -242,7 +228,6 @@ export default function ChatWindow() {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
     console.log(`Toggle to ${newMode}`);
     setMode(newMode);
-    handleResize(newMode);
   };
 
   window.electron.logInfo('ChatWindow loaded');
