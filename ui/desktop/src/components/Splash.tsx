@@ -9,7 +9,7 @@ export default function Splash({ append }) {
       <div className="flex flex-1" />
       <div className="flex items-center">
         <GooseSplashLogo />
-        <span className="ask-goose-type ml-[8px]">ask<br />goose</span>
+        <span className="ask-goose-type goose-text dark:goose-text-dark ml-[8px]">ask<br />goose</span>
       </div>
       <Spacer className="mt-[10px]"></Spacer>
       <div
