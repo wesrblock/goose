@@ -63,6 +63,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     Configure {
+        /// Name of the profile to configure. Use 'default' for the default profile.
+        #[arg(
+            help = "Profile name to configure",
+            long_help = "Create or modify a named configuration profile. Profiles store settings like API keys and model preferences."
+        )]
         profile_name: Option<String>,
     },
     System {
