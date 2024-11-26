@@ -331,8 +331,10 @@ async fn ask_handler(
 ) -> Result<Json<AskResponse>, StatusCode> {
     let provider = factory::get_provider(state.provider_config)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let system = Box::new(DeveloperSystem::new());
 
-    let agent = Agent::new(provider);
+    let mut agent = Agent::new(provider);
+    agent.add_system(system);
 
     // Create a single message for the prompt
     let messages = vec![Message::user().with_text(request.prompt)];

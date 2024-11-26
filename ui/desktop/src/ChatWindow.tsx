@@ -103,7 +103,7 @@ function ChatContent({
       setWorking(Working.Idle);
 
       const promptTemplates = [
-        "Take a look at this content, if this looks like it could be asking for a confirmation, return QUESTION. If it looks like it is a list of options or plans to choose from, return OPTIONS. It can't just be a list, but clearly must be asking the user to pick one or more of the plan or option alternatives, otherwise return READY. \n ### Message Content:\n" + message.content,
+        "Take a look at this content, if this looks like it could be asking for a confirmation, return QUESTION. If it looks like it is a list of options or plans to choose from, return OPTIONS. It can't just be a list, but clearly must be asking the user to pick one or more of the plan or option alternatives, otherwise return READY. \n ### Message Content:\n" + message.content + "\nYou must provide a response strictly limited to one of the following three words: QUESTION, OPTIONS, READY. No other words, phrases, or explanations are allowed.",
         "If the content is clearly a list of distinct options or plans of action to choose from, and not just a list of things, but clearly a list of things to choose one from from, taking into account the Message Content alone, try to format it in a json array, like this JSON array of objects of the form optionTitle:string, optionDescription:string (markdown).\n If is not a list of options or plans to choose from, then return empty list.\n ### Message Content:\n" + message.content,
       ];
 
