@@ -170,7 +170,7 @@ function ChatContent({
           />
         </div>
       </div>
-      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
+      <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient dark:bg-dark-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
         {messages.length === 0 ? (
           <Splash append={append} />
         ) : (

@@ -11,7 +11,7 @@ interface InputProps {
 
 export default function Input({ handleSubmit, handleInputChange, input, disabled = false }: InputProps) {
   return (
-    <form onSubmit={handleSubmit} className="flex relative bg-white h-[57px] px-[16px] rounded-b-2xl">
+    <form onSubmit={handleSubmit} className="flex relative bg-white dark:bg-gray-800 h-[57px] px-[16px] rounded-b-2xl">
       <input 
         type="text" 
         placeholder="What should goose do?"
@@ -27,7 +27,7 @@ export default function Input({ handleSubmit, handleInputChange, input, disabled
         size="icon"
         variant="ghost"
         disabled={disabled}
-        className={`absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 ${
+        className={`absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-800 ${
           disabled ? 'opacity-50 cursor-not-allowed' : ''
         }`}
       >

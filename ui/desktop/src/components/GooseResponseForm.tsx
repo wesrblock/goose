@@ -89,11 +89,11 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
   return (
     <div className="space-y-4">
       {isQuestion && (
-        <div className="flex items-center gap-4 p-4 rounded-lg bg-tool-card border">
+        <div className="flex items-center gap-4 p-4 rounded-lg bg-tool-card dark:bg-tool-card-dark border dark:border-dark-border">
           <Button
             onClick={handleAccept}
             variant="default"
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto dark:bg-button-dark"
           >
             <GPSIcon size={14} />
             Take flight with this plan
@@ -101,7 +101,7 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
           <Button
             onClick={handleCancel}
             variant="destructive"
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto dark:bg-button-destructive-dark"
           >
             <GPSIcon size={14} />
             Cancel
@@ -117,11 +117,11 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
               className={cn(
                 "p-4 rounded-lg border transition-colors cursor-pointer",
                 selectedOption === index
-                  ? "bg-primary/10 border-primary"
-                  : "bg-tool-card hover:bg-accent"
+                  ? "bg-primary/10 dark:bg-dark-primary border-primary dark:border-dark-primary"
+                  : "bg-tool-card dark:bg-tool-card-dark hover:bg-accent dark:hover:bg-dark-accent"
               )}
             >
-              <h3 className="font-semibold text-lg mb-2">{opt.optionTitle}</h3>
+              <h3 className="font-semibold text-lg mb-2 dark:text-gray-800">{opt.optionTitle}</h3>
               <div className="prose prose-xs max-w-none">
                 <ReactMarkdown>{opt.optionDescription}</ReactMarkdown>
               </div>
@@ -130,7 +130,7 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
           <Button
             onClick={handleSubmit}
             variant="default"
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto dark:bg-button-dark"
             disabled={selectedOption === null}
           >
             <GPSIcon size={14} />

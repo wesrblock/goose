@@ -181,7 +181,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
             {/* SVG Background - creates the tab shape */}
             <svg 
               xmlns="http://www.w3.org/2000/svg" 
-              className="absolute inset-0 w-full h-full"
+              className="absolute inset-0 w-full h-full dark:hidden"
               viewBox={`0 0 ${tabWidth} 24`}
               fill="none"
               preserveAspectRatio="none"
@@ -190,7 +190,22 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
                 d={generatePath(tabWidth)}
                 fill={selectedChatId === chat.id ? 
                   'rgba(226, 245, 251, 0.90)' : 
-                  'rgba(254, 254, 254, 0.80);'
+                  'rgba(254, 254, 254, 0.80)'
+                }
+              />
+            </svg>
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              className="absolute inset-0 w-full h-full hidden dark:block"
+              viewBox={`0 0 ${tabWidth} 24`}
+              fill="none"
+              preserveAspectRatio="none"
+            >
+              <path 
+                d={generatePath(tabWidth)}
+                fill={selectedChatId === chat.id ? 
+                  'rgba(17, 24, 39, 0.90)' : 
+                  'rgba(31, 41, 55, 0.90)'
                 }
               />
             </svg>

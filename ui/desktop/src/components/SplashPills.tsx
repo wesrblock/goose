@@ -3,7 +3,7 @@ import React from "react"
 function SplashPill({ content, append }) {
   return (
     <div
-      className="px-16 py-8 text-14 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-splash-pills rounded-full inline-block"
+      className="px-16 py-8 text-14 text-center text-splash-pills-text dark:text-splash-pills-text-dark  whitespace-nowrap cursor-pointer bg-splash-pills dark:bg-splash-pills-dark rounded-full inline-block"
       onClick={async () => {
         const message = {
           content,
