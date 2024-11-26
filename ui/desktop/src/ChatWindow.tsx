@@ -97,7 +97,7 @@ function ChatContent({
       }
     },
     onFinish: async (message, options) => {
-      setProgressMessage('Click here to expand');
+      setProgressMessage('Task finished. Click here to expand.');
       setWorking(Working.Idle);
 
       const promptTemplates = [
