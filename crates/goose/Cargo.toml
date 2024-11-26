@@ -38,6 +38,7 @@ webbrowser = "0.8"
 dotenv = "0.15"
 xcap = "0.0.14"
 libc = "=0.2.164"
+expanduser = "1.2.2"
 
 
 [dev-dependencies]

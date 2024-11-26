@@ -25,7 +25,6 @@ struct TokenCache {
     cache_path: PathBuf,
 }
 
-const BASE_PATH: &str = concat!(env!("HOME"), "/.config/goose/databricks/oauth");
 
 impl TokenCache {
     fn new(host: &str, client_id: &str, scopes: &[String]) -> Self {
@@ -35,8 +34,10 @@ impl TokenCache {
         hasher.update(scopes.join(",").as_bytes());
         let hash = format!("{:x}", hasher.finalize());
 
-        fs::create_dir_all(BASE_PATH).unwrap();
-        let cache_path = PathBuf::from(BASE_PATH).join(format!("{}.json", hash));
+        let bp = expanduser::expanduser("~/.config/goose/databricks/oauth").unwrap();
+        let base_path = bp.to_str().unwrap();
+        fs::create_dir_all(&base_path).unwrap();
+        let cache_path = PathBuf::from(&base_path).join(format!("{}.json", hash));
 
         Self { cache_path }
     }
