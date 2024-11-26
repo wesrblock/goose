@@ -22,6 +22,8 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
   const previousUrls = previousMessage ? extractUrls(previousMessage.content) : [];
   const urls = !message.toolInvocations ? extractUrls(message.content, previousUrls) : [];
 
+  console.log("message", message.content)
+
   return (
     <div className="flex">
       <div className="flex flex-col">
