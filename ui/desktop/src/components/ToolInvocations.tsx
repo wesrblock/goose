@@ -47,7 +47,7 @@ function ToolCall({ call }: ToolCallProps) {
   const argsMarkdownContent = convertArgsToMarkdown(call.args);
 
   return (
-    <Card className="bg-tool-card p-4 mb-[16px]">
+    <Card className="bg-tool-card dark:bg-tool-card-dark p-4 mb-[16px]">
       <div className="flex items-center">
         <BoxIcon size={14} />
         <span className="ml-[8px]">Tool Called: {call.toolName.substring(call.toolName.lastIndexOf("__") + 2)}</span>
@@ -117,7 +117,7 @@ function ToolResult({ result }: ToolResultProps) {
   };
 
   return (
-    <Card className="bg-tool-card p-4 mb-[16px]">
+    <Card className="bg-tool-card dark:bg-tool-card-dark p-4 mb-[16px]">
       <div className="flex items-center">
         <BoxIcon size={14} />
         <span className="ml-[8px]">Tool Result: {result.toolName.substring(result.toolName.lastIndexOf("__") + 2)}</span>
