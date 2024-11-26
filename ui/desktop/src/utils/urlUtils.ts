@@ -28,7 +28,6 @@ export function extractUrls(content: string, previousUrls: string[] = []): strin
   const normalizedPreviousUrls = previousUrls.map(normalizeUrl);
   const normalizedCurrentUrls = currentUrls.map(url => {
     const normalized = normalizeUrl(url);
-    console.log('Normalizing URL:', { original: url, normalized });
     return normalized;
   });
   
@@ -38,18 +37,8 @@ export function extractUrls(content: string, previousUrls: string[] = []): strin
     const isDuplicate = normalizedPreviousUrls.some(prevUrl => 
       normalizeUrl(prevUrl) === normalized
     );
-    console.log('URL comparison:', { 
-      url, 
-      normalized,
-      previousUrls: normalizedPreviousUrls,
-      isDuplicate 
-    });
     return !isDuplicate;
   });
-  
-  console.log('Content:', content);
-  console.log('Found URLs:', uniqueUrls);
-  console.log('Previous URLs:', previousUrls);
-  
+
   return uniqueUrls;
 }

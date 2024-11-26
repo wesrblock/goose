@@ -111,8 +111,6 @@ function ChatContent({
       const fetchResponses = await askAi(promptTemplates);
 
       setMessageMetadata((prev) => ({ ...prev, [message.id]: fetchResponses }));
-
-      console.log('All responses:', fetchResponses);
     },
   });
 
@@ -302,7 +300,6 @@ export default function ChatWindow() {
  * Utility to ask the LLM any question to clarify without wider context.
  */
 async function askAi(promptTemplates: string[]) {
-  console.log('askAi called...');
   const responses = await Promise.all(
     promptTemplates.map(async (template) => {
       const response = await fetch(getApiUrl('/ask'), {
@@ -318,7 +315,6 @@ async function askAi(promptTemplates: string[]) {
       }
 
       const data = await response.json();
-      console.log('ask Response:', data.response);
 
       return data.response;
     })

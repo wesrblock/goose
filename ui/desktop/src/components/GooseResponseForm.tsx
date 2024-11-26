@@ -19,8 +19,6 @@ export default function GooseResponseForm({ message, metadata, append }: GooseRe
   let isOptions = false;
   let options = [];
 
-  console.log('metadata:', metadata[0]);
-
   if (metadata) {
     isReady = metadata[0] === "READY";
     isQuestion = metadata[0] === "QUESTION";
