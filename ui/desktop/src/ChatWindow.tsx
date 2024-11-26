@@ -12,7 +12,8 @@ import Tabs from './components/Tabs';
 import MoreMenu from './components/MoreMenu';
 import { Bird } from './components/ui/icons';
 import LoadingGoose from './components/LoadingGoose';
-
+import { ApiKeyWarning } from './components/ApiKeyWarning';
+// import fakeToolInvocations from './fixtures/tool-calls-and-results.json';
 
 export interface Chat {
   id: number;
@@ -110,10 +111,10 @@ function ChatContent({
       const fetchResponses = await askAi(promptTemplates);
 
       setMessageMetadata((prev) => ({ ...prev, [message.id]: fetchResponses }));
-
-      console.log('All responses:', fetchResponses);
     },
   });
+
+  // const messages = fakeToolInvocations;
 
   // Update chat messages when they change
   useEffect(() => {
@@ -173,22 +174,28 @@ function ChatContent({
         {messages.length === 0 ? (
           <Splash append={append} />
         ) : (
-          <ScrollArea className="flex-1 px-[10px]">
+          <ScrollArea className="flex-1 px-[10px]" id="chat-scroll-area">
             <div className="block h-10" />
-            {messages.map((message) => (
-              <div key={message.id}>
-                {message.role === 'user' ? (
-                  <UserMessage message={message} />
-                ) : (
-                  <GooseMessage
-                    message={message}
-                    messages={messages}
-                    metadata={messageMetadata[message.id]}
-                    append={append}
-                  />
-                )}
-              </div>
-            ))}
+            <div ref={(el) => {
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+              }
+            }}>
+              {messages.map((message) => (
+                <div key={message.id}>
+                  {message.role === 'user' ? (
+                    <UserMessage message={message} />
+                  ) : (
+                    <GooseMessage
+                      message={message}
+                      messages={messages}
+                      metadata={messageMetadata[message.id]}
+                      append={append}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
             {isLoading && (
               <div className="flex items-center justify-center p-4">
                 <LoadingGoose />
@@ -217,6 +224,9 @@ function ChatContent({
 }
 
 export default function ChatWindow() {
+  // Check if API key is missing from the window arguments
+  const apiCredsMissing = window.electron.getConfig().apiCredsMissing;
+
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
@@ -251,30 +261,37 @@ export default function ChatWindow() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
-      {/* Always render ChatContent but control its visibility */}
-      <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
-        <Routes>
-          <Route
-            path="/chat/:id"
-            element={
-              <ChatContent
-                key={selectedChatId}
-                chats={chats}
-                setChats={setChats}
-                selectedChatId={selectedChatId}
-                setSelectedChatId={setSelectedChatId}
-                initialQuery={initialQuery}
-                setProgressMessage={setProgressMessage}
-                setWorking={setWorking}
+      {apiCredsMissing ? (
+        <div className="w-full h-full">
+          <ApiKeyWarning className="w-full h-full" />
+        </div>
+      ) : (
+        <>
+          <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
+            <Routes>
+              <Route
+                path="/chat/:id"
+                element={
+                  <ChatContent
+                    key={selectedChatId}
+                    chats={chats}
+                    setChats={setChats}
+                    selectedChatId={selectedChatId}
+                    setSelectedChatId={setSelectedChatId}
+                    initialQuery={initialQuery}
+                    setProgressMessage={setProgressMessage}
+                    setWorking={setWorking}
+                  />
+                }
               />
-            }
-          />
-          <Route path="*" element={<Navigate to="/chat/1" replace />} />
-        </Routes>
-      </div>
+              <Route path="*" element={<Navigate to="/chat/1" replace />} />
+            </Routes>
+          </div>
 
-      {/* Always render WingView but control its visibility */}
-      <WingView onExpand={toggleMode} progressMessage={progressMessage} working={working} />
+          {/* Always render WingView but control its visibility */}
+          <WingView onExpand={toggleMode} progressMessage={progressMessage} working={working} />
+        </>
+      )}
     </div>
   );
 }
@@ -283,7 +300,6 @@ export default function ChatWindow() {
  * Utility to ask the LLM any question to clarify without wider context.
  */
 async function askAi(promptTemplates: string[]) {
-  console.log('askAi called...');
   const responses = await Promise.all(
     promptTemplates.map(async (template) => {
       const response = await fetch(getApiUrl('/ask'), {
@@ -299,7 +315,6 @@ async function askAi(promptTemplates: string[]) {
       }
 
       const data = await response.json();
-      console.log('ask Response:', data.response);
 
       return data.response;
     })
