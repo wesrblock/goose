@@ -234,11 +234,11 @@ async fn stream_message(
                         }
                     }
                     MessageContent::Text(text) => {
-                        for line in text.text.lines() {
-                            let modified_line = format!("{}\n", line);
-                            tx.send(ProtocolFormatter::format_text(&modified_line)).await?;
+                        
+                            //let modified_line = format!("{}\n", text.text);
+                            tx.send(ProtocolFormatter::format_text(&text.text)).await?;
 
-                        }
+                        
                     }
                     MessageContent::Image(_) => {
                         // TODO
