@@ -266,6 +266,7 @@ pub fn execute_tool_call(tool_call: ToolCall) -> Result<String, io::Error> {
     }
 }
 
+#[derive(Clone)]
 // MemorySystem implementation
 
 pub struct MemorySystem {

@@ -1,8 +1,9 @@
-use anyhow::Result;
-use async_stream;
+use anyhow::{Result, anyhow};
 use futures::stream::BoxStream;
 use serde_json::json;
+use tokio_stream::wrappers::ReceiverStream;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
@@ -48,7 +49,7 @@ impl SystemStatus {
 /// Agent integrates a foundational LLM with the systems it needs to pilot
 pub struct Agent {
     systems: Vec<Box<dyn System>>,
-    provider: Box<dyn Provider>,
+    provider: Arc<Box<dyn Provider>>,
 }
 
 impl Agent {
@@ -56,7 +57,7 @@ impl Agent {
     pub fn new(provider: Box<dyn Provider>) -> Self {
         Self {
             systems: Vec::new(),
-            provider,
+            provider: Arc::new(provider),
         }
     }
 
@@ -68,7 +69,7 @@ impl Agent {
     /// Get all tools from all systems with proper system prefixing
     fn get_prefixed_tools(&self) -> Vec<Tool> {
         let mut tools = Vec::new();
-        for system in &self.systems {
+        for system in self.systems.iter() {
             for tool in system.tools() {
                 tools.push(Tool::new(
                     format!("{}__{}", system.name(), tool.name),
@@ -78,39 +79,6 @@ impl Agent {
             }
         }
         tools
-    }
-
-    /// Find the appropriate system for a tool call based on the prefixed name
-    fn get_system_for_tool(&self, prefixed_name: &str) -> Option<&dyn System> {
-        let parts: Vec<&str> = prefixed_name.split("__").collect();
-        if parts.len() != 2 {
-            return None;
-        }
-        let system_name = parts[0];
-        self.systems
-            .iter()
-            .find(|sys| sys.name() == system_name)
-            .map(|v| &**v)
-    }
-
-    /// Dispatch a single tool call to the appropriate system
-    async fn dispatch_tool_call(
-        &self,
-        tool_call: AgentResult<ToolCall>,
-    ) -> AgentResult<Vec<Content>> {
-        let call = tool_call?;
-        let system = self
-            .get_system_for_tool(&call.name)
-            .ok_or_else(|| AgentError::ToolNotFound(call.name.clone()))?;
-
-        let tool_name = call
-            .name
-            .split("__")
-            .nth(1)
-            .ok_or_else(|| AgentError::InvalidToolName(call.name.clone()))?;
-        let system_tool_call = ToolCall::new(tool_name, call.arguments);
-
-        system.call(system_tool_call).await
     }
 
     fn get_system_prompt(&self) -> AgentResult<String> {
@@ -127,107 +95,54 @@ impl Agent {
         load_prompt_file("system.md", &context).map_err(|e| AgentError::Internal(e.to_string()))
     }
 
-    /// Fetches the current status of all systems and formats it as a status message
-    async fn get_system_status(&self) -> AgentResult<String> {
-        // Get status of all systems
-        let status = if !self.systems.is_empty() {
-            let mut context = HashMap::new();
-            let mut systems_status: Vec<SystemStatus> = Vec::new();
-            for system in &self.systems {
-                let system_status = system
-                    .status()
-                    .await
-                    .map_err(|e| AgentError::Internal(e.to_string()))?;
-
-                // Format the status into a readable string
-                let status_str = serde_json::to_string(&system_status).unwrap_or_default();
-
-                systems_status.push(SystemStatus::new(system.name(), status_str));
-            }
-            context.insert("systems", systems_status);
-            load_prompt_file("status.md", &context)
-                .map_err(|e| AgentError::Internal(e.to_string()))?
-        } else {
-            "No systems loaded".to_string()
-        };
-
-        Ok(status)
-    }
-
-    // Initialize a new reply round, which may call multiple tools
-    async fn rewrite_messages_on_reply(
-        &self,
-        messages: &mut Vec<Message>,
-        status: String,
-    ) -> AgentResult<()> {
-        // Create tool use message for status check
-        let message_use =
-            Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
-
-        // Create tool result message with status
-        let message_result =
-            Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
-
-        messages.push(message_use);
-        messages.push(message_result);
-        Ok(())
-    }
-
-    // Rewrite the exchange as needed after each tool call
-    async fn rewrite_messages_on_tool_response(
-        &self,
-        messages: &mut Vec<Message>,
-        pending: Vec<Message>,
-        status: String,
-    ) -> AgentResult<()> {
-        // Remove the last two messages (status and tool response)
-        messages.pop();
-        messages.pop();
-
-        // Append the pending messages
-        messages.extend(pending);
-
-        // Add back a fresh status and tool response
-        let message_use =
-            Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
-
-        let message_result =
-            Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
-
-        messages.push(message_use);
-        messages.push(message_result);
-
-        Ok(())
-    }
-
     /// Create a stream that yields each message as it's generated by the agent.
     /// This includes both the assistant's responses and any tool responses.
+    ///
+    /// To stop the agent mid-flight, the caller needs to drop the stream.
     pub async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
+        let systems = self.systems.clone();
+        let provider = Arc::clone(&self.provider);
         let mut messages = messages.to_vec();
         let tools = self.get_prefixed_tools();
         let system_prompt = self.get_system_prompt()?;
 
         // Update conversation history for the start of the reply
-        let status = self.get_system_status().await?;
-        self.rewrite_messages_on_reply(&mut messages, status)
+        let status = get_system_status(&self.systems).await?;
+        rewrite_messages_on_reply(&mut messages, status)
             .await?;
 
-        Ok(Box::pin(async_stream::try_stream! {
+        // The message channel is used to send messages back to the caller via a stream at the end of this function.
+        // The channel has size 1 so the agent only gets at most 1 step ahead of what the user sees.
+        //
+        // It would be possible to increase this size to allow for the agent to go as fast as possible but any cancellation
+        // from the user would need to be handled stopping the agent and showing buffered messages before closing the channel.
+        // Tools are the slowest part of the agent so I don't think there is much benefit to increasing this size.
+        //
+        // Note: When the stream for the channel is closed the process needs to check for this and end.
+        //   Eg. if message_tx.is_closed() { break; }
+        let (message_tx, message_rx) = tokio::sync::mpsc::channel(1);
+
+        tokio::spawn(async move {
             loop {
                 // Get completion from provider
-                let (response, _) = self.provider.complete(
+                let (response, _) = match provider.complete(
                     &system_prompt,
                     &messages,
                     &tools,
-                ).await?;
+                ).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        if !message_tx.is_closed() {
+                            message_tx.send(Err(anyhow!(e))).await.unwrap();
+                        }
+                        break;
+                    }
+                };
 
                 // The assistant's response is added in rewrite_messages_on_tool_response
                 // Yield the assistant's response
-                yield response.clone();
-
-                // Not sure why this is needed, but this ensures that the above message is yielded
-                // before the following potentially long-running commands start processing
-                tokio::task::yield_now().await;
+                if message_tx.is_closed() { break; }
+                message_tx.send(Ok(response.clone())).await.unwrap();
 
                 // First collect any tool requests
                 let tool_requests: Vec<&ToolRequest> = response.content
@@ -243,7 +158,9 @@ impl Agent {
                 // Then dispatch each in parallel
                 let futures: Vec<_> = tool_requests
                     .iter()
-                    .map(|request| self.dispatch_tool_call(request.tool_call.clone()))
+                    .map(|request| {
+                        dispatch_tool_call(&systems, request.tool_call.clone())
+                    })
                     .collect();
 
                 // Process all the futures in parallel but wait until all are finished
@@ -259,19 +176,151 @@ impl Agent {
                     );
                 }
 
-                yield message_tool_response.clone();
+                if message_tx.is_closed() { break; }
+                message_tx.send(Ok(message_tool_response.clone())).await.unwrap();
 
                 // Update conversation history after the tool call round
-                let status = self.get_system_status().await?;
-                self.rewrite_messages_on_tool_response(
+                let status = match get_system_status(&systems).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        if !message_tx.is_closed() {
+                            message_tx.send(Err(anyhow!(e))).await.unwrap();
+                        }
+                        break;
+                    }
+                };
+
+                match rewrite_messages_on_tool_response(
                     &mut messages,
                     vec![response.clone(), message_tool_response],
                     status,
-                ).await?;
+                ).await {
+                    Ok(_) => (),
+                    Err(e) => {
+                        if !message_tx.is_closed() {
+                            message_tx.send(Err(anyhow!(e))).await.unwrap();
+                        }
+                        break;
+                    }
+                };
             }
-        }))
+        });
+        
+        Ok(Box::pin(ReceiverStream::new(message_rx)))        
     }
 }
+
+//////
+/// Message rewriting functions
+//////
+
+// Initialize a new reply round, which may call multiple tools
+async fn rewrite_messages_on_reply(
+    messages: &mut Vec<Message>,
+    status: String,
+) -> AgentResult<()> {
+    // Create tool use message for status check
+    let message_use =
+        Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
+
+    // Create tool result message with status
+    let message_result =
+        Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
+
+    messages.push(message_use);
+    messages.push(message_result);
+    Ok(())
+}
+
+// Rewrite the exchange as needed after each tool call
+async fn rewrite_messages_on_tool_response(
+    messages: &mut Vec<Message>,
+    pending: Vec<Message>,
+    status: String,
+) -> AgentResult<()> {
+    // Remove the last two messages (status and tool response)
+    messages.pop();
+    messages.pop();
+
+    // Append the pending messages
+    messages.extend(pending);
+
+    // Add back a fresh status and tool response
+    let message_use =
+        Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
+
+    let message_result =
+        Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
+
+    messages.push(message_use);
+    messages.push(message_result);
+
+    Ok(())
+}
+
+//////
+/// Functions primarily operating on systems.
+//////
+
+/// Find the appropriate system for a tool call based on the prefixed name
+fn get_system_for_tool<'a>(systems: &'a Vec<Box<dyn System>>, prefixed_name: &'a  str) -> Option<&'a Box<dyn System>> {
+    let parts: Vec<&str> = prefixed_name.split("__").collect();
+    if parts.len() != 2 {
+        return None;
+    }
+    let system_name = parts[0];
+    systems
+        .iter()
+        .find(|sys| sys.name() == system_name)
+}
+
+/// Dispatch a single tool call to the appropriate system
+async fn dispatch_tool_call(
+    systems: &Vec<Box<dyn System>>,
+    tool_call: AgentResult<ToolCall>,
+) -> AgentResult<Vec<Content>> {
+    let call = tool_call?;
+    let system = get_system_for_tool(systems, &call.name)
+        .ok_or_else(|| AgentError::ToolNotFound(call.name.clone()))?;
+
+    let tool_name = call
+        .name
+        .split("__")
+        .nth(1)
+        .ok_or_else(|| AgentError::InvalidToolName(call.name.clone()))?;
+    let system_tool_call = ToolCall::new(tool_name, call.arguments);
+
+    system.call(system_tool_call).await
+}
+
+/// Fetches the current status of all systems and formats it as a status message
+async fn get_system_status(systems: &Vec<Box<dyn System>>) -> AgentResult<String> {
+    // Get status of all systems
+    let status = if !systems.is_empty() {
+        let mut context = HashMap::new();
+        let mut systems_status: Vec<SystemStatus> = Vec::new();
+        for system in systems.iter() {
+            let system_status = system
+                .status()
+                .await
+                .map_err(|e| AgentError::Internal(e.to_string()))?;
+
+            // Format the status into a readable string
+            let status_str = serde_json::to_string(&system_status).unwrap_or_default();
+
+            systems_status.push(SystemStatus::new(system.name(), status_str));
+        }
+        context.insert("systems", systems_status);
+        load_prompt_file("status.md", &context)
+            .map_err(|e| AgentError::Internal(e.to_string()))?
+    } else {
+        "No systems loaded".to_string()
+    };
+
+    Ok(status)
+}
+
+
 
 #[cfg(test)]
 mod tests {
