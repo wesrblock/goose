@@ -65,7 +65,7 @@ const createChat = (query?: string) => {
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 18 },
-    width: 530,
+    width: 650,
     height: 800,
     minWidth: 530,
     minHeight: 800,

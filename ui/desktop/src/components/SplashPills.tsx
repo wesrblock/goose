@@ -21,7 +21,7 @@ export default function SplashPills({ append }) {
   return (
     <div className="grid grid-cols-2 gap-4 mb-[8px]">
       <SplashPill content="Migrate code to react" append={append} />
-      <SplashPill content="Scaffold an API for data retention" append={append} />
+      <SplashPill content="Scaffold a data retention API" append={append} />
       <SplashPill content="List files in my CWD" append={append} />
       <SplashPill content="Find all markdown files" append={append} />
     </div>
