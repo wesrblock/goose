@@ -14,12 +14,12 @@ mod systems;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use commands::configure::handle_configure;
 use commands::session::build_session;
+use commands::version::print_version;
+use std::io::{self, Read};
 
 use crate::systems::system_handler::{add_system, remove_system};
-use commands::configure::handle_configure;
-
-use commands::version::print_version;
 
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
@@ -82,6 +82,8 @@ enum Command {
     Run {
         #[arg(short, long)]
         instructions: Option<String>,
+        #[arg(short = 't', long = "text")]
+        input_text: Option<String>,
         #[arg(short, long)]
         profile: Option<String>,
         #[arg(short, long)]
@@ -145,15 +147,23 @@ async fn main() -> Result<()> {
         }
         Some(Command::Run {
             instructions,
+            input_text,
             profile,
             session,
             resume,
         }) => {
-            let file_name =
-                instructions.expect("Instruction file is required (--instructions <file_path>)");
-            let file_path = std::path::Path::new(&file_name);
-            let contents = std::fs::read_to_string(file_path).expect("Failed to read the file");
-
+            let contents = if let Some(file_name) = instructions {
+                let file_path = std::path::Path::new(&file_name);
+                std::fs::read_to_string(file_path).expect("Failed to read the instruction file")
+            } else if let Some(input_text) = input_text {
+                input_text
+            } else {
+                let mut stdin = String::new();
+                io::stdin()
+                    .read_to_string(&mut stdin)
+                    .expect("Failed to read from stdin");
+                stdin
+            };
             let mut session = build_session(session, profile, resume);
             let _ = session.headless_start(contents.clone()).await;
             return Ok(());
