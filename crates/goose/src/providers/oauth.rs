@@ -25,7 +25,11 @@ struct TokenCache {
     cache_path: PathBuf,
 }
 
-const BASE_PATH: &str = concat!(env!("HOME"), "/.config/goose/databricks/oauth");
+fn get_base_path() -> PathBuf {
+    const BASE_PATH: &str = ".config/goose/databricks/oauth";
+    let home_dir = std::env::var("HOME").expect("HOME environment variable not set");
+    PathBuf::from(home_dir).join(BASE_PATH)
+}
 
 impl TokenCache {
     fn new(host: &str, client_id: &str, scopes: &[String]) -> Self {
@@ -35,8 +39,8 @@ impl TokenCache {
         hasher.update(scopes.join(",").as_bytes());
         let hash = format!("{:x}", hasher.finalize());
 
-        fs::create_dir_all(BASE_PATH).unwrap();
-        let cache_path = PathBuf::from(BASE_PATH).join(format!("{}.json", hash));
+        fs::create_dir_all(get_base_path()).unwrap();
+        let cache_path = PathBuf::from(get_base_path()).join(format!("{}.json", hash));
 
         Self { cache_path }
     }

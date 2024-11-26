@@ -139,9 +139,10 @@ fn convert_messages(incoming: Vec<IncomingMessage>) -> Vec<Message> {
 struct ProtocolFormatter;
 
 impl ProtocolFormatter {
+
     fn format_text(text: &str) -> String {
-        // Text messages start with "0:"
-        format!("0:\"{}\"\n", text.replace('\"', "\\\""))
+        let encoded_text = serde_json::to_string(text).unwrap_or_else(|_| String::new());
+        format!("0:{}\n", encoded_text)
     }
 
     fn format_tool_call(id: &str, name: &str, args: &Value) -> String {
@@ -234,8 +235,9 @@ async fn stream_message(
                     }
                     MessageContent::Text(text) => {
                         for line in text.text.lines() {
-                            tx.send(ProtocolFormatter::format_text(&format!("{}\\n", line)))
-                                .await?;
+                            let modified_line = format!("{}\n", line);
+                            tx.send(ProtocolFormatter::format_text(&modified_line)).await?;
+
                         }
                     }
                     MessageContent::Image(_) => {
@@ -331,8 +333,10 @@ async fn ask_handler(
 ) -> Result<Json<AskResponse>, StatusCode> {
     let provider = factory::get_provider(state.provider_config)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let system = Box::new(DeveloperSystem::new());
 
-    let agent = Agent::new(provider);
+    let mut agent = Agent::new(provider);
+    agent.add_system(system);
 
     // Create a single message for the prompt
     let messages = vec![Message::user().with_text(request.prompt)];
@@ -360,7 +364,7 @@ async fn ask_handler(
                 }
             }
             Err(e) => {
-                tracing::error!("Error processing message: {}", e);
+                tracing::error!("Error processing as_ai message: {}", e);
                 return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
         }
