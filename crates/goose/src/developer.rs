@@ -102,6 +102,38 @@ impl DeveloperSystem {
             }),
         );
 
+        let screenshot_tool = Tool::new(
+            "screenshot",
+            indoc! {r#"
+                Capture a screenshot of the current screen, a specific area, or a window.
+                - Use the `output_path` parameter to specify where to save the screenshot.
+                - Use the `kind` parameter to choose the type of screenshot: "full", "area", or "window".
+                - For "area", you can specify `freeze` to enable/disable cursor freezing.
+            "#},
+            json!({
+                "type": "object",
+                "required": ["output_path"],
+                "properties": {
+                    "output_path": {
+                        "type": "string",
+                        "description": "Path to save the screenshot."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": ["full", "area", "window"],
+                        "default": "full",
+                        "description": "Type of screenshot to capture."
+                    },
+                    "freeze": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Whether to freeze the cursor during area screenshots."
+                    }
+                }
+            }),
+        );
+        
+
         let instructions = formatdoc! {r#"
             The developer system is loaded in the directory listed below.
             You can use the shell tool to run any command that would work on the relevant operating system.
@@ -125,7 +157,7 @@ impl DeveloperSystem {
             os=std::env::consts::OS,
         };
         Self {
-            tools: vec![bash_tool, text_editor_tool],
+            tools: vec![bash_tool, text_editor_tool, screenshot_tool],
             cwd: Mutex::new(std::env::current_dir().unwrap()),
             active_files: Mutex::new(HashSet::new()),
             file_history: Mutex::new(HashMap::new()),
@@ -506,6 +538,51 @@ impl DeveloperSystem {
         history.entry(path.clone()).or_default().push(content);
         Ok(())
     }
+
+    // implement screenshot tool functionality
+    async fn screenshot(&self, params: Value) -> AgentResult<Vec<Content>> {
+        let output_path = params
+            .get("output_path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AgentError::InvalidParameters("Missing 'output_path' parameter".into()))?;
+        
+        let kind = params
+            .get("kind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("full");
+    
+        let flag = match kind {
+            "area" => "-s",
+            "window" => "-w",
+            "full" => "-S",
+            _ => {
+                return Err(AgentError::InvalidParameters(format!(
+                    "Invalid screenshot kind '{}'",
+                    kind
+                )))
+            }
+        };
+    
+        let result = Command::new("screencapture")
+            .args(&[flag, output_path])
+            .output();
+    
+        match result {
+            Ok(output) if output.status.success() => Ok(vec![Content::text(format!(
+                "Screenshot of type '{}' saved at {}",
+                kind, output_path
+            ))]),
+            Ok(output) => Err(AgentError::ExecutionError(format!(
+                "Failed to take screenshot: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ))),
+            Err(e) => Err(AgentError::ExecutionError(format!(
+                "Failed to launch screencapture command: {}",
+                e
+            ))),
+        }
+    }    
+    
 }
 
 #[async_trait]
@@ -559,6 +636,7 @@ running commands on the shell."
         match tool_call.name.as_str() {
             "bash" => self.bash(tool_call.arguments).await,
             "text_editor" => self.text_editor(tool_call.arguments).await,
+            "screenshot" => self.screenshot(tool_call.arguments).await,
             _ => Err(AgentError::ToolNotFound(tool_call.name)),
         }
     }
@@ -784,4 +862,31 @@ mod tests {
 
         temp_dir.close().unwrap();
     }
+
+
+    #[tokio::test]
+    async fn test_screenshot() {
+        let system = get_system().await;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("screenshot.png");
+        let file_path_str = file_path.to_str().unwrap();
+
+        let screenshot_call = ToolCall::new(
+            "screenshot",
+            json!({
+                "output_path": file_path_str
+            }),
+        );
+
+        let result = system.call(screenshot_call).await.unwrap();
+        assert!(result[0]
+            .as_text()
+            .unwrap()
+            .contains("Screenshot saved at"));
+        assert!(file_path.exists());
+
+        temp_dir.close().unwrap();
+    }
+
 }
