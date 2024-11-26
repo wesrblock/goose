@@ -27,25 +27,28 @@ enum Working {
   Working = 'Working',
 }
 
-const WingView: React.FC<{ onExpand: () => void; status: string }> = ({ onExpand, status }) => {
+const WingView: React.FC<{
+  onExpand: () => void;
+  progressMessage: string;
+  working: Working;
+}> = ({ onExpand, progressMessage, working }) => {
   return (
-  <div
-    onClick={onExpand}
-    className="flex items-center w-full h-20 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-300 shadow-md rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200">      
-        {/* SVG Icon */}
+    <div
+      onClick={onExpand}
+      className="flex items-center w-full h-28 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-300 shadow-md rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200">
+      {working === Working.Working && (      
         <div className="w-10 h-10 mr-4 flex-shrink-0">
-          <Bird/>
+          <Bird />
         </div>
-      
+      )}
 
       {/* Status Text */}
       <div className="flex flex-col text-left">
-        <span className="text-sm text-gray-600 font-medium">{status}</span>
+        <span className="text-sm text-gray-600 font-medium">{progressMessage}</span>
       </div>
     </div>
   );
 };
-
 
 function ChatContent({
   chats,
@@ -53,19 +56,18 @@ function ChatContent({
   selectedChatId,
   setSelectedChatId,
   initialQuery,
-  setStatus,
+  setProgressMessage,
+  setWorking,
 }: {
   chats: Chat[];
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
   selectedChatId: number;
   setSelectedChatId: React.Dispatch<React.SetStateAction<number>>;
   initialQuery: string | null;
-  setStatus: React.Dispatch<React.SetStateAction<string>>;
-  
+  setProgressMessage: React.Dispatch<React.SetStateAction<string>>;
+  setWorking: React.Dispatch<React.SetStateAction<Working>>;
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
-
-  //window.electron.logInfo('chats' + JSON.stringify(chats, null, 2));
 
   const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});
 
@@ -77,23 +79,26 @@ function ChatContent({
     append,
     stop,
     isLoading,
-    error
+    error,
   } = useChat({
     api: getApiUrl('/reply'),
     initialMessages: chat?.messages || [],
     onToolCall: ({ toolCall }) => {
-      setStatus(`Executing tool: ${toolCall.toolName}`);
-      // Optionally handle tool call result here
+      setWorking(Working.Working);
+      setProgressMessage(`Executing tool: ${toolCall.toolName}`);
     },
     onResponse: (response) => {
       if (!response.ok) {
-        setStatus('An error occurred while receiving the response.');
+        setProgressMessage('An error occurred while receiving the response.');
+        setWorking(Working.Idle);
       } else {
-        setStatus('Receiving response...');
+        setProgressMessage('thinking...');
+        setWorking(Working.Working);
       }
     },
     onFinish: async (message, options) => {
-      setStatus('Goose is ready for the next task.');
+      setProgressMessage('Click here to expand');
+      setWorking(Working.Idle);
 
       const promptTemplates = [
         "Take a look at this content, if this looks like it could be asking for a confirmation, return QUESTION. If it looks like it is a list of options or plans to choose from, return OPTIONS. It can't just be a list, but clearly must be asking the user to pick one or more of the plan or option alternatives, otherwise return READY. \n ### Message Content:\n" + message.content,
@@ -102,7 +107,7 @@ function ChatContent({
 
       const fetchResponses = await askAi(promptTemplates);
 
-      setMessageMetadata(prev => ({ ...prev, [message.id]: fetchResponses }));
+      setMessageMetadata((prev) => ({ ...prev, [message.id]: fetchResponses }));
 
       console.log('All responses:', fetchResponses);
     },
@@ -190,7 +195,7 @@ function ChatContent({
             {error && (
               <div className="flex items-center justify-center p-4">
                 <div className="text-red-500 bg-red-100 p-3 rounded-lg">
-                  {error.message|| 'An error occurred while processing your request'}
+                  {error.message || 'An error occurred while processing your request'}
                 </div>
               </div>
             )}
@@ -213,11 +218,8 @@ export default function ChatWindow() {
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
-  //window.electron.logInfo('initialQuery: ' + initialQuery);
   const historyParam = searchParams.get('history');
-  const initialHistory = historyParam
-    ? JSON.parse(decodeURIComponent(historyParam))
-    : [];
+  const initialHistory = historyParam ? JSON.parse(decodeURIComponent(historyParam)) : [];
 
   const [chats, setChats] = useState<Chat[]>(() => {
     const firstChat = {
@@ -234,7 +236,8 @@ export default function ChatWindow() {
     initialQuery ? 'compact' : 'expanded'
   );
 
-  const [status, setStatus] = useState('Goose is ready for the next task.');
+  const [working, setWorking] = useState<Working>(Working.Idle);
+  const [progressMessage, setProgressMessage] = useState<string>('');
 
   const toggleMode = () => {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
@@ -259,7 +262,8 @@ export default function ChatWindow() {
                 selectedChatId={selectedChatId}
                 setSelectedChatId={setSelectedChatId}
                 initialQuery={initialQuery}
-                setStatus={setStatus}
+                setProgressMessage={setProgressMessage}
+                setWorking={setWorking}
               />
             }
           />
@@ -268,35 +272,36 @@ export default function ChatWindow() {
       </div>
 
       {/* Always render WingView but control its visibility */}
-      <WingView onExpand={toggleMode} status={status} />
+      <WingView onExpand={toggleMode} progressMessage={progressMessage} working={working} />
     </div>
   );
 }
 
 /**
- * Utillity to ask the LLM any question to clarify without wider context.
+ * Utility to ask the LLM any question to clarify without wider context.
  */
 async function askAi(promptTemplates: string[]) {
   console.log('askAi called...');
-  const responses = await Promise.all(promptTemplates.map(async (template) => {
-    const response = await fetch(getApiUrl('/ask'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prompt: template })
-    });
+  const responses = await Promise.all(
+    promptTemplates.map(async (template) => {
+      const response = await fetch(getApiUrl('/ask'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: template }),
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to get response');
-    }
+      if (!response.ok) {
+        throw new Error('Failed to get response');
+      }
 
-    const data = await response.json();
-    console.log('ask Response:', data.response);
+      const data = await response.json();
+      console.log('ask Response:', data.response);
 
-    return data.response;
-  }));
+      return data.response;
+    })
+  );
 
   return responses;
 }
-
