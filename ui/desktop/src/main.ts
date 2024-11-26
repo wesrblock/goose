@@ -13,7 +13,27 @@ if (started) app.quit();
 
 declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
-let appConfig = { GOOSE_SERVER__PORT: 3000, GOOSE_API_HOST: 'http://127.0.0.1' };
+
+const checkApiCredentials = () => {
+  const isDatabricksConfigValid =
+    process.env.GOOSE_PROVIDER__TYPE === 'databricks' &&
+    process.env.GOOSE_PROVIDER__HOST &&
+    process.env.GOOSE_PROVIDER__MODEL;
+
+  const isOpenAIDirectConfigValid =
+    process.env.GOOSE_PROVIDER__TYPE === 'openai' &&
+    process.env.GOOSE_PROVIDER__HOST === 'https://api.openai.com' &&
+    process.env.GOOSE_PROVIDER__MODEL &&
+    process.env.GOOSE_PROVIDER__API_KEY;
+
+  return isDatabricksConfigValid || isOpenAIDirectConfigValid
+};
+
+let appConfig = { 
+  GOOSE_SERVER__PORT: 3000, 
+  GOOSE_API_HOST: 'http://127.0.0.1',
+  apiCredsMissing: !checkApiCredentials()
+};
 
 const createLauncher = () => {
   const launcherWindow = new BrowserWindow({
@@ -172,7 +192,6 @@ const showWindow = () => {
     win.focus();
   });
 };
-
 
 app.whenReady().then(async () => {
   // Load zsh environment variables in production mode only

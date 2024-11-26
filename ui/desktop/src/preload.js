@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('appConfig', {
 });
 
 contextBridge.exposeInMainWorld('electron', {
+  getConfig: () => config,
   hideWindow: () => ipcRenderer.send('hide-window'),
   createChatWindow: (query) => ipcRenderer.send('create-chat-window', query),
   logInfo: (txt) => ipcRenderer.send('logInfo', txt),

@@ -12,6 +12,7 @@ import Tabs from './components/Tabs';
 import MoreMenu from './components/MoreMenu';
 import { Bird } from './components/ui/icons';
 import LoadingGoose from './components/LoadingGoose';
+import { ApiKeyWarning } from './components/ApiKeyWarning';
 // import fakeToolInvocations from './fixtures/tool-calls-and-results.json';
 
 export interface Chat {
@@ -225,6 +226,9 @@ function ChatContent({
 }
 
 export default function ChatWindow() {
+  // Check if API key is missing from the window arguments
+  const apiCredsMissing = window.electron.getConfig().apiCredsMissing;
+
   // Get initial query and history from URL parameters
   const searchParams = new URLSearchParams(window.location.search);
   const initialQuery = searchParams.get('initialQuery');
@@ -259,30 +263,37 @@ export default function ChatWindow() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
-      {/* Always render ChatContent but control its visibility */}
-      <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
-        <Routes>
-          <Route
-            path="/chat/:id"
-            element={
-              <ChatContent
-                key={selectedChatId}
-                chats={chats}
-                setChats={setChats}
-                selectedChatId={selectedChatId}
-                setSelectedChatId={setSelectedChatId}
-                initialQuery={initialQuery}
-                setProgressMessage={setProgressMessage}
-                setWorking={setWorking}
+      {apiCredsMissing ? (
+        <div className="w-full h-full">
+          <ApiKeyWarning className="w-full h-full" />
+        </div>
+      ) : (
+        <>
+          <div style={{ display: mode === 'expanded' ? 'block' : 'none' }}>
+            <Routes>
+              <Route
+                path="/chat/:id"
+                element={
+                  <ChatContent
+                    key={selectedChatId}
+                    chats={chats}
+                    setChats={setChats}
+                    selectedChatId={selectedChatId}
+                    setSelectedChatId={setSelectedChatId}
+                    initialQuery={initialQuery}
+                    setProgressMessage={setProgressMessage}
+                    setWorking={setWorking}
+                  />
+                }
               />
-            }
-          />
-          <Route path="*" element={<Navigate to="/chat/1" replace />} />
-        </Routes>
-      </div>
+              <Route path="*" element={<Navigate to="/chat/1" replace />} />
+            </Routes>
+          </div>
 
-      {/* Always render WingView but control its visibility */}
-      <WingView onExpand={toggleMode} progressMessage={progressMessage} working={working} />
+          {/* Always render WingView but control its visibility */}
+          <WingView onExpand={toggleMode} progressMessage={progressMessage} working={working} />
+        </>
+      )}
     </div>
   );
 }
