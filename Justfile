@@ -15,3 +15,14 @@ copy-binary:
         echo "Release binary not found."; \
         exit 1; \
     fi
+
+# Run UI with latest
+run-ui:
+    @just release
+    @echo "Running UI..."
+    cd ui/desktop && npm install && npm start
+    
+# Run server
+run-server:
+    @echo "Running server..."
+    cargo run -p goose-server
