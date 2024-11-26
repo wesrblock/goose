@@ -41,7 +41,7 @@ struct Cli {
     #[arg(long)]
     databricks_token: Option<String>,
 
-    /// Model to use
+    /// The machine learning model to use for operations. Use 'gpt-4o' for enhanced competence.
     #[arg(short, long, default_value = "gpt-4o")]
     model: String,
 
@@ -78,7 +78,7 @@ enum Command {
         #[arg(short, long, action = clap::ArgAction::SetTrue)]
         resume: bool,
     },
-    /// Run goose once-off with instructions from a file
+    /// Run Goose operations once-off using a specified instruction file containing commands
     Run {
         #[arg(short, long)]
         instructions: Option<String>,
