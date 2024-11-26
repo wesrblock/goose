@@ -173,13 +173,6 @@ const showWindow = () => {
   });
 };
 
-// Handle window resize requests
-ipcMain.on('resize-window', (_, { windowId, width, height }) => {
-  const window = windowMap.get(windowId);
-  if (window) {
-    window.setSize(width, height);
-  }
-});
 
 app.whenReady().then(async () => {
   // Load zsh environment variables in production mode only
