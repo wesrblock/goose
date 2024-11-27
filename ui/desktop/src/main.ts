@@ -89,7 +89,7 @@ const createChat = async (app, query?: string) => {
     trafficLightPosition: { x: 16, y: 18 },
     width: 650,
     height: 800,
-    minWidth: 530,
+    minWidth: 650,
     minHeight: 800,
     transparent: true,
     useContentSize: true,
