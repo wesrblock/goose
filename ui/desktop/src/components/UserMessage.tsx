@@ -11,7 +11,7 @@ export default function UserMessage({ message }) {
     <div className="flex justify-end mb-[16px]">
       <div className="flex-col">
         <div className="flex bg-user-bubble text-white rounded-2xl p-4">
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          <ReactMarkdown className="whitespace-pre-wrap">{message.content}</ReactMarkdown>
         </div>
         {urls.length > 0 && (
           <div className="flex mt-2">
