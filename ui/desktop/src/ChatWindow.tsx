@@ -8,7 +8,6 @@ import Splash from './components/Splash';
 import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
 import Input from './components/Input';
-import Tabs from './components/Tabs';
 import MoreMenu from './components/MoreMenu';
 import { Bird } from './components/ui/icons';
 import LoadingGoose from './components/LoadingGoose';
@@ -142,7 +141,7 @@ function ChatContent({
       <div className="flex w-screen">
         <div className="flex">
           <MoreMenu
-            className="absolute top-2 right-2"
+            className="absolute top-2 right-2 no-drag"
             onStopGoose={() => {
               stop();
             }}
@@ -254,6 +253,7 @@ export default function ChatWindow() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-transparent flex flex-col">
+      <div className="titlebar-drag-region" />
       {apiCredsMissing ? (
         <div className="w-full h-full">
           <ApiKeyWarning className="w-full h-full" />
