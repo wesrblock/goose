@@ -85,24 +85,24 @@ impl Default for KeyRetrievalStrategy {
     }
 }
 
-pub fn get_api_key_default(
-    api_key_name: &str,
+pub fn get_keyring_secret_default(
+    key_name: &str,
     strategy: KeyRetrievalStrategy,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let env = RealEnvironment;
-    let kr = Entry::new(KEYRING_SERVICE, api_key_name)?;
-    get_api_key(api_key_name, strategy, &kr, &env)
+    let kr = Entry::new(KEYRING_SERVICE, key_name)?;
+    get_keyring_secret(key_name, strategy, &kr, &env)
 }
 
-pub fn get_api_key(
-    api_key_name: &str,
+pub fn get_keyring_secret(
+    key_name: &str,
     strategy: KeyRetrievalStrategy,
     keyring: &impl Keyring,
     env: &impl Environment,
 ) -> Result<String, Box<dyn std::error::Error>> {
     match strategy {
         KeyRetrievalStrategy::EnvironmentOnly => {
-            env.get_var(api_key_name)
+            env.get_var(key_name)
                 .map_err(|e| Box::new(KeyManagerError::from(e)) as Box<dyn std::error::Error>)
         }
         KeyRetrievalStrategy::KeyringOnly => {
@@ -114,10 +114,10 @@ pub fn get_api_key(
                 Ok(key) => Ok(key),
                 Err(e) => {
                     println!("Note: Could not retrieve key from keyring: {}", e);
-                    env.get_var(api_key_name).map_err(|_| {
+                    env.get_var(key_name).map_err(|_| {
                         Box::new(KeyManagerError::EnvVarAccess(format!(
                             "Could not find {} key in keyring or environment variables",
-                            api_key_name
+                            key_name
                         ))) as Box<dyn std::error::Error>
                     })
                 }
@@ -128,10 +128,10 @@ pub fn get_api_key(
 
 pub fn save_to_keyring(
     key_name: &str,
-    api_key: &str,
+    key_val: &str,
 ) -> std::result::Result<(), KeyManagerError> {
     let kr = Entry::new(KEYRING_SERVICE, key_name)?;
-    kr.set_password(api_key)
+    kr.set_password(key_val)
         .map_err(|e| KeyManagerError::KeyringSave(format!("Failed to save key {}: {}", key_name, e)))
 }
 
@@ -142,7 +142,7 @@ mod tests {
     const TEST_KEY: &str = "TEST_KEY";
 
     #[test]
-    fn test_get_api_key_environment_only() {
+    fn test_get_key_environment_only() {
         let mut mock_env = MockEnvironment::new();
         let mut mock_keyring = MockKeyring::new();
         
@@ -154,7 +154,7 @@ mod tests {
         mock_keyring.expect_get_password()
             .times(0);
 
-        let result = get_api_key(
+        let result = get_keyring_secret(
             TEST_KEY,
             KeyRetrievalStrategy::EnvironmentOnly,
             &mock_keyring,
@@ -165,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_api_key_environment_only_missing() {
+    fn test_get_key_environment_only_missing() {
         let mut mock_env = MockEnvironment::new();
         let mut mock_keyring = MockKeyring::new();
         
@@ -177,7 +177,7 @@ mod tests {
         mock_keyring.expect_get_password()
             .times(0);
 
-        let result = get_api_key(
+        let result = get_keyring_secret(
             TEST_KEY,
             KeyRetrievalStrategy::EnvironmentOnly,
             &mock_keyring,
@@ -188,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_api_key_keyring_only() {
+    fn test_get_key_keyring_only() {
         let mut mock_env = MockEnvironment::new();
         let mut mock_keyring = MockKeyring::new();
         
@@ -199,7 +199,7 @@ mod tests {
         mock_env.expect_get_var()
             .times(0);
 
-        let result = get_api_key(
+        let result = get_keyring_secret(
             TEST_KEY,
             KeyRetrievalStrategy::KeyringOnly,
             &mock_keyring,
@@ -210,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_api_key_keyring_only_missing() {
+    fn test_get_key_keyring_only_missing() {
         let mut mock_env = MockEnvironment::new();
         let mut mock_keyring = MockKeyring::new();
         
@@ -221,7 +221,7 @@ mod tests {
         mock_env.expect_get_var()
             .times(0);
 
-        let result = get_api_key(
+        let result = get_keyring_secret(
             TEST_KEY,
             KeyRetrievalStrategy::KeyringOnly,
             &mock_keyring,
@@ -232,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_api_key_both_keyring_succeeds() {
+    fn test_get_key_both_keyring_succeeds() {
         let mut mock_env = MockEnvironment::new();
         let mut mock_keyring = MockKeyring::new();
         
@@ -243,7 +243,7 @@ mod tests {
         mock_env.expect_get_var()
             .times(0);
 
-        let result = get_api_key(
+        let result = get_keyring_secret(
             TEST_KEY,
             KeyRetrievalStrategy::Both,
             &mock_keyring,
@@ -254,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_api_key_both_keyring_fails_env_succeeds() {
+    fn test_get_key_both_keyring_fails_env_succeeds() {
         let mut mock_env = MockEnvironment::new();
         let mut mock_keyring = MockKeyring::new();
         
@@ -267,7 +267,7 @@ mod tests {
             .times(1)
             .return_once(|_| Ok("env_value".to_string()));
 
-        let result = get_api_key(
+        let result = get_keyring_secret(
             TEST_KEY,
             KeyRetrievalStrategy::Both,
             &mock_keyring,
@@ -278,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_api_key_both_all_fail() {
+    fn test_get_key_both_all_fail() {
         let mut mock_env = MockEnvironment::new();
         let mut mock_keyring = MockKeyring::new();
         
@@ -291,7 +291,7 @@ mod tests {
             .times(1)
             .return_once(|_| Err(env::VarError::NotPresent));
 
-        let result = get_api_key(
+        let result = get_keyring_secret(
             TEST_KEY,
             KeyRetrievalStrategy::Both,
             &mock_keyring,

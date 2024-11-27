@@ -10,7 +10,7 @@ use goose::providers::configs::{
 };
 use goose::providers::factory::ProviderType;
 use goose::providers::ollama::OLLAMA_HOST;
-use goose::key_manager::{get_api_key_default, save_to_keyring, KeyRetrievalStrategy};
+use goose::key_manager::{get_keyring_secret_default, save_to_keyring, KeyRetrievalStrategy};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -92,9 +92,9 @@ pub fn find_existing_profile(name: &str) -> Option<Profile> {
     }
 }
 
-pub fn get_or_set_api_key(provider_name: &str, api_key_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub fn get_or_set_key(provider_name: &str, api_key_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     // Try to get existing key first from keyring or environment
-    if let Ok(key) = get_api_key_default(api_key_name, KeyRetrievalStrategy::Both) {
+    if let Ok(key) = get_keyring_secret_default(api_key_name, KeyRetrievalStrategy::Both) {
         return Ok(key);
     }
 
@@ -125,7 +125,7 @@ pub fn get_or_set_api_key(provider_name: &str, api_key_name: &str) -> Result<Str
 pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig {
     match provider_name.to_lowercase().as_str() {
         PROVIDER_OPEN_AI => {
-            let api_key = get_or_set_api_key(provider_name, "OPENAI_API_KEY")
+            let api_key = get_or_set_key(provider_name, "OPENAI_API_KEY")
             .expect("Failed to get OpenAI API key");
             ProviderConfig::OpenAi(OpenAiProviderConfig {
                 host: "https://api.openai.com".to_string(),
