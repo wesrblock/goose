@@ -140,14 +140,6 @@ function ChatContent({
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <div className="flex w-screen">
-        <div className="flex-1">
-          <Tabs
-            chats={chats}
-            selectedChatId={selectedChatId}
-            setSelectedChatId={setSelectedChatId}
-            setChats={setChats}
-          />
-        </div>
         <div className="flex">
           <MoreMenu
             className="absolute top-2 right-2"
