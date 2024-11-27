@@ -12,22 +12,9 @@ pub trait Prompt {
     fn hide_busy(&self);
     fn close(&self);
     fn goose_ready(&self) {
-        self.draw_goose();
-    }
-
-    fn draw_goose(&self) {
-        println!(
-            r#"        __      - - - -
-       ( 0)>  <  honk!  >
-       ||       - - - -
-       ||
-     __||_
-  <=/     \=>
-    \_____/
-     |  |
-     ^  ^
-    "#
-        );
+        println!("\n");
+        println!("Goose is running! Enter your instructions, or try asking what goose can do.");
+        println!("\n");
     }
 }
 
