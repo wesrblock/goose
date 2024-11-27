@@ -92,16 +92,19 @@ pub fn find_existing_profile(name: &str) -> Option<Profile> {
     }
 }
 
-pub fn get_or_set_key(provider_name: &str, api_key_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub fn get_or_set_key(provider_name: &str, key_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     // Try to get existing key first from keyring or environment
-    if let Ok(key) = get_keyring_secret_default(api_key_name, KeyRetrievalStrategy::Both) {
-        return Ok(key);
+    match get_keyring_secret_default(key_name, KeyRetrievalStrategy::Both) {
+        Ok(key) => return Ok(key),
+        Err(e) => {
+            eprintln!("{}", e); // Print the error
+        }
     }
 
     // If no key found or error occurred, prompt user for input
     let prompt = format!("Please enter your {} key:", provider_name);
-    let api_key = get_env_value_or_input(
-        api_key_name,
+    let key_val = get_env_value_or_input(
+        key_name,
         &prompt,
         false,
     );
@@ -109,7 +112,7 @@ pub fn get_or_set_key(provider_name: &str, api_key_name: &str) -> Result<String,
     // Check if user wants to save to the system keyring
     let resp = get_user_input("Would you like to save this key to the system keyring? (y/n):", "y")?;
     if resp.eq_ignore_ascii_case("y") {
-        match save_to_keyring(api_key_name, &api_key) {
+        match save_to_keyring(key_name, &key_val) {
             Ok(_) => println!("Successfully saved key to system keyring"),
             Err(e) => {
                 // Log the error but don't fail - the API key is still usable
@@ -118,7 +121,7 @@ pub fn get_or_set_key(provider_name: &str, api_key_name: &str) -> Result<String,
         }
     }
 
-    Ok(api_key)
+    Ok(key_val)
 }
 
 

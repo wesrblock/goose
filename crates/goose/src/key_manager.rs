@@ -112,8 +112,7 @@ pub fn get_keyring_secret(
         KeyRetrievalStrategy::Both => {
             match keyring.get_password() {
                 Ok(key) => Ok(key),
-                Err(e) => {
-                    println!("Note: Could not retrieve key from keyring: {}", e);
+                Err(_) => {
                     env.get_var(key_name).map_err(|_| {
                         Box::new(KeyManagerError::EnvVarAccess(format!(
                             "Could not find {} key in keyring or environment variables",
