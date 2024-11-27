@@ -2,6 +2,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use goose::{models::message::Message, systems::System};
+use tokio::sync::watch;
 
 use crate::agents::agent::Agent;
 
@@ -13,7 +14,7 @@ impl Agent for MockAgent {
         ()
     }
 
-    async fn reply(&self, _messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
+    async fn reply(&self, _messages: &[Message], _cancel_rx: watch::Receiver<bool>) -> Result<BoxStream<'_, Result<Message>>> {
         Ok(Box::pin(futures::stream::empty()))
     }
 }

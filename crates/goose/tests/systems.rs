@@ -6,7 +6,8 @@ use std::collections::HashMap;
 use goose::errors::{AgentError, AgentResult};
 use goose::models::content::Content;
 use goose::models::tool::{Tool, ToolCall};
-use goose::systems::System;
+use goose::systems::{System, CancellableOperation, CancelFn};
+use std::sync::Arc;
 
 #[derive(Clone)]
 /// A simple system that echoes input back to the caller
@@ -72,10 +73,26 @@ impl System for EchoSystem {
         Ok(HashMap::new()) // Echo system has no state to report
     }
 
-    async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
-        match tool_call.name.as_str() {
-            "echo" => self.echo(tool_call.arguments).await,
-            _ => Err(AgentError::ToolNotFound(tool_call.name)),
+    async fn call(&self, tool_call: ToolCall) -> CancellableOperation {
+        // Create a no-op cancel function since this system doesn't create long-running processes
+        let cancel_fn: CancelFn = Arc::new(|| {});
+        
+        // Clone self and tool info since we need to move them into the future
+        let this = self.clone();
+        let tool_name = tool_call.name.clone();
+        let arguments = tool_call.arguments.clone();
+        
+        // Create the future that will execute the tool call
+        let future = Box::pin(async move {
+            match tool_name.as_str() {
+                "echo" => this.echo(arguments).await,
+                _ => Err(AgentError::ToolNotFound(tool_name)),
+            }
+        });
+
+        CancellableOperation {
+            cancel: cancel_fn,
+            future,
         }
     }
 }
@@ -88,7 +105,7 @@ mod tests {
         let system = EchoSystem::new();
 
         let tool_call = ToolCall::new("echo", json!({"message": "hello world"}));
-        let result = system.call(tool_call).await.unwrap();
+        let result = system.call(tool_call).await.future.await.unwrap();
         assert_eq!(result.len(), 1);
         if let Content::Text(text) = &result[0] {
             assert_eq!(text.text, "hello world");
@@ -102,8 +119,7 @@ mod tests {
         let system = EchoSystem::new();
 
         let tool_call = ToolCall::new("echo", json!({}));
-        let error = system.call(tool_call).await.unwrap_err();
-
+        let error = system.call(tool_call).await.future.await.unwrap_err();
         assert!(matches!(error, AgentError::InvalidParameters(_)));
     }
 
@@ -112,8 +128,7 @@ mod tests {
         let system = EchoSystem::new();
 
         let tool_call = ToolCall::new("unknown", json!({}));
-        let error = system.call(tool_call).await.unwrap_err();
-
+        let error = system.call(tool_call).await.future.await.unwrap_err();
         assert!(matches!(error, AgentError::ToolNotFound(_)));
     }
 }

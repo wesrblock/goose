@@ -1,6 +1,7 @@
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, Result as AnyhowResult};
 use futures::stream::BoxStream;
-use serde_json::json;
+use serde_json::{json, Value};
+use tokio::sync::watch;
 use tokio_stream::wrappers::ReceiverStream;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -11,7 +12,7 @@ use crate::models::message::{Message, ToolRequest};
 use crate::models::tool::{Tool, ToolCall};
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
-use crate::systems::System;
+use crate::systems::{System, CancellableOperation, CancelFn};
 use serde::Serialize;
 
 #[derive(Clone, Debug, Serialize)]
@@ -99,7 +100,7 @@ impl Agent {
     /// This includes both the assistant's responses and any tool responses.
     ///
     /// To stop the agent mid-flight, the caller needs to drop the stream.
-    pub async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
+    pub async fn reply(&self, messages: &[Message], cancel_rx: watch::Receiver<bool>) -> Result<BoxStream<'_, Result<Message>>> {
         let systems = self.systems.clone();
         let provider = Arc::clone(&self.provider);
         let mut messages = messages.to_vec();
@@ -113,16 +114,10 @@ impl Agent {
 
         // The message channel is used to send messages back to the caller via a stream at the end of this function.
         // The channel has size 1 so the agent only gets at most 1 step ahead of what the user sees.
-        //
-        // It would be possible to increase this size to allow for the agent to go as fast as possible but any cancellation
-        // from the user would need to be handled stopping the agent and showing buffered messages before closing the channel.
-        // Tools are the slowest part of the agent so I don't think there is much benefit to increasing this size.
-        //
-        // Note: When the stream for the channel is closed the process needs to check for this and end.
-        //   Eg. if message_tx.is_closed() { break; }
         let (message_tx, message_rx) = tokio::sync::mpsc::channel(1);
 
         tokio::spawn(async move {
+            let mut cancel_rx = cancel_rx.clone();
             loop {
                 // Get completion from provider
                 let (response, _) = match provider.complete(
@@ -144,6 +139,8 @@ impl Agent {
                 if message_tx.is_closed() { break; }
                 message_tx.send(Ok(response.clone())).await.unwrap();
 
+                tokio::task::yield_now().await;
+
                 // First collect any tool requests
                 let tool_requests: Vec<&ToolRequest> = response.content
                     .iter()
@@ -159,12 +156,44 @@ impl Agent {
                 let futures: Vec<_> = tool_requests
                     .iter()
                     .map(|request| {
-                        dispatch_tool_call(&systems, request.tool_call.clone())
+                        let op = dispatch_tool_call(&systems, request.tool_call.clone());
+                        async move {
+                            match op.await {
+                                Ok(op) => Ok((op.future, op.cancel)),
+                                Err(e) => Err(e),
+                            }
+                        }
                     })
                     .collect();
 
-                // Process all the futures in parallel but wait until all are finished
-                let outputs = futures::future::join_all(futures).await;
+                let mut future_vec = Vec::new();
+                let mut cancel_vec = Vec::new();
+
+                for res in futures::future::join_all(futures).await {
+                    match res {
+                        Ok((future, cancel)) => {
+                            future_vec.push(future);
+                            cancel_vec.push(cancel);
+                        }
+                        Err(e) => {
+                            if !message_tx.is_closed() {
+                                message_tx.send(Err(anyhow!(e))).await.unwrap();
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // let outputs = futures::future::join_all(future_vec).await;
+                let outputs = tokio::select! {
+                    outputs = futures::future::join_all(future_vec) => outputs,
+                    _ = cancel_rx.changed() => {
+                        for cancel in cancel_vec {
+                            cancel();
+                        }
+                        break;
+                    }
+                };
 
                 // Create a message with the responses
                 let mut message_tool_response = Message::user();
@@ -205,7 +234,6 @@ impl Agent {
                 };
             }
         });
-        
         Ok(Box::pin(ReceiverStream::new(message_rx)))        
     }
 }
@@ -278,7 +306,7 @@ fn get_system_for_tool<'a>(systems: &'a Vec<Box<dyn System>>, prefixed_name: &'a
 async fn dispatch_tool_call(
     systems: &Vec<Box<dyn System>>,
     tool_call: AgentResult<ToolCall>,
-) -> AgentResult<Vec<Content>> {
+) -> Result<CancellableOperation> {
     let call = tool_call?;
     let system = get_system_for_tool(systems, &call.name)
         .ok_or_else(|| AgentError::ToolNotFound(call.name.clone()))?;
@@ -290,7 +318,11 @@ async fn dispatch_tool_call(
         .ok_or_else(|| AgentError::InvalidToolName(call.name.clone()))?;
     let system_tool_call = ToolCall::new(tool_name, call.arguments);
 
-    system.call(system_tool_call).await
+    // Get the cancellable operation
+    Ok(system.call(system_tool_call).await)
+    // let op = system.call(system_tool_call).await;
+    // Execute the future
+    // op.future.await
 }
 
 /// Fetches the current status of all systems and formats it as a status message
@@ -320,8 +352,6 @@ async fn get_system_status(systems: &Vec<Box<dyn System>>) -> AgentResult<String
     Ok(status)
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -350,36 +380,59 @@ mod tests {
                 )],
             }
         }
+
+        async fn echo(&self, params: Value) -> AgentResult<Vec<Content>> {
+            let message = params
+                .get("message")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| AgentError::InvalidParameters("message parameter required".into()))?;
+
+            Ok(vec![Content::text(message)])
+        }
     }
 
     #[async_trait]
     impl System for MockSystem {
         fn name(&self) -> &str {
-            &self.name
+            "echo"
         }
 
         fn description(&self) -> &str {
-            "A mock system for testing"
+            "A simple system that echoes input back to the caller"
         }
 
         fn instructions(&self) -> &str {
-            "Mock system instructions"
+            "Use the echo tool to get a response back with your input message"
         }
 
         fn tools(&self) -> &[Tool] {
             &self.tools
         }
 
-        async fn status(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
-            Ok(HashMap::new())
+        async fn status(&self) -> AnyhowResult<HashMap<String, Value>> {
+            Ok(HashMap::new()) // Echo system has no state to report
         }
 
-        async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
-            match tool_call.name.as_str() {
-                "echo" => Ok(vec![Content::text(
-                    tool_call.arguments["message"].as_str().unwrap_or(""),
-                )]),
-                _ => Err(AgentError::ToolNotFound(tool_call.name)),
+        async fn call(&self, tool_call: ToolCall) -> CancellableOperation {
+            // Create a no-op cancel function since this system doesn't create long-running processes
+            let cancel_fn: CancelFn = Arc::new(|| {});
+            
+            // Clone self and tool info since we need to move them into the future
+            let this = self.clone();
+            let tool_name = tool_call.name.clone();
+            let arguments = tool_call.arguments.clone();
+            
+            // Create the future that will execute the tool call
+            let future = Box::pin(async move {
+                match tool_name.as_str() {
+                    "echo" => this.echo(arguments).await,
+                    _ => Err(AgentError::ToolNotFound(tool_name)),
+                }
+            });
+
+            CancellableOperation {
+                cancel: cancel_fn,
+                future,
             }
         }
     }
@@ -393,7 +446,8 @@ mod tests {
         let initial_message = Message::user().with_text("Hi");
         let initial_messages = vec![initial_message];
 
-        let mut stream = agent.reply(&initial_messages).await?;
+        let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(true);
+        let mut stream = agent.reply(&initial_messages, cancel_rx).await?;
         let mut messages = Vec::new();
         while let Some(msg) = stream.try_next().await? {
             messages.push(msg);
@@ -419,7 +473,8 @@ mod tests {
         let initial_message = Message::user().with_text("Echo test");
         let initial_messages = vec![initial_message];
 
-        let mut stream = agent.reply(&initial_messages).await?;
+        let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(true);
+        let mut stream = agent.reply(&initial_messages, cancel_rx).await?;
         let mut messages = Vec::new();
         while let Some(msg) = stream.try_next().await? {
             messages.push(msg);
@@ -448,7 +503,8 @@ mod tests {
         let initial_message = Message::user().with_text("Invalid tool");
         let initial_messages = vec![initial_message];
 
-        let mut stream = agent.reply(&initial_messages).await?;
+        let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(true);
+        let mut stream = agent.reply(&initial_messages, cancel_rx).await?;
         let mut messages = Vec::new();
         while let Some(msg) = stream.try_next().await? {
             messages.push(msg);
@@ -487,7 +543,8 @@ mod tests {
         let initial_message = Message::user().with_text("Multiple calls");
         let initial_messages = vec![initial_message];
 
-        let mut stream = agent.reply(&initial_messages).await?;
+        let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(true);
+        let mut stream = agent.reply(&initial_messages, cancel_rx).await?;
         let mut messages = Vec::new();
         while let Some(msg) = stream.try_next().await? {
             messages.push(msg);

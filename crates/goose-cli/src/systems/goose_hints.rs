@@ -2,13 +2,14 @@ use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::fs;
 
 use goose::errors::{AgentError, AgentResult};
 use goose::models::content::Content;
 use goose::models::tool::Tool;
 use goose::models::tool::ToolCall;
-use goose::systems::System;
+use goose::systems::{System, CancellableOperation, CancelFn};
 
 #[derive(Clone)]
 pub struct GooseHintsSystem {
@@ -74,8 +75,19 @@ impl System for GooseHintsSystem {
         Ok(HashMap::new())
     }
 
-    async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
-        Err(AgentError::ToolNotFound(tool_call.name))
+    async fn call(&self, tool_call: ToolCall) -> CancellableOperation {
+        // No-op cancel function since this system doesn't create long-running processes
+        let cancel_fn: CancelFn = Arc::new(|| {});
+        
+        // Create the future that will execute the tool call
+        let future = Box::pin(async move {
+            Err(AgentError::ToolNotFound(tool_call.name))
+        });
+
+        CancellableOperation {
+            cancel: cancel_fn,
+            future,
+        }
     }
 }
 

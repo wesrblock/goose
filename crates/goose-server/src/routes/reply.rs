@@ -21,8 +21,9 @@ use serde_json::{json, Value};
 use std::{
     convert::Infallible,
     pin::Pin,
-    task::{Context, Poll},
+    task::{Context, Poll}, time::Duration,
 };
+use tokio::time::{sleep, timeout};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
@@ -280,9 +281,10 @@ async fn handler(
     // Convert incoming messages
     let messages = convert_messages(request.messages);
 
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
     // Spawn task to handle streaming
     tokio::spawn(async move {
-        let mut stream = match agent.reply(&messages).await {
+        let mut stream = match agent.reply(&messages, cancel_rx).await {
             Ok(stream) => stream,
             Err(e) => {
                 tracing::error!("Failed to start reply stream: {}", e);
@@ -292,16 +294,41 @@ async fn handler(
             }
         };
 
-        while let Some(response) = stream.next().await {
-            match response {
-                Ok(message) => {
-                    if let Err(e) = stream_message(message, &tx).await {
-                        tracing::error!("Error sending message through channel: {}", e);
-                        break;
+        // Create a once-off timer
+        let timer = sleep(Duration::from_secs(5));
+        tokio::pin!(timer); // Pin the timer so it can be used in `tokio::select!`
+        loop {
+            tokio::select! {
+                response = timeout(Duration::from_millis(500), stream.next()) => {
+                    match response {
+                        Ok(Some(Ok(message))) => {
+                            let tx_clone = tx.clone();
+                            tokio::spawn(async move {
+                                if let Err(e) = stream_message(message, &tx_clone).await {
+                                tracing::error!("Error sending message through channel: {}", e);
+                                }
+                            });
+                            tracing::info!("Message sent.");
+                        }
+                        Ok(Some(Err(e))) => {
+                            tracing::error!("Error processing message: {}", e);
+                            break;
+                        }
+                        Ok(None) => {
+                            tracing::info!("Stream ended.");
+                            break;
+                        },
+                        Err(_) => {
+                            tracing::warn!("stream check timeout");
+                        },
                     }
                 }
-                Err(e) => {
-                    tracing::error!("Error processing message: {}", e);
+                _ = &mut timer => {
+                    println!("S Timeout!!!");
+                    cancel_tx.send(true).unwrap();
+                    drop(stream);
+                    tracing::warn!("Timeout reached while waiting for the next message.");
+                    println!("E Timeout!!!.");
                     break;
                 }
             }
@@ -337,9 +364,10 @@ async fn ask_handler(
     // Create a single message for the prompt
     let messages = vec![Message::user().with_text(request.prompt)];
 
+    let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
     // Get response from agent
     let mut response_text = String::new();
-    let mut stream = match agent.reply(&messages).await {
+    let mut stream = match agent.reply(&messages, cancel_rx).await {
         Ok(stream) => stream,
         Err(e) => {
             tracing::error!("Failed to start reply stream: {}", e);

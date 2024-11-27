@@ -138,7 +138,8 @@ impl<'a> Session<'a> {
     }
 
     async fn agent_process_messages(&mut self) {
-        let mut stream = match self.agent.reply(&self.messages).await {
+        let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+        let mut stream = match self.agent.reply(&self.messages, cancel_rx).await {
             Ok(stream) => stream,
             Err(e) => {
                 eprintln!("Error starting reply stream: {}", e);
@@ -166,6 +167,7 @@ impl<'a> Session<'a> {
                 }
                 _ = tokio::signal::ctrl_c() => {
                     drop(stream);
+                    cancel_tx.send(true).unwrap();
                     self.rewind_messages();
                     self.prompt.render(raw_message(" Interrupt: Resetting conversation to before the last sent message...\n"));
                     break;

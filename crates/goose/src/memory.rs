@@ -1,7 +1,7 @@
 use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
 use crate::models::tool::{Tool, ToolCall};
-use crate::systems::System;
+use crate::systems::{System, CancellableOperation, CancelFn};
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use indoc::formatdoc;
@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Debug, Default)]
 pub struct MemoryManager {
@@ -399,10 +400,21 @@ impl System for MemorySystem {
         )]))
     }
 
-    async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
-        match execute_tool_call(tool_call) {
-            Ok(result) => Ok(vec![Content::text(result)]),
-            Err(err) => Err(AgentError::ExecutionError(err.to_string())),
+    async fn call(&self, tool_call: ToolCall) -> CancellableOperation {
+        // No-op cancel function since memory operations are immediate
+        let cancel_fn: CancelFn = Arc::new(|| {});
+        
+        // Create the future that will execute the tool call
+        let future = Box::pin(async move {
+            match execute_tool_call(tool_call) {
+                Ok(result) => Ok(vec![Content::text(result)]),
+                Err(err) => Err(AgentError::ExecutionError(err.to_string())),
+            }
+        });
+
+        CancellableOperation {
+            cancel: cancel_fn,
+            future,
         }
     }
 }
