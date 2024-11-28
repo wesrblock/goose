@@ -30,7 +30,11 @@ export const startGoosed = async (app, dir=null): Promise<number> => {
 
   let goosedPath: string;
 
-  if (isDev) {
+  if (isDev && !app.isPackaged) {
+    if (process.env.VITE_START_EMBEDDED_SERVER === 'no') {
+      log.info('Skipping starting goosed in development mode');
+      return 3000;
+    }
     // In development, use the absolute path from the project root
     goosedPath = path.join(process.cwd(), 'src', 'bin', process.platform === 'win32' ? 'goosed.exe' : 'goosed');
   } else {
