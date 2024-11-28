@@ -93,7 +93,7 @@ pub fn find_existing_profile(name: &str) -> Option<Profile> {
 }
 
 pub fn get_or_set_key(
-    provider_name: &str,
+    human_readable_name: &str,
     key_name: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Try to get existing key first from keyring or environment
@@ -105,7 +105,7 @@ pub fn get_or_set_key(
     }
 
     // If no key found or error occurred, prompt user for input
-    let prompt = format!("Please enter your {} key:", provider_name);
+    let prompt = format!("Please enter your {}:", human_readable_name);
     let key_val = get_env_value_or_input(key_name, &prompt, false);
 
     // Check if user wants to save to the system keyring
@@ -129,7 +129,7 @@ pub fn get_or_set_key(
 pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig {
     match provider_name.to_lowercase().as_str() {
         PROVIDER_OPEN_AI => {
-            let api_key = get_or_set_key(provider_name, "OPENAI_API_KEY")
+            let api_key = get_or_set_key("OPENAI_API_KEY", "OPENAI_API_KEY")
                 .expect("Failed to get OpenAI API key");
             ProviderConfig::OpenAi(OpenAiProviderConfig {
                 host: "https://api.openai.com".to_string(),
@@ -140,7 +140,7 @@ pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig
             })
         }
         PROVIDER_DATABRICKS => {
-            let host = get_or_set_key(provider_name, "DATABRICKS_HOST")
+            let host = get_or_set_key("databricks host url", "DATABRICKS_HOST")
                 .expect("Failed to get databricks host");
 
             ProviderConfig::Databricks(DatabricksProviderConfig {
