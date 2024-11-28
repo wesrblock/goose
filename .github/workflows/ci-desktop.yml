@@ -25,10 +25,6 @@ jobs:
       run: npm ci
       working-directory: ui/desktop
 
-    - name: Package application
-      run: npm run package
-      working-directory: ui/desktop
-
     - name: Run E2E tests
       run: npm run test-e2e
       working-directory: ui/desktop
