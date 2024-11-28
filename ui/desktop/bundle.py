@@ -2,8 +2,11 @@
 import re
 from pathlib import Path
 from typing import Dict, Union
+import os
 
-def replace_env_macro(provider_type: str, host: str, model: str) -> bool:
+def replace_env_macro() -> bool:
+
+    
     """
     Replace content between environment macro markers with formatted environment variables.
     
@@ -24,9 +27,9 @@ def replace_env_macro(provider_type: str, host: str, model: str) -> bool:
         
         # Format the environment variables
         formatted_vars = [
-            f"        process.env.GOOSE_PROVIDER__TYPE = '{provider_type}';",
-            f"        process.env.GOOSE_PROVIDER__HOST = '{host}';",
-            f"        process.env.GOOSE_PROVIDER__MODEL = '{model}';"
+            f"        process.env.GOOSE_PROVIDER__TYPE = '{os.getenv("GOOSE_BUNDLE_TYPE")}';",
+            f"        process.env.GOOSE_PROVIDER__HOST = '{os.getenv("GOOSE_BUNDLE_HOST")}';",
+            f"        process.env.GOOSE_PROVIDER__MODEL = '{os.getenv("GOOSE_BUNDLE_MODEL")}';"
         ]
         
         replacement_content = "\n".join(formatted_vars)
@@ -59,20 +62,7 @@ def replace_env_macro(provider_type: str, host: str, model: str) -> bool:
 
 # Example usage
 if __name__ == '__main__':
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Update environment variables in main.ts')
-    parser.add_argument('--type', required=True, help='Provider type (e.g., databricks)')
-    parser.add_argument('--host', required=True, help='Host URL')
-    parser.add_argument('--model', required=True, help='Model name')
-    
-    args = parser.parse_args()
-    
-    success = replace_env_macro(
-        provider_type=args.type,
-        host=args.host,
-        model=args.model
-    )
+    success = replace_env_macro()
     
     if not success:
         print("Failed to update environment variables")

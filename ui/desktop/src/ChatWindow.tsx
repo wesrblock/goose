@@ -138,29 +138,26 @@ function ChatContent({
 
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
-      <div className="flex w-screen">
-        <div className="flex">
-          <MoreMenu
-            className="absolute top-2 right-2 no-drag"
-            onStopGoose={() => {
-              stop();
-            }}
-            onClearContext={() => {
-              append({
-                id: Date.now().toString(),
-                role: 'system',
-                content: 'Context cleared',
-              });
-            }}
-            onRestartGoose={() => {
-              append({
-                id: Date.now().toString(),
-                role: 'system',
-                content: 'Goose restarted',
-              });
-            }}
-          />
-        </div>
+      <div className="relative block h-[20px] w-screen">
+        <MoreMenu
+          onStopGoose={() => {
+            stop();
+          }}
+          onClearContext={() => {
+            append({
+              id: Date.now().toString(),
+              role: 'system',
+              content: 'Context cleared',
+            });
+          }}
+          onRestartGoose={() => {
+            append({
+              id: Date.now().toString(),
+              role: 'system',
+              content: 'Goose restarted',
+            });
+          }}
+        />
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
         {messages.length === 0 ? (
@@ -209,6 +206,8 @@ function ChatContent({
           handleInputChange={handleInputChange}
           input={input}
           disabled={isLoading}
+          isLoading={isLoading}
+          onStop={stop}
         />
       </Card>
     </div>
@@ -216,13 +215,18 @@ function ChatContent({
 }
 
 export default function ChatWindow() {
+  // Shared function to create a chat window
+  const openNewChatWindow = () => {
+    window.electron.createChatWindow();
+  };
+
   // Add keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check for Command+N (Mac) or Control+N (Windows/Linux)
       if ((event.metaKey || event.ctrlKey) && event.key === 'n') {
         event.preventDefault(); // Prevent default browser behavior
-        window.electron.createChatWindow();
+        openNewChatWindow();
       }
     };
 
