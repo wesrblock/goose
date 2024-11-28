@@ -15,8 +15,9 @@ declare var MAIN_WINDOW_VITE_NAME: string;
 
 const checkApiCredentials = () => {
 
-  //{env-macro-start}//
   loadZshEnv(app.isPackaged);
+
+  //{env-macro-start}//  
   const isDatabricksConfigValid =
     process.env.GOOSE_PROVIDER__TYPE === 'databricks' &&
     process.env.GOOSE_PROVIDER__HOST &&
