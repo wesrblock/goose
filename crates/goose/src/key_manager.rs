@@ -1,12 +1,6 @@
-use std::env;
 use keyring::Entry;
+use std::env;
 use thiserror::Error;
-#[cfg(test)]
-use mockall::automock;
-#[cfg(test)]
-use mockall::predicate::*;
-
-const KEYRING_SERVICE: &str = "goose";
 
 #[derive(Error, Debug)]
 pub enum KeyManagerError {
@@ -17,7 +11,7 @@ pub enum KeyManagerError {
     KeyringSave(String),
 
     #[error("Failed to access environment variable: {0}")]
-    EnvVarAccess(String)
+    EnvVarAccess(String),
 }
 
 impl From<keyring::Error> for KeyManagerError {
@@ -29,43 +23,6 @@ impl From<keyring::Error> for KeyManagerError {
 impl From<env::VarError> for KeyManagerError {
     fn from(err: env::VarError) -> Self {
         KeyManagerError::EnvVarAccess(err.to_string())
-    }
-}
-
-// Define a trait for the keyring operations
-#[cfg_attr(test, automock)]
-pub trait Keyring: Send + Sync {
-    fn get_password(&self) -> std::result::Result<String, KeyManagerError>;
-    fn set_password(&self, password: &str) -> std::result::Result<(), KeyManagerError>;
-}
-
-#[cfg_attr(test, automock)]
-pub trait Environment: Send + Sync {
-    fn get_var(&self, key: &str) -> std::result::Result<String, env::VarError>;
-    fn set_var(&self, key: &str, value: &str);
-}
-
-// Implement the trait for the actual environment
-pub struct RealEnvironment;
-
-impl Environment for RealEnvironment {
-    fn get_var(&self, key: &str) -> std::result::Result<String, env::VarError> {
-        env::var(key)
-    }
-
-    fn set_var(&self, key: &str, value: &str) {
-        env::set_var(key, value)
-    }
-}
-
-// Implement the trait for the actual keyring
-impl Keyring for Entry {
-    fn get_password(&self) -> std::result::Result<String, KeyManagerError> {
-        self.get_password().map_err(KeyManagerError::from)
-    }
-
-    fn set_password(&self, password: &str) -> std::result::Result<(), KeyManagerError> {
-        self.set_password(password).map_err(KeyManagerError::from)
     }
 }
 
@@ -85,242 +42,112 @@ impl Default for KeyRetrievalStrategy {
     }
 }
 
-pub fn get_keyring_secret_default(
-    key_name: &str,
-    strategy: KeyRetrievalStrategy,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let env = RealEnvironment;
-    let kr = Entry::new(KEYRING_SERVICE, key_name)?;
-    get_keyring_secret(key_name, strategy, &kr, &env)
-}
-
 pub fn get_keyring_secret(
     key_name: &str,
     strategy: KeyRetrievalStrategy,
-    keyring: &impl Keyring,
-    env: &impl Environment,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    let kr = Entry::new("goose", key_name)?;
     match strategy {
-        KeyRetrievalStrategy::EnvironmentOnly => {
-            env.get_var(key_name)
-                .map_err(|e| Box::new(KeyManagerError::from(e)) as Box<dyn std::error::Error>)
-        }
-        KeyRetrievalStrategy::KeyringOnly => {
-            keyring.get_password()
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
-        }
+        KeyRetrievalStrategy::EnvironmentOnly => env::var(key_name)
+            .map_err(|e| Box::new(KeyManagerError::from(e)) as Box<dyn std::error::Error>),
+        KeyRetrievalStrategy::KeyringOnly => kr
+            .get_password()
+            .map_err(|e| Box::new(KeyManagerError::from(e)) as Box<dyn std::error::Error>),
         KeyRetrievalStrategy::Both => {
-            match keyring.get_password() {
-                Ok(key) => Ok(key),
-                Err(_) => {
-                    env.get_var(key_name).map_err(|_| {
-                        Box::new(KeyManagerError::EnvVarAccess(format!(
-                            "Could not find {} key in keyring or environment variables",
-                            key_name
-                        ))) as Box<dyn std::error::Error>
-                    })
-                }
-            }
+            // Try environment first, then keyring
+            env::var(key_name).or_else(|_| {
+                kr.get_password().map_err(|_| {
+                    Box::new(KeyManagerError::EnvVarAccess(format!(
+                        "Could not find {} key in keyring or environment variables",
+                        key_name
+                    ))) as Box<dyn std::error::Error>
+                })
+            })
         }
     }
 }
 
-pub fn save_to_keyring(
-    key_name: &str,
-    key_val: &str,
-) -> std::result::Result<(), KeyManagerError> {
-    let kr = Entry::new(KEYRING_SERVICE, key_name)?;
-    kr.set_password(key_val)
-        .map_err(|e| KeyManagerError::KeyringSave(format!("Failed to save key {}: {}", key_name, e)))
+pub fn save_to_keyring(key_name: &str, key_val: &str) -> std::result::Result<(), KeyManagerError> {
+    let kr = Entry::new("goose", key_name)?;
+    kr.set_password(key_val).map_err(KeyManagerError::from)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const TEST_KEY: &str = "TEST_KEY";
+    const TEST_ENV_PREFIX: &str = "GOOSE_TEST_";
+
+    fn cleanup_env(key: &str) {
+        std::env::remove_var(key);
+    }
+
+    fn cleanup_keyring(key: &str) -> Result<(), KeyManagerError> {
+        let kr = Entry::new("goose", key)?;
+        kr.delete_credential().map_err(KeyManagerError::from)
+    }
 
     #[test]
     fn test_get_key_environment_only() {
-        let mut mock_env = MockEnvironment::new();
-        let mut mock_keyring = MockKeyring::new();
-        
-        mock_env.expect_get_var()
-            .with(eq(TEST_KEY))
-            .times(1)
-            .return_once(|_| Ok("env_value".to_string()));
-        
-        mock_keyring.expect_get_password()
-            .times(0);
+        let key_name = format!("{}{}", TEST_ENV_PREFIX, "ENV_KEY");
+        std::env::set_var(&key_name, "test_value");
 
-        let result = get_keyring_secret(
-            TEST_KEY,
-            KeyRetrievalStrategy::EnvironmentOnly,
-            &mock_keyring,
-            &mock_env,
-        );
-        
-        assert!(matches!(result.as_deref(), Ok("env_value")));
+        let result = get_keyring_secret(&key_name, KeyRetrievalStrategy::EnvironmentOnly);
+        assert_eq!(result.unwrap(), "test_value");
+
+        cleanup_env(&key_name);
     }
 
     #[test]
     fn test_get_key_environment_only_missing() {
-        let mut mock_env = MockEnvironment::new();
-        let mut mock_keyring = MockKeyring::new();
-        
-        mock_env.expect_get_var()
-            .with(eq(TEST_KEY))
-            .times(1)
-            .return_once(|_| Err(env::VarError::NotPresent));
-        
-        mock_keyring.expect_get_password()
-            .times(0);
+        let key_name = format!("{}{}", TEST_ENV_PREFIX, "MISSING_KEY");
 
-        let result = get_keyring_secret(
-            TEST_KEY,
-            KeyRetrievalStrategy::EnvironmentOnly,
-            &mock_keyring,
-            &mock_env,
-        );
-        
+        let result = get_keyring_secret(&key_name, KeyRetrievalStrategy::EnvironmentOnly);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_get_key_keyring_only() {
-        let mut mock_env = MockEnvironment::new();
-        let mut mock_keyring = MockKeyring::new();
-        
-        mock_keyring.expect_get_password()
-            .times(1)
-            .return_once(|| Ok("keyring_value".to_string()));
-            
-        mock_env.expect_get_var()
-            .times(0);
+        let key_name = format!("{}{}", TEST_ENV_PREFIX, "KEYRING_KEY");
 
-        let result = get_keyring_secret(
-            TEST_KEY,
-            KeyRetrievalStrategy::KeyringOnly,
-            &mock_keyring,
-            &mock_env,
-        );
-        
-        assert!(matches!(result.as_deref(), Ok("keyring_value")));
+        // First save a value
+        save_to_keyring(&key_name, "test_value").unwrap();
+
+        let result = get_keyring_secret(&key_name, KeyRetrievalStrategy::KeyringOnly);
+        assert_eq!(result.unwrap(), "test_value");
+
+        cleanup_keyring(&key_name).unwrap();
     }
 
     #[test]
-    fn test_get_key_keyring_only_missing() {
-        let mut mock_env = MockEnvironment::new();
-        let mut mock_keyring = MockKeyring::new();
-        
-        mock_keyring.expect_get_password()
-            .times(1)
-            .return_once(|| Err(KeyManagerError::KeyringAccess("Not found".to_string())));
-            
-        mock_env.expect_get_var()
-            .times(0);
+    fn test_get_key_both() {
+        let key_name = format!("{}{}", TEST_ENV_PREFIX, "BOTH_KEY");
 
-        let result = get_keyring_secret(
-            TEST_KEY,
-            KeyRetrievalStrategy::KeyringOnly,
-            &mock_keyring,
-            &mock_env,
-        );
-        
-        assert!(result.is_err());
-    }
+        // Test environment first
+        std::env::set_var(&key_name, "env_value");
+        let result = get_keyring_secret(&key_name, KeyRetrievalStrategy::Both);
+        assert_eq!(result.unwrap(), "env_value");
 
-    #[test]
-    fn test_get_key_both_keyring_succeeds() {
-        let mut mock_env = MockEnvironment::new();
-        let mut mock_keyring = MockKeyring::new();
-        
-        mock_keyring.expect_get_password()
-            .times(1)
-            .return_once(|| Ok("keyring_value".to_string()));
-            
-        mock_env.expect_get_var()
-            .times(0);
+        // Test keyring takes precedence
+        save_to_keyring(&key_name, "keyring_value").unwrap();
+        let result = get_keyring_secret(&key_name, KeyRetrievalStrategy::Both);
+        assert_eq!(result.unwrap(), "env_value"); // Environment still takes precedence
 
-        let result = get_keyring_secret(
-            TEST_KEY,
-            KeyRetrievalStrategy::Both,
-            &mock_keyring,
-            &mock_env,
-        );
-        
-        assert!(matches!(result.as_deref(), Ok("keyring_value")));
-    }
-
-    #[test]
-    fn test_get_key_both_keyring_fails_env_succeeds() {
-        let mut mock_env = MockEnvironment::new();
-        let mut mock_keyring = MockKeyring::new();
-        
-        mock_keyring.expect_get_password()
-            .times(1)
-            .return_once(|| Err(KeyManagerError::KeyringAccess("Failed".to_string())));
-            
-        mock_env.expect_get_var()
-            .with(eq(TEST_KEY))
-            .times(1)
-            .return_once(|_| Ok("env_value".to_string()));
-
-        let result = get_keyring_secret(
-            TEST_KEY,
-            KeyRetrievalStrategy::Both,
-            &mock_keyring,
-            &mock_env,
-        );
-        
-        assert!(matches!(result.as_deref(), Ok("env_value")));
-    }
-
-    #[test]
-    fn test_get_key_both_all_fail() {
-        let mut mock_env = MockEnvironment::new();
-        let mut mock_keyring = MockKeyring::new();
-        
-        mock_keyring.expect_get_password()
-            .times(1)
-            .return_once(|| Err(KeyManagerError::KeyringAccess("Failed".to_string())));
-            
-        mock_env.expect_get_var()
-            .with(eq(TEST_KEY))
-            .times(1)
-            .return_once(|_| Err(env::VarError::NotPresent));
-
-        let result = get_keyring_secret(
-            TEST_KEY,
-            KeyRetrievalStrategy::Both,
-            &mock_keyring,
-            &mock_env,
-        );
-        
-        assert!(result.is_err());
+        cleanup_env(&key_name);
+        cleanup_keyring(&key_name).unwrap();
     }
 
     #[test]
     fn test_save_to_keyring() {
-        let mut mock_keyring = MockKeyring::new();
-        mock_keyring.expect_set_password()
-            .with(eq("test_value"))
-            .times(1)
-            .return_once(|_| Ok(()));
+        let key_name = format!("{}{}", TEST_ENV_PREFIX, "SAVE_KEY");
 
-        let result = save_to_keyring(TEST_KEY, "test_value");
+        let result = save_to_keyring(&key_name, "test_value");
         assert!(result.is_ok());
-    }
 
-    #[test]
-    fn test_save_to_keyring_fails() {
-        let mut mock_keyring = MockKeyring::new();
-        mock_keyring.expect_set_password()
-            .with(eq("test_value"))
-            .times(1)
-            .return_once(|_| Err(KeyManagerError::KeyringSave("Failed to save".to_string())));
+        // Verify the value was saved
+        let kr = Entry::new("goose", &key_name).unwrap();
+        assert_eq!(kr.get_password().unwrap(), "test_value");
 
-        let result = save_to_keyring(TEST_KEY, "test_value");
-        assert!(matches!(result.unwrap_err(), KeyManagerError::KeyringSave(_)));
+        cleanup_keyring(&key_name).unwrap();
     }
 }

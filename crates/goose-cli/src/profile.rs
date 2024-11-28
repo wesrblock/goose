@@ -3,14 +3,14 @@ use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::inputs::{get_user_input, get_env_value_or_input};
+use crate::inputs::{get_env_value_or_input, get_user_input};
+use goose::key_manager::{get_keyring_secret, save_to_keyring, KeyRetrievalStrategy};
 use goose::providers::configs::{
     DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig,
     ProviderConfig,
 };
 use goose::providers::factory::ProviderType;
 use goose::providers::ollama::OLLAMA_HOST;
-use goose::key_manager::{get_keyring_secret_default, save_to_keyring, KeyRetrievalStrategy};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -92,9 +92,12 @@ pub fn find_existing_profile(name: &str) -> Option<Profile> {
     }
 }
 
-pub fn get_or_set_key(provider_name: &str, key_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub fn get_or_set_key(
+    provider_name: &str,
+    key_name: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     // Try to get existing key first from keyring or environment
-    match get_keyring_secret_default(key_name, KeyRetrievalStrategy::Both) {
+    match get_keyring_secret(key_name, KeyRetrievalStrategy::Both) {
         Ok(key) => return Ok(key),
         Err(e) => {
             eprintln!("{}", e); // Print the error
@@ -103,14 +106,13 @@ pub fn get_or_set_key(provider_name: &str, key_name: &str) -> Result<String, Box
 
     // If no key found or error occurred, prompt user for input
     let prompt = format!("Please enter your {} key:", provider_name);
-    let key_val = get_env_value_or_input(
-        key_name,
-        &prompt,
-        false,
-    );
+    let key_val = get_env_value_or_input(key_name, &prompt, false);
 
     // Check if user wants to save to the system keyring
-    let resp = get_user_input("Would you like to save this key to the system keyring? (y/n):", "y")?;
+    let resp = get_user_input(
+        "Would you like to save this key to the system keyring? (y/n):",
+        "y",
+    )?;
     if resp.eq_ignore_ascii_case("y") {
         match save_to_keyring(key_name, &key_val) {
             Ok(_) => println!("Successfully saved key to system keyring"),
@@ -124,20 +126,19 @@ pub fn get_or_set_key(provider_name: &str, key_name: &str) -> Result<String, Box
     Ok(key_val)
 }
 
-
 pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig {
     match provider_name.to_lowercase().as_str() {
         PROVIDER_OPEN_AI => {
             let api_key = get_or_set_key(provider_name, "OPENAI_API_KEY")
-            .expect("Failed to get OpenAI API key");
+                .expect("Failed to get OpenAI API key");
             ProviderConfig::OpenAi(OpenAiProviderConfig {
                 host: "https://api.openai.com".to_string(),
-                api_key: api_key,
+                api_key,
                 model,
                 temperature: None,
                 max_tokens: None,
             })
-        },
+        }
         PROVIDER_DATABRICKS => {
             let host = get_env_value_or_input(
                 "DATABRICKS_HOST",
