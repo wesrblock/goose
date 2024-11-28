@@ -228,34 +228,31 @@ impl<'a> Session<'a> {
         if !tool_requests.is_empty() {
             // Create a message with tool responses for all interrupted requests
             let mut response_message = Message::user();
+            let last_tool_name = tool_requests
+                .last()
+                .and_then(|(_, tool_call)| tool_call.as_ref().ok().map(|tool| tool.name.clone()))
+                .unwrap_or_else(|| "tool".to_string());
+            
             for (req_id, _) in &tool_requests {
-                let interrupt_error = goose::errors::AgentError::ExecutionError(
-                    "Interrupted by the user to make a correction".to_string()
-                );
-                response_message.content.push(MessageContent::tool_response(req_id, Err(interrupt_error)));
+                response_message.content.push(MessageContent::tool_response(req_id.clone(), Err(goose::errors::AgentError::ExecutionError("Interrupted by the user to make a correction".to_string()))));
             }
             self.messages.push(response_message);
 
             // Add assistant message about the interruption using the last tool name
-            if let Some((_, tool_call)) = tool_requests.last() {
-                if let Ok(tool) = tool_call {
-                    self.messages.push(Message::assistant().with_text(
-                        &format!("We interrupted the existing call to {}. How would you like to proceed?", tool.name)
-                    ));
-                }
-            }
+            let prompt_response = &format!("We interrupted the existing call to {}. How would you like to proceed?", last_tool_name);
+            self.messages.push(Message::assistant().with_text(prompt_response));
+            self.prompt.render(raw_message(prompt_response));
         } else {
-            // Default behavior for non-tool interruptions
+            // Default behavior for non-tool interruptions, remove the last user message
             if let Some(last_msg) = self.messages.last() {
                 if last_msg.role == Role::User {
                     self.messages.pop();
                 }
             }
-            
-            self.prompt.render(raw_message(
-                "We interrupted before the model replied and removed the last message.",
-            ));
+            let prompt_response = "We interrupted before the model replied and removed the last message.";
+            self.prompt.render(raw_message(prompt_response));
         }
+
     }
 
     fn setup_session(&mut self) {
@@ -441,20 +438,7 @@ mod tests {
 
         assert!(session.messages.is_empty());
 
-        let prompt = session
-            .prompt
-            .as_any()
-            .downcast_ref::<MockPrompt>()
-            .expect("Failed to downcast");
-        let messages = prompt.get_messages();
-        let msg = messages.get(0).unwrap();
-        assert_eq!(msg.role, Role::Assistant);
-        assert_eq!(
-            msg.content[0],
-            MessageContent::text(
-                "We interrupted before the model replied and removed the last message."
-            )
-        );
+        assert_last_prompt_text(&session, "We interrupted before the model replied and removed the last message.");
     }
 
     #[test]
@@ -472,20 +456,7 @@ mod tests {
         assert_eq!(session.messages[1].role, Role::Assistant);
         assert_eq!(session.messages[1].content[0], MessageContent::text("Hi"));
 
-        let prompt = session
-            .prompt
-            .as_any()
-            .downcast_ref::<MockPrompt>()
-            .expect("Failed to downcast");
-        let prompt_messages = prompt.get_messages();
-        let msg = prompt_messages.get(0).unwrap();
-        assert_eq!(msg.role, Role::Assistant);
-        assert_eq!(
-            msg.content[0],
-            MessageContent::text(
-                "We interrupted before the model replied and removed the last message."
-            )
-        );
+        assert_last_prompt_text(&session, "We interrupted before the model replied and removed the last message.");
     }
 
     #[test]
@@ -502,7 +473,6 @@ mod tests {
         session.messages.push(Message::user().with_text("Did Task 1").with_tool_response("1", tool_result1.clone()));
         session.messages.push(Message::user().with_text("Do something else"));
         session.messages.push(Message::assistant().with_text("Doing task 2").with_tool_request("2", Ok(tool_call2.clone())));
-
 
         session.handle_interrupted_messages();
         
@@ -530,6 +500,8 @@ mod tests {
         // Check the follow-up assistant message
         assert_eq!(session.messages[6].role, Role::Assistant);
         assert_eq!(session.messages[6].content[0], MessageContent::text(format!("We interrupted the existing call to {}. How would you like to proceed?", tool_name2)));
+
+        assert_last_prompt_text(&session, format!("We interrupted the existing call to {}. How would you like to proceed?", tool_name2).as_str());
     }
 
     #[test]
@@ -565,5 +537,19 @@ mod tests {
         // Check the follow-up assistant message
         assert_eq!(session.messages[3].role, Role::Assistant);
         assert_eq!(session.messages[3].content[0], MessageContent::text(format!("We interrupted the existing call to {}. How would you like to proceed?", tool_name2)));
+
+        assert_last_prompt_text(&session, format!("We interrupted the existing call to {}. How would you like to proceed?", tool_name2).as_str());
+    }
+
+    fn assert_last_prompt_text(session: &Session, expected_text: &str) {
+        let prompt = session
+            .prompt
+            .as_any()
+            .downcast_ref::<MockPrompt>()
+            .expect("Failed to downcast");
+        let messages = prompt.get_messages();
+        let msg = messages.last().unwrap();
+        assert_eq!(msg.role, Role::Assistant);
+        assert_eq!(msg.content[0], MessageContent::text(expected_text));
     }
 }
