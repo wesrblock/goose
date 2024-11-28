@@ -19,7 +19,7 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Add MacOS certs for signing and notarization
-      run: ./add-osx-cert.sh
+      run: ./add-macos-cert.sh
       working-directory: ui/desktop
       env:
         CERTIFICATE_OSX_APPLICATION: ${{ secrets.CERTIFICATE_OSX_APPLICATION }}
