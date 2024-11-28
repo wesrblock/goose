@@ -216,6 +216,25 @@ function ChatContent({
 }
 
 export default function ChatWindow() {
+  // Add keyboard shortcut handler
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check for Command+N (Mac) or Control+N (Windows/Linux)
+      if ((event.metaKey || event.ctrlKey) && event.key === 'n') {
+        event.preventDefault(); // Prevent default browser behavior
+        window.electron.createChatWindow();
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Check if API key is missing from the window arguments
   const apiCredsMissing = window.electron.getConfig().apiCredsMissing;
 
