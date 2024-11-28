@@ -140,11 +140,9 @@ pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig
             })
         }
         PROVIDER_DATABRICKS => {
-            let host = get_env_value_or_input(
-                "DATABRICKS_HOST",
-                "Please enter your Databricks host:",
-                false,
-            );
+            let host = get_or_set_key(provider_name, "DATABRICKS_HOST")
+                .expect("Failed to get databricks host");
+
             ProviderConfig::Databricks(DatabricksProviderConfig {
                 host: host.clone(),
                 // TODO revisit configuration
