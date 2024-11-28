@@ -6,18 +6,72 @@ on:
       - v1.0
   pull_request:
     branches:
-      - v1.0 #remove this before committing!
+      - v1.0
 
 jobs:
-  ## todo - add just release/copy to get binary in place first... 
-
-  bundle:
+  build-and-bundle:
     runs-on: macos-latest
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    # Rust Setup Steps
+    - name: Install System Dependencies
+      run: |
+        brew install dbus openssl gnome-keyring
+        brew install --cask xquartz
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Cache Cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+
+    - name: Cache Cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/index
+        key: ${{ runner.os }}-cargo-index
+        restore-keys: |
+          ${{ runner.os }}-cargo-index
+
+    - name: Cache Cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-build-
+
+    # Install UV and download tokenizer files
+    - name: Install UV
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+
+    - name: Run download_tokenizer_files.py
+      run: uv run download_tokenizer_files.py
+
+    # Build Rust Binary
+    - name: Build Release Binary
+      run: cargo build --release
+
+    - name: copy binary
+      run: cp target/release/goosed ui/desktop/src/bin/goosed
+
+
+
+
+    # Desktop App Steps
     - name: Add MacOS certs for signing and notarization
       run: ./add-macos-cert.sh
       working-directory: ui/desktop
@@ -48,7 +102,6 @@ jobs:
         name: Goose.zip
         path: ui/desktop/out/Goose-darwin-arm64/Goose.zip          
 
-
     - name: Make preconfigured Goose App
       run: npm run bundle:preconfigured
       working-directory: ui/desktop
@@ -60,11 +113,8 @@ jobs:
           GOOSE_BUNDLE_MODEL: ${{ secrets.GOOSE_BUNDLE_MODEL }}
           GOOSE_BUNDLE_TYPE: ${{ secrets.GOOSE_BUNDLE_TYPE }}      
 
-
     - name: Upload preconfigured
       uses: actions/upload-artifact@v3
       with:
         name: Goose-preconfigured.app
         path: ui/desktop/out/Goose-darwin-arm64/Goose.zip
-
-
