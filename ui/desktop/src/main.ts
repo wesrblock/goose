@@ -14,6 +14,8 @@ declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
 
 const checkApiCredentials = () => {
+
+  //{env-macro-start}//
   loadZshEnv(app.isPackaged);
   const isDatabricksConfigValid =
     process.env.GOOSE_PROVIDER__TYPE === 'databricks' &&
@@ -27,6 +29,7 @@ const checkApiCredentials = () => {
     process.env.GOOSE_PROVIDER__API_KEY;
 
   return isDatabricksConfigValid || isOpenAIDirectConfigValid
+  //{env-macro-end}//
 };
 
 let appConfig = { 
