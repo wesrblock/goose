@@ -206,6 +206,8 @@ function ChatContent({
           handleInputChange={handleInputChange}
           input={input}
           disabled={isLoading}
+          isLoading={isLoading}
+          onStop={stop}
         />
       </Card>
     </div>

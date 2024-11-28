@@ -4,12 +4,11 @@ import VertDots from './ui/VertDots';
 
 interface MoreMenuProps {
   className?: string;
-  onStopGoose: () => void;
   onClearContext: () => void;
   onRestartGoose: () => void;
 }
 
-export default function MoreMenu({ onStopGoose, onClearContext, onRestartGoose }: MoreMenuProps) {
+export default function MoreMenu({ onClearContext, onRestartGoose }: MoreMenuProps) {
   const [open, setOpen] = useState(false);
 
   const handleAction = (action: () => void) => {
@@ -26,12 +25,6 @@ export default function MoreMenu({ onStopGoose, onClearContext, onRestartGoose }
       </PopoverTrigger>
       <PopoverContent className="w-48 rounded-md">
         <div className="flex flex-col bg-black text-white rounded-md">
-          <button
-            onClick={() => handleAction(onStopGoose)}
-            className="w-full text-left px-2 py-1.5 text-sm"
-          >
-            Stop current Goose
-          </button>
           <button
             onClick={() => handleAction(onClearContext)}
             className="w-full text-left px-2 py-1.5 text-sm"
