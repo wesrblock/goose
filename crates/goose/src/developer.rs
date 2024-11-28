@@ -205,7 +205,8 @@ impl DeveloperSystem {
             String::from_utf8_lossy(&output.stdout)
         );
         Ok(vec![
-            Content::text(output_str).with_audience(vec![Role::Assistant])
+            Content::text(output_str.clone()).with_audience(vec![Role::Assistant]),
+            Content::text(output_str).with_audience(vec![Role::User]).with_priority(0.0),
         ])
     }
 
