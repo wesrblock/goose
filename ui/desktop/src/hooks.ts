@@ -9,40 +9,71 @@ import type {
   Message,
   UseChatOptions,
 } from '@ai-sdk/ui-utils';
-import { callChatApi, generateId as generateIdFunc } from '@ai-sdk/ui-utils';
+import { generateId as generateIdFunc } from '@ai-sdk/ui-utils';
+import { callCustomChatApi as callChatApi } from './custom-chat-api'
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import useSWR, { KeyedMutator } from 'swr';
+import { throttle } from './throttle';
 
 export type { CreateMessage, Message, UseChatOptions };
 
 export type UseChatHelpers = {
+  /** Current messages in the chat */
   messages: Message[];
+  /** The error object of the API request */
   error: undefined | Error;
+  /**
+   * Append a user message to the chat list. This triggers the API call to fetch
+   * the assistant's response.
+   * @param message The message to append
+   * @param options Additional options to pass to the API call
+   */
   append: (
     message: Message | CreateMessage,
     chatRequestOptions?: ChatRequestOptions,
   ) => Promise<string | null | undefined>;
+  /**
+   * Reload the last AI chat response for the given chat history. If the last
+   * message isn't from the assistant, it will request the API to generate a
+   * new response.
+   */
   reload: (
     chatRequestOptions?: ChatRequestOptions,
   ) => Promise<string | null | undefined>;
+  /**
+   * Abort the current request immediately, keep the generated tokens if any.
+   */
   stop: () => void;
+  /**
+   * Update the `messages` state locally. This is useful when you want to
+   * edit the messages on the client, and then trigger the `reload` method
+   * manually to regenerate the AI response.
+   */
   setMessages: (
     messages: Message[] | ((messages: Message[]) => Message[]),
   ) => void;
+  /** The current value of the input */
   input: string;
+  /** setState-powered method to update the input value */
   setInput: React.Dispatch<React.SetStateAction<string>>;
+  /** An input/textarea-ready onChange handler to control the value of the input */
   handleInputChange: (
     e:
       | React.ChangeEvent<HTMLInputElement>
       | React.ChangeEvent<HTMLTextAreaElement>,
   ) => void;
+  /** Form submission handler to automatically reset input and append a user message */
   handleSubmit: (
     event?: { preventDefault?: () => void },
     chatRequestOptions?: ChatRequestOptions,
   ) => void;
   metadata?: Object;
+  /** Whether the API request is in progress */
   isLoading: boolean;
+
+  /** Additional data added on the server via StreamData. */
   data?: JSONValue[];
+  /** Set the data of the chat. You can use this to transform or clear the chat data. */
   setData: (
     data:
       | JSONValue[]
@@ -76,18 +107,31 @@ const processResponseStream = async (
   fetch: FetchFunction | undefined,
   keepLastMessageOnError: boolean,
 ) => {
+  // Do an optimistic update to the chat state to show the updated messages immediately:
   const previousMessages = messagesRef.current;
   mutate(chatRequest.messages, false);
 
   const constructedMessagesPayload = sendExtraMessageFields
     ? chatRequest.messages
-    : chatRequest.messages.map(({ role, content, experimental_attachments, data, annotations }) => ({
-        role,
-        content,
-        ...(experimental_attachments !== undefined && { experimental_attachments }),
-        ...(data !== undefined && { data }),
-        ...(annotations !== undefined && { annotations }),
-      }));
+    : chatRequest.messages.map(
+        ({
+          role,
+          content,
+          experimental_attachments,
+          data,
+          annotations,
+          toolInvocations,
+        }) => ({
+          role,
+          content,
+          ...(experimental_attachments !== undefined && {
+            experimental_attachments,
+          }),
+          ...(data !== undefined && { data }),
+          ...(annotations !== undefined && { annotations }),
+          ...(toolInvocations !== undefined && { toolInvocations }),
+        }),
+      );
 
   const existingData = existingDataRef.current;
 
@@ -148,13 +192,38 @@ export function useChat({
   generateId = generateIdFunc,
   fetch,
   keepLastMessageOnError = true,
+  experimental_throttle: throttleWaitMs,
 }: UseChatOptions & {
   key?: string;
+
+  /**
+   * Experimental (React only). When a function is provided, it will be used
+   * to prepare the request body for the chat API. This can be useful for
+   * customizing the request body based on the messages and data in the chat.
+   *
+   * @param messages The current messages in the chat.
+   * @param requestData The data object passed in the chat request.
+   * @param requestBody The request body object passed in the chat request.
+   */
   experimental_prepareRequestBody?: (options: {
     messages: Message[];
     requestData?: JSONValue;
     requestBody?: object;
   }) => JSONValue;
+
+  /**
+Custom throttle wait in ms for the chat messages and data updates.
+Default is undefined, which disables throttling.
+   */
+  experimental_throttle?: number;
+
+  /**
+Maximum number of sequential LLM calls (steps), e.g. when you use tool calls. Must be at least 1.
+
+A maximum number is required to prevent infinite loops in the case of misconfigured tools.
+
+By default, it's set to 1, which means that only a single LLM call is made.
+ */
   maxSteps?: number;
 } = {}): UseChatHelpers & {
   addToolResult: ({
@@ -165,32 +234,41 @@ export function useChat({
     result: any;
   }) => void;
 } {
+  // Generate a unique id for the chat if not provided.
   const hookId = useId();
   const idKey = id ?? hookId;
   const chatKey = typeof api === 'string' ? [api, idKey] : idKey;
 
+  // Store a empty array as the initial messages
+  // (instead of using a default parameter value that gets re-created each time)
+  // to avoid re-renders:
   const [initialMessagesFallback] = useState([]);
 
+  // Store the chat state in SWR, using the chatId as the key to share states.
   const { data: messages, mutate } = useSWR<Message[]>(
     [chatKey, 'messages'],
     null,
     { fallbackData: initialMessages ?? initialMessagesFallback },
   );
 
+  // Keep the latest messages in a ref.
   const messagesRef = useRef<Message[]>(messages || []);
   useEffect(() => {
     messagesRef.current = messages || [];
   }, [messages]);
 
+  // stream data
   const { data: streamData, mutate: mutateStreamData } = useSWR<
     JSONValue[] | undefined
   >([chatKey, 'streamData'], null);
 
+  // keep the latest stream data in a ref
   const streamDataRef = useRef<JSONValue[] | undefined>(streamData);
   useEffect(() => {
     streamDataRef.current = streamData;
   }, [streamData]);
 
+  // We store loading state in another hook to sync loading states across hook invocations
   const { data: isLoading = false, mutate: mutateLoading } = useSWR<boolean>(
     [chatKey, 'loading'],
     null,
@@ -200,6 +278,7 @@ export function useChat({
     undefined | Error
   >([chatKey, 'error'], null);
 
+  // Abort controller to cancel the current API call.
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const extraMetadataRef = useRef({
@@ -230,8 +309,9 @@ export function useChat({
         await processResponseStream(
           api,
           chatRequest,
-          mutate,
-          mutateStreamData,
+          // throttle streamed ui updates:
+          throttle(mutate, throttleWaitMs),
+          throttle(mutateStreamData, throttleWaitMs),
           streamDataRef,
           extraMetadataRef,
           messagesRef,
@@ -249,6 +329,7 @@ export function useChat({
 
         abortControllerRef.current = null;
       } catch (err) {
+        // Ignore abort errors as they are expected.
         if ((err as any).name === 'AbortError') {
           abortControllerRef.current = null;
           return null;
@@ -263,36 +344,46 @@ export function useChat({
         mutateLoading(false);
       }
 
+      // auto-submit when all tool calls in the last assistant message have results:
       const messages = messagesRef.current;
       const lastMessage = messages[messages.length - 1];
       if (
+        // ensure we actually have new messages (to prevent infinite loops in case of errors):
         messages.length > messageCount &&
+        // ensure there is a last message:
         lastMessage != null &&
+        // check if the feature is enabled:
         maxSteps > 1 &&
+        // check that next step is possible:
         isAssistantMessageWithCompletedToolCalls(lastMessage) &&
+        // limit the number of automatic steps:
         countTrailingAssistantMessages(messages) < maxSteps
       ) {
         await triggerRequest({ messages });
       }
     },
     [
-      api,
       mutate,
       mutateLoading,
-      mutateStreamData,
-      onFinish,
+      api,
+      extraMetadataRef,
       onResponse,
+      onFinish,
       onError,
-      onToolCall,
       setError,
+      mutateStreamData,
       streamDataRef,
-      maxSteps,
       streamProtocol,
       sendExtraMessageFields,
       experimental_prepareRequestBody,
-      fetch,
+      onToolCall,
+      maxSteps,
+      messagesRef,
+      abortControllerRef,
       generateId,
+      fetch,
       keepLastMessageOnError,
+      throttleWaitMs,
     ],
   );
 
@@ -335,6 +426,7 @@ export function useChat({
         return null;
       }
 
+      // Remove last assistant message and retry last user message.
       const lastMessage = messages[messages.length - 1];
       return triggerRequest({
         messages:
@@ -383,6 +475,7 @@ export function useChat({
     [mutateStreamData],
   );
 
+  // Input state and handlers.
   const [input, setInput] = useState(initialInput);
 
   const handleSubmit = useCallback(
@@ -446,6 +539,7 @@ export function useChat({
     result: any;
   }) => {
     const updatedMessages = messagesRef.current.map((message, index, arr) =>
+      // update the tool calls in the last assistant message:
       index === arr.length - 1 &&
       message.role === 'assistant' &&
       message.toolInvocations
@@ -466,6 +560,7 @@ export function useChat({
 
     mutate(updatedMessages, false);
 
+    // auto-submit when all tool calls in the last assistant message have results:
     const lastMessage = updatedMessages[updatedMessages.length - 1];
     if (isAssistantMessageWithCompletedToolCalls(lastMessage)) {
       triggerRequest({ messages: updatedMessages });
@@ -490,6 +585,11 @@ export function useChat({
   };
 }
 
+/**
+Check if the message is an assistant message with completed tool calls.
+The message must have at least one tool invocation and all tool invocations
+must have a result.
+ */
 function isAssistantMessageWithCompletedToolCalls(message: Message) {
   return (
     message.role === 'assistant' &&
@@ -499,6 +599,9 @@ function isAssistantMessageWithCompletedToolCalls(message: Message) {
   );
 }
 
+/**
+Returns the number of trailing assistant messages in the array.
+ */
 function countTrailingAssistantMessages(messages: Message[]) {
   let count = 0;
   for (let i = messages.length - 1; i >= 0; i--) {
