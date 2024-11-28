@@ -206,7 +206,13 @@ impl<'a> Session<'a> {
     }
 
     fn handle_interrupted_messages(&mut self) {
-        self.messages.clear();
+        // Find and remove only the last user message, keeping previous conversation intact
+        if let Some(msg) = self.messages.last() {
+            if msg.role == Role::User {
+                self.messages.pop();
+            }
+        }
+        
         self.prompt.render(raw_message(
             "We interrupted before the model replied and removed the last message.",
         ));
@@ -385,21 +391,52 @@ mod tests {
     }
 
     #[test]
-    fn test_interrupted_messages_only_user() {
-        let prompt = Box::new(MockPrompt::new());
-        let mut session = create_test_session_with_prompt(prompt);
+    fn test_interrupted_messages_only_1_user_msg() {
+        let mut session = create_test_session_with_prompt(Box::new(MockPrompt::new()));
         session.messages.push(Message::user().with_text("Hello"));
 
         session.handle_interrupted_messages();
+
         assert!(session.messages.is_empty());
 
-        let le_prompt = session
+        let prompt = session
             .prompt
             .as_any()
             .downcast_ref::<MockPrompt>()
             .expect("Failed to downcast");
-        let messages = le_prompt.get_messages();
+        let messages = prompt.get_messages();
         let msg = messages.get(0).unwrap();
+        assert_eq!(msg.role, Role::Assistant);
+        assert_eq!(
+            msg.content[0],
+            MessageContent::text(
+                "We interrupted before the model replied and removed the last message."
+            )
+        );
+    }
+
+    #[test]
+    fn test_interrupted_messages_removes_last_user_msg() {
+        let mut session = create_test_session_with_prompt(Box::new(MockPrompt::new()));
+        session.messages.push(Message::user().with_text("Hello"));
+        session.messages.push(Message::assistant().with_text("Hi"));
+        session.messages.push(Message::user().with_text("How are you?"));
+
+        session.handle_interrupted_messages();
+        
+        assert_eq!(session.messages.len(), 2);
+        assert_eq!(session.messages[0].role, Role::User);
+        assert_eq!(session.messages[0].content[0], MessageContent::text("Hello"));
+        assert_eq!(session.messages[1].role, Role::Assistant);
+        assert_eq!(session.messages[1].content[0], MessageContent::text("Hi"));
+
+        let prompt = session
+            .prompt
+            .as_any()
+            .downcast_ref::<MockPrompt>()
+            .expect("Failed to downcast");
+        let prompt_messages = prompt.get_messages();
+        let msg = prompt_messages.get(0).unwrap();
         assert_eq!(msg.role, Role::Assistant);
         assert_eq!(
             msg.content[0],
