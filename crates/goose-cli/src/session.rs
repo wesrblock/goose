@@ -161,11 +161,11 @@ impl<'a> Session<'a> {
                             eprintln!("Error: {}", e);
                             drop(stream);
                             self.rewind_messages();
-                            self.prompt.render(raw_message(&format!("{}",
-                                "\x1b[31mThe error above was an exception we were not able to handle.\n\n\x1b[0m".to_string()
-                                + "These errors are often related to connection or authentication\n"
-                                + "We've removed the conversation up to the most recent user message"
-                                + " - \x1b[33mdepending on the error you may be able to continue\x1b[0m")));
+                            self.prompt.render(raw_message(r#"
+\x1b[31mThe error above was an exception we were not able to handle.\n\n\x1b[0m
+These errors are often related to connection or authentication\n
+We've removed the conversation up to the most recent user message
+ - \x1b[33mdepending on the error you may be able to continue\x1b[0m"#));
                             break;
                         }
                         None => break,
