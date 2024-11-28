@@ -141,8 +141,19 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
 
   const removeChat = (chatId: number) => {
     const updatedChats = chats.filter((chat: any) => chat.id !== chatId);
-    setChats(updatedChats);
-    navigateChat(updatedChats[0].id);
+    // Reassign titles based on the new order
+    const reorderedChats = updatedChats.map((chat, index) => ({
+      ...chat,
+      title: `Chat ${index + 1}`,
+    }));
+
+    // Update the chats state
+    setChats(reorderedChats);
+
+    // Navigate to the first remaining chat (if any)
+    if (reorderedChats.length > 0) {
+      navigateChat(reorderedChats[0].id);
+    }
   };
 
   return (
