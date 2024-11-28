@@ -173,8 +173,7 @@ impl<'a> Session<'a> {
                 }
                 _ = tokio::signal::ctrl_c() => {
                     drop(stream);
-                    self.rewind_messages();
-                    self.prompt.render(raw_message(" Interrupt: Resetting conversation to before the last sent message...\n"));
+                    self.handle_interrupted_messages();
                     break;
                 }
             }
@@ -204,6 +203,11 @@ impl<'a> Session<'a> {
         if !self.messages.is_empty() {
             self.messages.pop();
         }
+    }
+
+    fn handle_interrupted_messages(&mut self) {
+        let mut recovery_message = "".to_string();
+
     }
 
     fn setup_session(&mut self) {
@@ -242,12 +246,29 @@ mod tests {
     fn create_test_session() -> Session<'static> {
         let temp_file = NamedTempFile::new().unwrap();
         let agent = Box::new(MockAgent {});
-        let prompt = Box::new(MockPrompt {});
+        let prompt = Box::new(MockPrompt::new());
+        Session::new(agent, prompt, temp_file.path().to_path_buf())
+    }
+
+    fn create_test_session_with_prompt<'a>(prompt: Box<dyn Prompt + 'a>) -> Session<'a> {
+        let temp_file = NamedTempFile::new().unwrap();
+        let agent = Box::new(MockAgent {});
         Session::new(agent, prompt, temp_file.path().to_path_buf())
     }
 
     // Mock prompt implementation for testing
-    struct MockPrompt {}
+    struct MockPrompt {
+        messages: Vec<Box<Message>>,
+    }
+
+    impl MockPrompt {
+        fn new() -> MockPrompt {
+            MockPrompt {
+                messages: Vec::new(),
+            }
+        }
+    }
+
     impl Prompt for MockPrompt {
         fn get_input(&mut self) -> std::result::Result<prompt::Input, anyhow::Error> {
             Ok(Input {
@@ -255,7 +276,9 @@ mod tests {
                 content: Some("Msg:".to_string()),
             })
         }
-        fn render(&mut self, _: Box<Message>) {}
+        fn render(&mut self, message: Box<Message>) {
+            self.messages.push(message);
+        }
         fn show_busy(&mut self) {}
         fn hide_busy(&self) {}
         fn goose_ready(&self) {}
