@@ -176,10 +176,6 @@ impl ProtocolFormatter {
         });
         format!("d:{}\n", finish)
     }
-
-    fn heartbeat() -> String {
-        "2:[]\n".to_string()
-    }
 }
 
 async fn stream_message(
@@ -317,17 +313,8 @@ async fn handler(
                             break;
                         }
                         Err(_) => { // Heartbeat, used to detect disconnected clients and then end running tools.
-                            if let Err(e) = tx.try_send(ProtocolFormatter::heartbeat()) {
-                                match e {
-                                    mpsc::error::TrySendError::Closed(_) => {
-                                        // Client has disconnected, end the stream and close running tools (works by ending this process).
-                                        break;
-                                    }
-                                    mpsc::error::TrySendError::Full(_) => {
-                                        tracing::warn!("Error sending heartbeat message through channel: {}", e);
-                                        continue;
-                                    }
-                                }
+                            if tx.is_closed() {
+                                break;
                             }
                             continue;
                         }
