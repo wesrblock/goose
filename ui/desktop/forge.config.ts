@@ -10,6 +10,7 @@ module.exports = {
       entitlements: 'entitlements.plist',
       'entitlements-inherit': 'entitlements.plist',
       'gatekeeper-assess': false,
+      hardenedRuntime: true,
     },
   },
   rebuildConfig: {},
