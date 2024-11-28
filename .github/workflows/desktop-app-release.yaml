@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - v1.0
-  pull_request:
-    branches:
-      - v1.0
 
 jobs:
   build-and-bundle:
