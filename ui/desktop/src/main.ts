@@ -5,7 +5,6 @@ import path from 'node:path';
 import { findAvailablePort, startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
 import log from './utils/logger';
-import { getPort } from './utils/portUtils';
 import { exec } from 'child_process';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -15,6 +14,7 @@ declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
 
 const checkApiCredentials = () => {
+  loadZshEnv(app.isPackaged);
   const isDatabricksConfigValid =
     process.env.GOOSE_PROVIDER__TYPE === 'databricks' &&
     process.env.GOOSE_PROVIDER__HOST &&
