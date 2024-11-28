@@ -22,8 +22,10 @@ use std::{
     convert::Infallible,
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 use tokio::sync::mpsc;
+use tokio::time::timeout;
 use tokio_stream::wrappers::ReceiverStream;
 
 // Types matching the incoming JSON structure
@@ -293,17 +295,30 @@ async fn handler(
             }
         };
 
-        while let Some(response) = stream.next().await {
-            match response {
-                Ok(message) => {
-                    if let Err(e) = stream_message(message, &tx).await {
-                        tracing::error!("Error sending message through channel: {}", e);
-                        break;
+        loop {
+            tokio::select! {
+                response = timeout(Duration::from_millis(500), stream.next()) => {
+                    match response {
+                        Ok(Some(Ok(message))) => {
+                            if let Err(e) = stream_message(message, &tx).await {
+                                tracing::error!("Error sending message through channel: {}", e);
+                                break;
+                            }
+                        }
+                        Ok(Some(Err(e))) => {
+                            tracing::error!("Error processing message: {}", e);
+                            break;
+                        }
+                        Ok(None) => {
+                            break;
+                        }
+                        Err(_) => { // Heartbeat, used to detect disconnected clients and then end running tools.
+                            if tx.is_closed() {
+                                break;
+                            }
+                            continue;
+                        }
                     }
-                }
-                Err(e) => {
-                    tracing::error!("Error processing message: {}", e);
-                    break;
                 }
             }
         }
