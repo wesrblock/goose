@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom'
+import { Chat } from '../ChatWindow';
 
 import Plus from './ui/Plus';
 import X from './ui/X';
@@ -129,10 +130,10 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
 
   // Tab management functions
   const addChat = () => {
-    const newChatId = chats[chats.length-1].id + 1;
+    const newChatId = chats.length > 0 ? Math.max(...chats.map(chat => chat.id)) + 1 : 1;
     const newChat = {
       id: newChatId,
-      title: `Chat ${newChatId}`,
+      title: `Chat ${chats.length + 1}`,
       messages: [],
     };
     setChats([...chats, newChat]);
@@ -142,7 +143,7 @@ export default function Tabs({ chats, selectedChatId, setSelectedChatId, setChat
   const removeChat = (chatId: number) => {
     const updatedChats = chats.filter((chat: any) => chat.id !== chatId);
     // Reassign titles based on the new order
-    const reorderedChats = updatedChats.map((chat, index) => ({
+    const reorderedChats = updatedChats.map((chat: Chat, index: number) => ({
       ...chat,
       title: `Chat ${index + 1}`,
     }));
