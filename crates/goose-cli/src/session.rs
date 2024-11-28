@@ -284,7 +284,7 @@ mod tests {
     use crate::prompt::{self, Input};
 
     use super::*;
-    use goose::models::content::{Content, TextContent};
+    use goose::models::content::Content;
     use goose::models::tool;
     use goose::{errors::AgentResult, models::tool::ToolCall};
     use tempfile::NamedTempFile;
@@ -524,5 +524,40 @@ mod tests {
         // Check the follow-up assistant message
         assert_eq!(session.messages[6].role, Role::Assistant);
         assert_eq!(session.messages[6].content[0], MessageContent::text(format!("We interrupted the existing call to {}. How would you like to proceed?", tool_name2)));
+    }
+
+    #[test]
+    fn test_interrupted_tool_use_interrupts_multiple_tools() {
+        let tool_name1 = "test";
+        let tool_call1 = tool::ToolCall::new(tool_name1, "test".into());
+
+        let tool_name2 = "test2";
+        let tool_call2 = tool::ToolCall::new(tool_name2, "test2".into());
+        let mut session = create_test_session_with_prompt(Box::new(MockPrompt::new()));
+        session.messages.push(Message::user().with_text("Do something"));
+        session.messages.push(Message::assistant().with_text("Doing it")
+            .with_tool_request("1", Ok(tool_call1.clone()))
+            .with_tool_request("2", Ok(tool_call2.clone())));
+
+
+        session.handle_interrupted_messages();
+        
+        assert_eq!(session.messages.len(), 4);
+        assert_eq!(session.messages[0].role, Role::User);
+        assert_eq!(session.messages[0].content[0], MessageContent::text("Do something"));
+        assert_eq!(session.messages[1].role, Role::Assistant);
+        assert_eq!(session.messages[1].content[0], MessageContent::text("Doing it"));
+        assert_eq!(session.messages[1].content[1], MessageContent::tool_request("1", Ok(tool_call1)));
+        assert_eq!(session.messages[1].content[2], MessageContent::tool_request("2", Ok(tool_call2)));
+
+        // Check the interrupted tool response message
+        assert_eq!(session.messages[2].role, Role::User);
+        let tool_result = Err(goose::errors::AgentError::ExecutionError("Interrupted by the user to make a correction".to_string()));
+        assert_eq!(session.messages[2].content[0], MessageContent::tool_response("1", tool_result.clone()));
+        assert_eq!(session.messages[2].content[1], MessageContent::tool_response("2", tool_result));
+
+        // Check the follow-up assistant message
+        assert_eq!(session.messages[3].role, Role::Assistant);
+        assert_eq!(session.messages[3].content[0], MessageContent::text(format!("We interrupted the existing call to {}. How would you like to proceed?", tool_name2)));
     }
 }
