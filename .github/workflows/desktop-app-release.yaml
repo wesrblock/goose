@@ -16,12 +16,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    # Rust Setup Steps
-    - name: Install System Dependencies
-      run: |
-        brew install dbus openssl gnome-keyring
-        brew install --cask xquartz
-
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
