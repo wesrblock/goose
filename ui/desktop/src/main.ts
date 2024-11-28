@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { loadZshEnv } from './utils/loadEnv';
-import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification } from 'electron';
+import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem } from 'electron';
 import path from 'node:path';
 import { findAvailablePort, startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
@@ -208,6 +208,23 @@ app.whenReady().then(async () => {
   // Show launcher input on key combo
   globalShortcut.register('Control+Alt+Command+G', createLauncher);
 
+  // Preserve existing menu and add new items
+  const menu = Menu.getApplicationMenu();
+  const fileMenu = menu?.items.find(item => item.label === 'File');
+
+  // Add 'New Chat Window' to File menu
+  if (fileMenu && fileMenu.submenu) {
+    fileMenu.submenu.append(new MenuItem({
+      label: 'New Chat Window',
+      accelerator: 'CmdOrCtrl+N',
+      click() {
+        ipcMain.emit('create-chat-window');
+      },
+    }));
+  }
+
+  Menu.setApplicationMenu(menu);
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createChat(app);
@@ -267,3 +284,4 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+

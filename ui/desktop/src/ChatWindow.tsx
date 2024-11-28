@@ -213,13 +213,18 @@ function ChatContent({
 }
 
 export default function ChatWindow() {
+  // Shared function to create a chat window
+  const openNewChatWindow = () => {
+    window.electron.createChatWindow();
+  };
+
   // Add keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check for Command+N (Mac) or Control+N (Windows/Linux)
       if ((event.metaKey || event.ctrlKey) && event.key === 'n') {
         event.preventDefault(); // Prevent default browser behavior
-        window.electron.createChatWindow();
+        openNewChatWindow();
       }
     };
 
