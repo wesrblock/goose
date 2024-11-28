@@ -30,7 +30,7 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
             <ReactMarkdown className="prose prose-xs max-w-full overflow-x-auto break-words prose-pre:whitespace-pre-wrap prose-pre:break-words">{message.content}</ReactMarkdown>
           )}
           {message.toolInvocations && (
-            <div className="mb-4">
+            <div className="mb-1">
               <ToolInvocations toolInvocations={message.toolInvocations} />
             </div>
           )}
