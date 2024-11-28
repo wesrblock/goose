@@ -1,4 +1,4 @@
-name: Desktop App
+name: Desktop App CI
 
 on:
   push:
