@@ -18,7 +18,7 @@ jobs:
 
     - name: Install Libs
       run: |
-        sudo apt install libdbus-1-dev libsecret
+        sudo apt install libdbus-1-dev libsecret-1-0 libsecret-1-dev
 
     - name: Install UV
       run: |
