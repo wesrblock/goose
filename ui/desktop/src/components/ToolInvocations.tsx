@@ -18,11 +18,9 @@ export default function ToolInvocations({ toolInvocations }) {
 }
 
 
-
-
 function ToolInvocation({ toolInvocation }) {
   return (
-    <div className="flex bg-goose-bubble text-white rounded-2xl p-4 pb-0 mb-[16px] max-w-full">
+    <div className="flex flex-col w-full">
       <div key={toolInvocation.toolCallId} className="w-full h-full flex flex-col text-tool">
         <ToolCall call={toolInvocation} />
         {toolInvocation.state === 'result' && <ToolResult result={toolInvocation} />}
@@ -30,8 +28,6 @@ function ToolInvocation({ toolInvocation }) {
     </div>
   )
 }
-
-
 
 
 interface ToolCallProps {
@@ -47,7 +43,7 @@ function ToolCall({ call }: ToolCallProps) {
   const argsMarkdownContent = convertArgsToMarkdown(call.args);
 
   return (
-    <Card className="bg-tool-card p-4 mb-[16px]">
+    <Card className="bg-tool-card p-4 mb-2">
       <div className="flex items-center">
         <BoxIcon size={14} />
         <span className="ml-[8px]">Tool Called: {call.toolName.substring(call.toolName.lastIndexOf("__") + 2)}</span>
@@ -61,8 +57,6 @@ function ToolCall({ call }: ToolCallProps) {
     </Card>
   )
 }
-
-
 
 
 interface ResultItem {
@@ -117,7 +111,7 @@ function ToolResult({ result }: ToolResultProps) {
   };
 
   return (
-    <Card className="bg-tool-card p-4 mb-[16px]">
+    <Card className="bg-tool-card p-4">
       <div className="flex items-center">
         <BoxIcon size={14} />
         <span className="ml-[8px]">Tool Result: {result.toolName.substring(result.toolName.lastIndexOf("__") + 2)}</span>
