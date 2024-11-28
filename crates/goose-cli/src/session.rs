@@ -206,8 +206,10 @@ impl<'a> Session<'a> {
     }
 
     fn handle_interrupted_messages(&mut self) {
-        let mut recovery_message = "".to_string();
-
+        self.messages.clear();
+        self.prompt.render(raw_message(
+            "We interrupted before the model replied and removed the last message.",
+        ));
     }
 
     fn setup_session(&mut self) {
@@ -235,6 +237,9 @@ fn raw_message(content: &str) -> Box<Message> {
 
 #[cfg(test)]
 mod tests {
+    use std::any::Any;
+    use std::sync::{Arc, Mutex};
+
     use crate::agents::mock_agent::MockAgent;
     use crate::prompt::{self, Input};
 
@@ -257,15 +262,25 @@ mod tests {
     }
 
     // Mock prompt implementation for testing
-    struct MockPrompt {
-        messages: Vec<Box<Message>>,
+    pub struct MockPrompt {
+        messages: Arc<Mutex<Vec<Message>>>, // Thread-safe, owned storage
     }
 
     impl MockPrompt {
-        fn new() -> MockPrompt {
-            MockPrompt {
-                messages: Vec::new(),
+        pub fn new() -> Self {
+            Self {
+                messages: Arc::new(Mutex::new(Vec::new())),
             }
+        }
+
+        pub fn add_message(&self, message: Message) {
+            let mut messages = self.messages.lock().unwrap(); // Lock to safely modify
+            messages.push(message);
+        }
+
+        pub fn get_messages(&self) -> Vec<Message> {
+            let messages = self.messages.lock().unwrap(); // Lock to safely read
+            messages.clone() // Return a clone to avoid borrowing issues
         }
     }
 
@@ -277,12 +292,15 @@ mod tests {
             })
         }
         fn render(&mut self, message: Box<Message>) {
-            self.messages.push(message);
+            self.add_message(message.as_ref().clone());
         }
         fn show_busy(&mut self) {}
         fn hide_busy(&self) {}
         fn goose_ready(&self) {}
         fn close(&self) {}
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
     }
 
     #[test]
@@ -363,6 +381,31 @@ mod tests {
         assert_eq!(
             session.messages[1].content[0],
             MessageContent::text("Response 1")
+        );
+    }
+
+    #[test]
+    fn test_interrupted_messages_only_user() {
+        let prompt = Box::new(MockPrompt::new());
+        let mut session = create_test_session_with_prompt(prompt);
+        session.messages.push(Message::user().with_text("Hello"));
+
+        session.handle_interrupted_messages();
+        assert!(session.messages.is_empty());
+
+        let le_prompt = session
+            .prompt
+            .as_any()
+            .downcast_ref::<MockPrompt>()
+            .expect("Failed to downcast");
+        let messages = le_prompt.get_messages();
+        let msg = messages.get(0).unwrap();
+        assert_eq!(msg.role, Role::Assistant);
+        assert_eq!(
+            msg.content[0],
+            MessageContent::text(
+                "We interrupted before the model replied and removed the last message."
+            )
         );
     }
 }
