@@ -22,7 +22,7 @@ export default function ToolInvocations({ toolInvocations }) {
 
 function ToolInvocation({ toolInvocation }) {
   return (
-    <div className="flex bg-goose-bubble text-white rounded-2xl p-4 pb-0 mb-[16px]">
+    <div className="flex bg-goose-bubble text-white rounded-2xl p-4 pb-0 mb-[16px] max-w-full">
       <div key={toolInvocation.toolCallId} className="w-full h-full flex flex-col text-tool">
         <ToolCall call={toolInvocation} />
         {toolInvocation.state === 'result' && <ToolResult result={toolInvocation} />}
@@ -54,7 +54,7 @@ function ToolCall({ call }: ToolCallProps) {
       </div>
 
       {call.args && (
-        <ReactMarkdown className="p-2">
+        <ReactMarkdown className="p-2 max-w-full overflow-x-auto break-words prose-pre:whitespace-pre-wrap prose-pre:break-words">
           {argsMarkdownContent}
         </ReactMarkdown>
       )}
@@ -140,7 +140,7 @@ function ToolResult({ result }: ToolResultProps) {
               {(isExpanded || !shouldMinimize) && (
                 <>
                   {item.type === 'text' && item.text && (
-                    <ReactMarkdown className="text-tool-result-green whitespace-pre-wrap p-2">
+                    <ReactMarkdown className="text-tool-result-green whitespace-pre-wrap p-2 max-w-full overflow-x-auto break-words prose-pre:whitespace-pre-wrap prose-pre:break-words">
                       {item.text}
                     </ReactMarkdown>
                   )}

@@ -139,7 +139,6 @@ fn convert_messages(incoming: Vec<IncomingMessage>) -> Vec<Message> {
 struct ProtocolFormatter;
 
 impl ProtocolFormatter {
-
     fn format_text(text: &str) -> String {
         let encoded_text = serde_json::to_string(text).unwrap_or_else(|_| String::new());
         format!("0:{}\n", encoded_text)
@@ -236,8 +235,8 @@ async fn stream_message(
                     MessageContent::Text(text) => {
                         for line in text.text.lines() {
                             let modified_line = format!("{}\n", line);
-                            tx.send(ProtocolFormatter::format_text(&modified_line)).await?;
-
+                            tx.send(ProtocolFormatter::format_text(&modified_line))
+                                .await?;
                         }
                     }
                     MessageContent::Image(_) => {

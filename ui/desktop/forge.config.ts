@@ -6,6 +6,11 @@ module.exports = {
     asar: true,
     extraResource: ['src/bin', 'src/images'],
     icon: 'src/images/icon',
+    osxSign: {
+      entitlements: 'entitlements.plist',
+      'entitlements-inherit': 'entitlements.plist',
+      'gatekeeper-assess': false,
+    },
   },
   rebuildConfig: {},
   makers: [

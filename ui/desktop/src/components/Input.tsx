@@ -1,27 +1,70 @@
-import React from 'react';
-import { Button } from './ui/button'
-import Send from './ui/Send'
+import React, { useRef, useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import Send from './ui/Send';
 
 interface InputProps {
   handleSubmit: (e: React.FormEvent) => void;
-  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   input: string;
   disabled?: boolean;
 }
 
 export default function Input({ handleSubmit, handleInputChange, input, disabled = false }: InputProps) {
+  const [value, setValue] = useState(input);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+
+  const useAutosizeTextArea = (textAreaRef: HTMLTextAreaElement | null, value: string) => {
+    useEffect(() => {
+      if (textAreaRef) {
+        textAreaRef.style.height = "0px"; // Reset height
+        const scrollHeight = textAreaRef.scrollHeight;
+        textAreaRef.style.height = Math.min(scrollHeight, maxHeight) + "px";
+      }
+    }, [textAreaRef, value]);
+  };
+
+  const minHeight = "1rem";
+  const maxHeight = 10 * 24;
+
+  useAutosizeTextArea(textAreaRef.current, value);
+
+  const handleChange = (evt: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = evt.target?.value;
+    setValue(val);
+    handleInputChange(evt);
+  };
+
+  const handleKeyDown = (evt: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (evt.key === 'Enter' && !evt.shiftKey) {
+      evt.preventDefault();
+      handleSubmit(new CustomEvent('submit', { detail: { value } })); // Trigger custom form submit
+      setValue(''); // Clear textarea
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="flex relative bg-white h-[57px] px-[16px] rounded-b-2xl">
-      <input 
-        type="text" 
+    <form onSubmit={(e) => {
+      handleSubmit(e);
+      setValue('');
+    }} className="flex relative bg-white h-auto px-[16px] pr-[38px] py-[1rem] rounded-b-2xl">
+      <textarea
+        id="dynamic-textarea"
         placeholder="What should goose do?"
-        value={input}
-        onChange={handleInputChange}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
         disabled={disabled}
-        className={`w-full outline-none border-none focus:ring-0 bg-transparent p-0 text-14 ${
+        ref={textAreaRef}
+        rows={1}
+        style={{
+          minHeight: `${minHeight}px`,
+          maxHeight: `${maxHeight}px`,
+          overflowY: 'auto'
+        }}
+        className={`w-full outline-none border-none focus:ring-0 bg-transparent p-0 text-14 resize-none ${
           disabled ? 'cursor-not-allowed opacity-50' : ''
         }`}
-      />  
+      />
       <Button
         type="submit"
         size="icon"

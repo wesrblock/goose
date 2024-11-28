@@ -99,6 +99,7 @@ impl<'a> Session<'a> {
 
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.setup_session();
+        self.prompt.goose_ready();
 
         loop {
             let input = self.prompt.get_input().unwrap();
@@ -202,14 +203,8 @@ impl<'a> Session<'a> {
     fn setup_session(&mut self) {
         let system = Box::new(DeveloperSystem::new());
         self.agent.add_system(system);
-        self.prompt
-            .render(raw_message("Connected developer system."));
         let goosehints_system = Box::new(GooseHintsSystem::new());
         self.agent.add_system(goosehints_system);
-        self.prompt
-            .render(raw_message("Connected .goosehints system."));
-
-        self.prompt.goose_ready();
     }
 
     fn close_session(&mut self) {

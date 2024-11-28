@@ -31,7 +31,7 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
 
         {message.content && (
           <div className="flex bg-goose-bubble text-white rounded-2xl p-4 mb-[16px]">
-            <ReactMarkdown className="prose prose-xs">{message.content}</ReactMarkdown>
+            <ReactMarkdown className="prose prose-xs max-w-full overflow-x-auto break-words prose-pre:whitespace-pre-wrap prose-pre:break-words">{message.content}</ReactMarkdown>
           </div>
         )}
 
@@ -43,8 +43,8 @@ export default function GooseMessage({ message, metadata, messages, append }: Go
           </div>
         )}
 
-        {/* append false && to turn this off */}
-        {metadata && (
+        {/* Currently disabled */}
+        {false && metadata && (
           <div className="flex mb-[16px]">
             <GooseResponseForm
               message={message.content}
