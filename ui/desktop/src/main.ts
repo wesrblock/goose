@@ -90,7 +90,7 @@ const createChat = async (app, query?: string) => {
   const port = await startGoosed(app);  
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
-    trafficLightPosition: { x: 16, y: 18 },
+    trafficLightPosition: { x: 16, y: 10 },
     width: 650,
     height: 800,
     minWidth: 650,

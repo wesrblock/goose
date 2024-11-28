@@ -20,10 +20,7 @@ export default function MoreMenu({ onStopGoose, onClearContext, onRestartGoose }
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          className="z-30 block w-[30px] h-[30px]"
-          aria-label="Menu"
-        >
+        <button className="z-[100] absolute top-[-4px] right-[10px] w-[20px] h-[20px] cursor-pointer no-drag">
           <VertDots size={18} />
         </button>
       </PopoverTrigger>
