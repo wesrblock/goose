@@ -206,37 +206,43 @@ impl<'a> Session<'a> {
     }
 
     fn handle_interrupted_messages(&mut self) {
-        // First, get any tool request information from the last message if it exists
-        let tool_request = if let Some(last_assistant_msg) = self.messages.last() {
+        // First, get any tool requests from the last message if it exists
+        let tool_requests = if let Some(last_assistant_msg) = self.messages.last() {
             if last_assistant_msg.role == Role::Assistant {
-                // Extract tool request if it exists
-                last_assistant_msg.content.iter().find_map(|content| {
+                // Extract all tool requests
+                last_assistant_msg.content.iter().filter_map(|content| {
                     if let MessageContent::ToolRequest(req) = content {
                         Some((req.id.clone(), req.tool_call.clone()))
                     } else {
                         None
                     }
-                })
+                }).collect::<Vec<_>>()
             } else {
-                None
+                Vec::new()
             }
         } else {
-            None
+            Vec::new()
         };
 
         // Handle the interruption based on whether we were in a tool request
-        if let Some((req_id, tool_call)) = tool_request {
-            // Add a tool response message indicating interruption
-            let interrupt_error = goose::errors::AgentError::ExecutionError(
-                "Interrupted by the user to make a correction".to_string()
-            );
-            self.messages.push(Message::user().with_tool_response(&req_id, Err(interrupt_error)));
+        if !tool_requests.is_empty() {
+            // Create a message with tool responses for all interrupted requests
+            let mut response_message = Message::user();
+            for (req_id, _) in &tool_requests {
+                let interrupt_error = goose::errors::AgentError::ExecutionError(
+                    "Interrupted by the user to make a correction".to_string()
+                );
+                response_message.content.push(MessageContent::tool_response(req_id, Err(interrupt_error)));
+            }
+            self.messages.push(response_message);
 
-            // Add assistant message about the interruption
-            if let Ok(tool) = tool_call {
-                self.messages.push(Message::assistant().with_text(
-                    &format!("We interrupted the existing call to {}. How would you like to proceed?", tool.name)
-                ));
+            // Add assistant message about the interruption using the last tool name
+            if let Some((_, tool_call)) = tool_requests.last() {
+                if let Ok(tool) = tool_call {
+                    self.messages.push(Message::assistant().with_text(
+                        &format!("We interrupted the existing call to {}. How would you like to proceed?", tool.name)
+                    ));
+                }
             }
         } else {
             // Default behavior for non-tool interruptions
