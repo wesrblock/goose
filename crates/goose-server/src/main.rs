@@ -15,9 +15,7 @@ async fn main() -> anyhow::Result<()> {
     let settings = configuration::Settings::new()?;
 
     // Create app state
-    let state = state::AppState {
-        provider_config: settings.provider.into_config(),
-    };
+    let state = state::AppState::new(settings.provider.into_config())?;
 
     // Create router with CORS support
     let cors = CorsLayer::new()

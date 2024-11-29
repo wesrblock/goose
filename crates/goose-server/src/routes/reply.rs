@@ -9,12 +9,9 @@ use axum::{
 use bytes::Bytes;
 use futures::{stream::StreamExt, Stream};
 use goose::{
-    agent::Agent,
-    developer::DeveloperSystem,
     models::content::Content,
     models::message::{Message, MessageContent},
     models::role::Role,
-    providers::factory,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -201,7 +198,8 @@ async fn stream_message(
                             .await?;
                         }
                         Err(err) => {
-                            let result = vec![Content::text(format!("Error {}", err))];
+                            let result =
+                                vec![Content::text(format!("Error {}", err)).with_priority(0.0)];
                             tx.send(ProtocolFormatter::format_tool_response(
                                 &response.id,
                                 &result,
@@ -272,19 +270,15 @@ async fn handler(
     let (tx, rx) = mpsc::channel(100);
     let stream = ReceiverStream::new(rx);
 
-    // Setup agent with developer system
-    let system = Box::new(DeveloperSystem::new());
-    let provider = factory::get_provider(state.provider_config)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let mut agent = Agent::new(provider);
-    agent.add_system(system);
-
     // Convert incoming messages
     let messages = convert_messages(request.messages);
 
+    // Get a lock on the shared agent
+    let agent = state.agent.clone();
+
     // Spawn task to handle streaming
     tokio::spawn(async move {
+        let agent = agent.lock().await;
         let mut stream = match agent.reply(&messages).await {
             Ok(stream) => stream,
             Err(e) => {
@@ -345,12 +339,8 @@ async fn ask_handler(
     State(state): State<AppState>,
     Json(request): Json<AskRequest>,
 ) -> Result<Json<AskResponse>, StatusCode> {
-    let provider = factory::get_provider(state.provider_config)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let system = Box::new(DeveloperSystem::new());
-
-    let mut agent = Agent::new(provider);
-    agent.add_system(system);
+    let agent = state.agent.clone();
+    let agent = agent.lock().await;
 
     // Create a single message for the prompt
     let messages = vec![Message::user().with_text(request.prompt)];
