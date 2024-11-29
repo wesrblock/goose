@@ -62,10 +62,34 @@ function normalizePathDepth(filePath: string, homeDir: string, maxDepth: number 
  * @param homeDir User's home directory
  * @returns boolean indicating if path should be excluded
  */
+/**
+ * Gets the latest modification timestamp for a file or directory
+ * @param filePath Path to check
+ * @returns number representing the latest timestamp or 0 if error
+ */
+function getLatestTimestamp(filePath: string): number {
+    try {
+        const stats = fs.statSync(filePath);
+        return Math.max(
+            stats.mtimeMs,  // modification time
+            stats.ctimeMs,  // change time
+            stats.birthtimeMs  // creation time
+        );
+    } catch (e) {
+        console.error('Error getting timestamp for:', filePath, e);
+        return 0;
+    }
+}
+
 function shouldExcludePath(filePath: string, homeDir: string): boolean {
     if (filePath.endsWith('.app')) {
         return true;
     }
+    if (filePath.startsWith('/Applications')) {
+        return true;
+    }
+
+
     const normalizedPath = path.normalize(filePath);
     
 
@@ -170,5 +194,16 @@ export function listRecentPaths(): string[] {
         console.error('Error reading process list:', e);
     }
 
-    return Array.from(paths).sort();
+    // Convert paths to [path, timestamp] pairs for sorting
+    const pathsWithTimestamps = Array.from(paths).map(p => [p, getLatestTimestamp(p)] as [string, number]);
+    
+    // Sort by timestamp (most recent first), then by path name for stable sorting
+    return pathsWithTimestamps
+        .sort(([pathA, timeA], [pathB, timeB]) => {
+            if (timeA === timeB) {
+                return pathA.localeCompare(pathB);
+            }
+            return timeB - timeA; // Sort descending (most recent first)
+        })
+        .map(([path]) => path);
 }
