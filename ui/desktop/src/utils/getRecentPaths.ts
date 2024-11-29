@@ -26,6 +26,20 @@ function isDirectory(filePath: string): boolean {
 function normalizePathDepth(filePath: string, homeDir: string, maxDepth: number = 5): string {
     const normalizedPath = path.normalize(filePath);
 
+    // Handle .xcodeproj paths by returning parent directory
+    if (normalizedPath.endsWith('.xcodeproj')) {
+        return path.dirname(normalizedPath);
+    }
+
+    // Handle node_modules paths by returning parent directory
+    if (normalizedPath.includes('node_modules')) {
+        const parts = normalizedPath.split(path.sep);
+        const nodeModulesIndex = parts.indexOf('node_modules');
+        if (nodeModulesIndex !== -1) {
+            return parts.slice(0, nodeModulesIndex).join(path.sep);
+        }
+    }
+
     if (!normalizedPath.startsWith(homeDir) && !normalizedPath.startsWith('/Applications')) {
         return normalizedPath;
     }
