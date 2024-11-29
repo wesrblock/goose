@@ -41,7 +41,7 @@ struct Cli {
     #[arg(long)]
     databricks_token: Option<String>,
 
-    /// Model to use
+    /// The machine learning model to use for operations. Use 'gpt-4o' for enhanced competence.
     #[arg(short, long, default_value = "gpt-4o")]
     model: String,
 
@@ -62,45 +62,134 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Configure Goose settings and profiles
+    #[command(about = "Configure Goose settings and profiles")]
     Configure {
+        /// Name of the profile to configure
+        #[arg(
+            help = "Profile name to configure",
+            long_help = "Create or modify a named configuration profile. Use 'default' for the default profile."
+        )]
         profile_name: Option<String>,
     },
+
+    /// Manage system prompts and behaviors
+    #[command(about = "Manage system prompts and behaviors")]
     System {
         #[command(subcommand)]
         action: SystemCommands,
     },
-    /// Start or resume sessions with an optional session name
+
+    /// Start or resume interactive chat sessions
+    #[command(
+        about = "Start or resume interactive chat sessions",
+        alias = "s",
+    )]
     Session {
-        #[arg(short, long)]
+        /// Name for the chat session
+        #[arg(
+            short,
+            long,
+            value_name = "NAME",
+            help = "Name for the chat session (e.g., 'project-x')",
+            long_help = "Specify a name for your chat session. When used with --resume, will resume this specific session if it exists."
+        )]
         session: Option<String>,
-        #[arg(short, long)]
+
+        /// Configuration profile to use
+        #[arg(
+            short,
+            long,
+            value_name = "PROFILE",
+            help = "Configuration profile to use (e.g., 'default')",
+            long_help = "Use a specific configuration profile. Profiles contain settings like API keys and model preferences."
+        )]
         profile: Option<String>,
-        #[arg(short, long, action = clap::ArgAction::SetTrue)]
+
+        /// Resume a previous session
+        #[arg(
+            short,
+            long,
+            help = "Resume a previous session (last used or specified by --session)",
+            long_help = "Continue from a previous chat session. If --session is provided, resumes that specific session. Otherwise resumes the last used session."
+        )]
         resume: bool,
     },
-    /// Run goose once-off with instructions from a file
+
+    /// Execute commands from an instruction file
+    #[command(about = "Execute commands from an instruction file")]
     Run {
-        #[arg(short, long)]
+        /// Path to instruction file containing commands
+        #[arg(
+            short,
+            long,
+            required = true,
+            value_name = "FILE",
+            help = "Path to instruction file containing commands",
+        )]
         instructions: Option<String>,
-        #[arg(short = 't', long = "text")]
-        input_text: Option<String>,
-        #[arg(short, long)]
+
+        /// Configuration profile to use
+        #[arg(
+            short,
+            long,
+            value_name = "PROFILE",
+            help = "Configuration profile to use (e.g., 'default')",
+            long_help = "Use a specific configuration profile. Profiles contain settings like API keys and model preferences."
+        )]
         profile: Option<String>,
-        #[arg(short, long)]
+
+        /// Input text containing commands
+        #[arg(
+          short = 't',
+          long = "text",
+          value_name = "TEXT",
+          help = "Input text to provide to Goose directly",
+          long_help = "Input text containing commands for Goose. Use this in lieu of the instructions argument."
+        )]
+        input_text: Option<String>,
+
+        /// Name for this run session
+        #[arg(
+            short,
+            long,
+            value_name = "NAME",
+            help = "Name for this run session (e.g., 'daily-tasks')",
+            long_help = "Specify a name for this run session. This helps identify and resume specific runs later."
+        )]
         session: Option<String>,
-        #[arg(short, long, action = clap::ArgAction::SetTrue)]
+
+        /// Resume a previous run
+        #[arg(
+            short,
+            long,
+            action = clap::ArgAction::SetTrue,
+            help = "Resume from a previous run",
+            long_help = "Continue from a previous run, maintaining the execution state and context."
+        )]
         resume: bool,
     },
 }
 
 #[derive(Subcommand)]
 enum SystemCommands {
+    /// Add a new system prompt
+    #[command(about = "Add a new system prompt from URL")]
     Add {
-        #[arg(help = "The URL to add system")]
+        #[arg(
+            help = "URL of the system prompt to add",
+            long_help = "URL pointing to a file containing the system prompt to be added."
+        )]
         url: String,
     },
+
+    /// Remove an existing system prompt
+    #[command(about = "Remove an existing system prompt")]
     Remove {
-        #[arg(help = "The URL to remove system")]
+        #[arg(
+            help = "URL of the system prompt to remove",
+            long_help = "URL of the system prompt that should be removed from the configuration."
+        )]
         url: String,
     },
 }
