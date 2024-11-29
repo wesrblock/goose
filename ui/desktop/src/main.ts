@@ -11,8 +11,6 @@ import { listRecentPaths } from './utils/getRecentPaths';
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
 
-console.log(listRecentPaths('micn'));
-
 declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
 
@@ -20,7 +18,7 @@ const checkApiCredentials = () => {
 
   loadZshEnv(app.isPackaged);
 
-  //{env-macro-start}//  
+  //{env-macro-start}//
   const isDatabricksConfigValid =
     process.env.GOOSE_PROVIDER__TYPE === 'databricks' &&
     process.env.GOOSE_PROVIDER__HOST &&
@@ -36,7 +34,7 @@ const checkApiCredentials = () => {
   //{env-macro-end}//
 };
 
-let appConfig = { 
+let appConfig = {
   apiCredsMissing: !checkApiCredentials(),
   GOOSE_API_HOST: 'http://127.0.0.1',
   GOOSE_SERVER__PORT: 0,
@@ -90,7 +88,7 @@ const windowMap = new Map<number, BrowserWindow>();
 
 const createChat = async (app, query?: string) => {
 
-  const port = await startGoosed(app);  
+  const port = await startGoosed(app);
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 10 },
@@ -204,7 +202,7 @@ const showWindow = () => {
 
 app.whenReady().then(async () => {
   // Load zsh environment variables in production mode only
-  
+
   createTray();
   createChat(app);
 
@@ -242,6 +240,21 @@ app.whenReady().then(async () => {
     console.log("NOTIFY", data);
     new Notification({ title: data.title, body: data.body }).show();
   });
+
+  ipcMain.on('list-recent', (_) => {
+    return listRecentPaths();
+  });
+
+  // Handle metadata fetching from main process
+  ipcMain.handle('list-recent', async (_) => {
+    try {
+      return listRecentPaths();
+    } catch (error) {
+      console.error('Error looking up recent dirs:', error);
+      throw error;
+    }
+  });
+
 
   ipcMain.on('logInfo', (_, info) => {
     log.info("from renderer:", info);
@@ -287,4 +300,3 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-
