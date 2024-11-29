@@ -1,6 +1,7 @@
 import React from 'react';
 import GooseSplashLogo from './GooseSplashLogo';
 import SplashPills from './SplashPills';
+import SplashDirs from './SplashDirs';
 import Spacer from './ui/spacer';
 
 export default function Splash({ append }) {
@@ -25,8 +26,9 @@ export default function Splash({ append }) {
         What can goose do?
       </div>
       <div className="flex flex-1" />
-      <div className="flex items-center">
+      <div className="flex flex-col items-center gap-4">
         <SplashPills append={append} />
+        <SplashDirs append={append} />
       </div>
     </div>
   )
