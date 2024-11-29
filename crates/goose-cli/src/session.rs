@@ -1,4 +1,5 @@
 use anyhow::Result;
+use core::panic;
 use futures::StreamExt;
 use serde_json;
 use std::fs::{self, File};
@@ -255,12 +256,24 @@ We've removed the conversation up to the most recent user message
             // Default behavior for non-tool interruptions, remove the last user message
             if let Some(last_msg) = self.messages.last() {
                 if last_msg.role == Role::User {
-                    self.messages.pop();
+                    match last_msg.content.first() {
+                        Some(MessageContent::ToolResponse(_)) => {
+                            // Interruption occurred after a tool had completed but not assistant reply
+                            let prompt_response = "We interrupted the existing calls to tools. How would you like to proceed?";
+                            self.messages
+                                .push(Message::assistant().with_text(prompt_response));
+                            self.prompt.render(raw_message(prompt_response));
+                        }
+                        Some(_) => {
+                            // A real users message
+                            self.messages.pop();
+                            let prompt_response = "We interrupted before the model replied and removed the last message.";
+                            self.prompt.render(raw_message(prompt_response));
+                        }
+                        None => panic!("No content in last message"),
+                    }
                 }
             }
-            let prompt_response =
-                "We interrupted before the model replied and removed the last message.";
-            self.prompt.render(raw_message(prompt_response));
         }
     }
 
@@ -653,6 +666,64 @@ mod tests {
                 tool_name2
             )
             .as_str(),
+        );
+    }
+
+    #[test]
+    fn test_interrupted_tool_use_interrupts_completed_tool_result_but_no_assistant_msg_yet() {
+        let tool_name1 = "test";
+        let tool_call1 = tool::ToolCall::new(tool_name1, "test".into());
+        let tool_result1 = AgentResult::Ok(vec![Content::text("Task 1 done")]);
+
+        let mut session = create_test_session_with_prompt(Box::new(MockPrompt::new()));
+        session
+            .messages
+            .push(Message::user().with_text("Do something"));
+        session.messages.push(
+            Message::assistant()
+                .with_text("Doing part 1")
+                .with_tool_request("1", Ok(tool_call1.clone())),
+        );
+        session
+            .messages
+            .push(Message::user().with_tool_response("1", tool_result1.clone()));
+
+        session.handle_interrupted_messages();
+
+        assert_eq!(session.messages.len(), 4);
+        assert_eq!(session.messages[0].role, Role::User);
+        assert_eq!(
+            session.messages[0].content[0],
+            MessageContent::text("Do something")
+        );
+        assert_eq!(session.messages[1].role, Role::Assistant);
+        assert_eq!(
+            session.messages[1].content[0],
+            MessageContent::text("Doing part 1")
+        );
+        assert_eq!(
+            session.messages[1].content[1],
+            MessageContent::tool_request("1", Ok(tool_call1))
+        );
+
+        assert_eq!(session.messages[2].role, Role::User);
+        assert_eq!(
+            session.messages[2].content[0],
+            MessageContent::tool_response("1", tool_result1.clone())
+        );
+
+        // Check the follow-up assistant message
+        assert_eq!(session.messages[3].role, Role::Assistant);
+        assert_eq!(
+            session.messages[3].content[0],
+            MessageContent::text(
+                "We interrupted the existing calls to tools. How would you like to proceed?",
+            )
+        );
+
+        assert_last_prompt_text(
+            &session,
+            "We interrupted the existing calls to tools. How would you like to proceed?",
         );
     }
 
