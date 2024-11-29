@@ -126,8 +126,6 @@ enum Command {
             required = true,
             value_name = "FILE",
             help = "Path to instruction file containing commands",
-            long_help = "Path to a file containing commands to execute. Each command should be on a new line. \
-                        The file will be executed in order from top to bottom."
         )]
         instructions: Option<String>,
 
