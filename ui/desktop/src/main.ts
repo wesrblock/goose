@@ -6,9 +6,12 @@ import { findAvailablePort, startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
 import log from './utils/logger';
 import { exec } from 'child_process';
+import { listRecentPaths } from './utils/getRecentPaths';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
+
+console.log(listRecentPaths('micn'));
 
 declare var MAIN_WINDOW_VITE_DEV_SERVER_URL: string;
 declare var MAIN_WINDOW_VITE_NAME: string;
