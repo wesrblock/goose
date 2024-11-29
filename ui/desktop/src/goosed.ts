@@ -1,10 +1,9 @@
 import path from 'node:path';
-import { execSync, spawn } from 'child_process';
-import { existsSync } from 'fs';
+import { spawn } from 'child_process';
 import log from './utils/logger';
 import os from 'node:os';
 import { createServer } from 'net';
-import { loadZshEnv } from './utils/loadEnv';
+
 
 
 // Find an available port to start goosed on
