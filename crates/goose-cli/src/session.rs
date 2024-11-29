@@ -225,9 +225,9 @@ We've removed the conversation up to the most recent user message
                     .collect()
             });
 
-        // Handle the interruption based on whether we were in a tool request
         if !tool_requests.is_empty() {
-            // Create a message with tool responses for all interrupted requests
+            // Interrupted during a tool request
+            // Create tool responses for all interrupted tool requests
             let mut response_message = Message::user();
             let last_tool_name = tool_requests
                 .last()
@@ -244,7 +244,6 @@ We've removed the conversation up to the most recent user message
             }
             self.messages.push(response_message);
 
-            // Add assistant message about the interruption using the last tool name
             let prompt_response = &format!(
                 "We interrupted the existing call to {}. How would you like to proceed?",
                 last_tool_name
@@ -253,7 +252,7 @@ We've removed the conversation up to the most recent user message
                 .push(Message::assistant().with_text(prompt_response));
             self.prompt.render(raw_message(prompt_response));
         } else {
-            // Default behavior for non-tool interruptions, remove the last user message
+            // An interruption occurred outside of a tool request-response.
             if let Some(last_msg) = self.messages.last() {
                 if last_msg.role == Role::User {
                     match last_msg.content.first() {
