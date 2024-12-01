@@ -14,6 +14,8 @@ import LoadingGoose from './components/LoadingGoose';
 import { ApiKeyWarning } from './components/ApiKeyWarning';
 // import fakeToolInvocations from './fixtures/tool-calls-and-results.json';
 
+type DirectoryState = 'undecided' | 'default' | string;
+
 export interface Chat {
   id: number;
   title: string;
@@ -61,6 +63,7 @@ function ChatContent({
   setProgressMessage,
   setWorking,
   setDirectory,
+  directory,
 }: {
   chats: Chat[];
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
@@ -69,6 +72,8 @@ function ChatContent({
   initialQuery: string | null;
   setProgressMessage: React.Dispatch<React.SetStateAction<string>>;
   setWorking: React.Dispatch<React.SetStateAction<Working>>;
+  setDirectory: React.Dispatch<React.SetStateAction<DirectoryState>>;
+  directory: DirectoryState;
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
 
@@ -159,7 +164,7 @@ function ChatContent({
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
         {messages.length === 0 ? (
-          <Splash append={append} setDirectory={setDirectory} />
+          <Splash append={append} setDirectory={setDirectory} directory={directory} />
         ) : (
           <ScrollArea className="flex-1 px-[10px]" id="chat-scroll-area">
             <div className="block h-10" />
@@ -338,6 +343,7 @@ export default function ChatWindow() {
                     setProgressMessage={setProgressMessage}
                     setWorking={setWorking}
                     setDirectory={setDirectory}
+                    directory={directory}
                   />
                 }
               />

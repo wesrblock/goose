@@ -260,7 +260,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('start-goosed', async (_, dir) => {
-    const port = await startGoosed(app);
+    const port = await startGoosed(app, dir);
     return port;
   });
 
