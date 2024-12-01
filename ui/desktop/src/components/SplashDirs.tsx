@@ -1,15 +1,11 @@
 import React, { useEffect, useState } from "react"
 
-function DirectoryPill({ path, append }) {
+function DirectoryPill({ path, setDirectory }) {
   return (
     <div
       className="px-16 py-4 text-14 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-splash-pills hover:bg-splash-pills/90 hover:scale-[1.02] rounded-lg inline-block transition-all duration-150 truncate max-w-full"
       onClick={async () => {
-        const message = {
-          content: `cd ${path}`,
-          role: "user",
-        };
-        await append(message);
+        setDirectory(path);
       }}
       title={path}
     >
@@ -18,7 +14,7 @@ function DirectoryPill({ path, append }) {
   )
 }
 
-export default function SplashDirs({ append }) {
+export default function SplashDirs({ setDirectory }) {
   const [recentDirs, setRecentDirs] = useState<string[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const maxDisplayedDirs = 3;
@@ -68,7 +64,7 @@ export default function SplashDirs({ append }) {
         }}
       >
         {displayedDirs.map((dir, index) => (
-          <DirectoryPill key={index} path={dir} append={append} />
+          <DirectoryPill key={index} path={dir} setDirectory={setDirectory} />
         ))}
       </div>
     </div>
