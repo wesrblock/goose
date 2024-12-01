@@ -36,7 +36,7 @@ export default function Splash({ append, setDirectory, directory }: SplashProps)
       </div>
       <div className="flex flex-1" />
       <div className="flex flex-col items-center gap-4">
-        <SplashPills append={append} />
+        <SplashPills append={append} setDirectory={setDirectory} />
         {directory === 'undecided' && <SplashDirs setDirectory={setDirectory} />}
       </div>
     </div>
