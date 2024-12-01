@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld('electron', {
   createWingToWingWindow: (query) => ipcRenderer.send('create-wing-to-wing-window', query),
   openInChrome: (url) => ipcRenderer.send('open-in-chrome', url),
   fetchMetadata: (url) => ipcRenderer.invoke('fetch-metadata', url),
+  startGoosed: (dir) => ipcRenderer.invoke('start-goosed', dir),
 })
