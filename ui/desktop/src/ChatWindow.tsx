@@ -215,33 +215,53 @@ function ChatContent({
 }
 
 export default function ChatWindow() {
-  // State for managing Goosed initialization
+  // Type for directory state management
+  type DirectoryState = 'undecided' | 'default' | string;
+
+  // State for managing Goosed initialization and directory
   const [isGoosedStarted, setIsGoosedStarted] = useState(false);
+  const [directory, setDirectory] = useState<DirectoryState>(window.appConfig.get("GOOSE_DIR"));
 
   // Function to initialize Goosed
   const initializeGoosed = useCallback(async () => {
-    window.electron.logInfo('Initializing Goosed...');
-    if (!isGoosedStarted) {
-      try {
-        window.electron.logInfo('Starting Goosed server...');
+    window.electron.logInfo('Initializing Goosed...', { directory, isGoosedStarted });
+    if (isGoosedStarted) {
+      window.electron.logInfo('Goosed already started');
+      return;
+    }
+
+    if (directory === 'undecided') {
+      window.electron.logInfo('Waiting for directory state to be determined');
+      return;
+    }
+
+    try {
+      if (directory === 'default') {
+        window.electron.logInfo('Starting Goosed server with default directory...');
         const port = await window.electron.startGoosed();
         window.electron.logInfo(`Goosed started successfully on port ${port}`);
         window.goosedPort = port;
         setIsGoosedStarted(true);
-      } catch (error) {
-        console.log('Failed to start Goosed:', error);
-        console.error('Failed to start Goosed:', error);
+      } else {
+        window.electron.logInfo(`Starting Goosed server for directory: ${directory}...`);
+        const port = await window.electron.startGoosed(directory);
+        window.electron.logInfo(`Goosed started successfully on port ${port}`);
+        window.goosedPort = port;
+        setIsGoosedStarted(true);
       }
-    } else {
-      window.electron.logInfo('Goosed already started');
+    } catch (error) {
+      console.log('Failed to start Goosed:', error);
+      console.error('Failed to start Goosed:', error);
     }
-  }, [isGoosedStarted]);
+  }, [isGoosedStarted, directory]);
 
-  // Initialize Goosed when needed (for now, we'll do it on component mount)
-  // Initialize Goosed when needed (for now, we'll do it on component mount)
+  // Initialize Goosed only when directory state is determined
   useEffect(() => {
-    initializeGoosed();
-  }, [initializeGoosed]);
+    // Only initialize if directory is set and Goosed hasn't started
+    if (directory !== 'undecided' && !isGoosedStarted) {
+      initializeGoosed();
+    }
+  }, [directory, initializeGoosed, isGoosedStarted]);
 
   // Shared function to create a chat window
   const openNewChatWindow = () => {
