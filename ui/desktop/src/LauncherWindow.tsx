@@ -2,9 +2,12 @@ import React, { useState, useRef } from 'react';
 
 declare global {
   interface Window {
+    goosedPort: number;
     electron: {
       hideWindow: () => void;
-      createChatWindow: (query: string) => void;
+      createChatWindow: (query?: string) => void;
+      startGoosed: (dir?: string) => number;
+      logInfo: (info: string) => void;
     };
   }
 }

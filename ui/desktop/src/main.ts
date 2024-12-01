@@ -37,7 +37,6 @@ const checkApiCredentials = () => {
 let appConfig = {
   apiCredsMissing: !checkApiCredentials(),
   GOOSE_API_HOST: 'http://127.0.0.1',
-  GOOSE_SERVER__PORT: 0,
 };
 
 const createLauncher = () => {
@@ -86,9 +85,8 @@ const createLauncher = () => {
 let windowCounter = 0;
 const windowMap = new Map<number, BrowserWindow>();
 
-const createChat = async (app, query?: string) => {
+const createChat = async (_, query?: string) => {
 
-  const port = await startGoosed(app);
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 10 },
@@ -101,7 +99,7 @@ const createChat = async (app, query?: string) => {
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [JSON.stringify({ ...appConfig, GOOSE_SERVER__PORT: port })],
+      additionalArguments: [JSON.stringify({ ...appConfig })],
     },
   });
 
@@ -258,6 +256,11 @@ app.whenReady().then(async () => {
 
   ipcMain.on('logInfo', (_, info) => {
     log.info("from renderer:", info);
+  });
+
+  ipcMain.handle('start-goosed', async (_, dir) => {
+    const port = await startGoosed(app);
+    return port;
   });
 
   // Handle metadata fetching from main process

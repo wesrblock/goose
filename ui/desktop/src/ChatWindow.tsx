@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useChat } from './ai-sdk-fork/useChat';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { getApiUrl } from './config';
@@ -215,6 +215,34 @@ function ChatContent({
 }
 
 export default function ChatWindow() {
+  // State for managing Goosed initialization
+  const [isGoosedStarted, setIsGoosedStarted] = useState(false);
+
+  // Function to initialize Goosed
+  const initializeGoosed = useCallback(async () => {
+    window.electron.logInfo('Initializing Goosed...');
+    if (!isGoosedStarted) {
+      try {
+        window.electron.logInfo('Starting Goosed server...');
+        const port = await window.electron.startGoosed();
+        window.electron.logInfo(`Goosed started successfully on port ${port}`);
+        window.goosedPort = port;
+        setIsGoosedStarted(true);
+      } catch (error) {
+        console.log('Failed to start Goosed:', error);
+        console.error('Failed to start Goosed:', error);
+      }
+    } else {
+      window.electron.logInfo('Goosed already started');
+    }
+  }, [isGoosedStarted]);
+
+  // Initialize Goosed when needed (for now, we'll do it on component mount)
+  // Initialize Goosed when needed (for now, we'll do it on component mount)
+  useEffect(() => {
+    initializeGoosed();
+  }, [initializeGoosed]);
+
   // Shared function to create a chat window
   const openNewChatWindow = () => {
     window.electron.createChatWindow();
