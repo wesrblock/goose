@@ -4,7 +4,15 @@ import SplashPills from './SplashPills';
 import SplashDirs from './SplashDirs';
 import Spacer from './ui/spacer';
 
-export default function Splash({ append, setDirectory }) {
+type DirectoryState = 'undecided' | 'default' | string;
+
+interface SplashProps {
+  append: (message: any) => Promise<void>;
+  setDirectory: (dir: DirectoryState) => void;
+  directory?: DirectoryState;
+}
+
+export default function Splash({ append, setDirectory, directory }: SplashProps) {
   return (
     <div className="h-full flex flex-col items-center justify-center">
       <div className="flex flex-1" />
@@ -28,9 +36,8 @@ export default function Splash({ append, setDirectory }) {
       <div className="flex flex-1" />
       <div className="flex flex-col items-center gap-4">
         <SplashPills append={append} />
-        <SplashDirs setDirectory={setDirectory} />
+        {directory === 'undecided' && <SplashDirs setDirectory={setDirectory} />}
       </div>
     </div>
   )
 }
-
