@@ -4,7 +4,7 @@ import SplashPills from './SplashPills';
 import SplashDirs from './SplashDirs';
 import Spacer from './ui/spacer';
 
-export default function Splash({ append }) {
+export default function Splash({ append, setDirectory }) {
   return (
     <div className="h-full flex flex-col items-center justify-center">
       <div className="flex flex-1" />
@@ -28,7 +28,7 @@ export default function Splash({ append }) {
       <div className="flex flex-1" />
       <div className="flex flex-col items-center gap-4">
         <SplashPills append={append} />
-        <SplashDirs append={append} />
+        <SplashDirs setDirectory={setDirectory} />
       </div>
     </div>
   )

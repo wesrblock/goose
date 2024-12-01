@@ -88,7 +88,6 @@ const windowMap = new Map<number, BrowserWindow>();
 
 const createChat = async (_, query?: string, dir:string="undecided") => {
 
-  dir = 'default';
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 10 },

@@ -5,6 +5,7 @@ declare global {
     goosedPort: number;
     electron: {
       hideWindow: () => void;
+      listRecent: () => Promise<string[]>;
       createChatWindow: (query?: string) => void;
       startGoosed: (dir?: string) => number;
       logInfo: (info: string) => void;

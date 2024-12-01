@@ -60,6 +60,7 @@ function ChatContent({
   initialQuery,
   setProgressMessage,
   setWorking,
+  setDirectory,
 }: {
   chats: Chat[];
   setChats: React.Dispatch<React.SetStateAction<Chat[]>>;
@@ -140,9 +141,6 @@ function ChatContent({
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <div className="relative block h-[20px] w-screen">
         <MoreMenu
-          onStopGoose={() => {
-            stop();
-          }}
           onClearContext={() => {
             append({
               id: Date.now().toString(),
@@ -161,7 +159,7 @@ function ChatContent({
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
         {messages.length === 0 ? (
-          <Splash append={append} />
+          <Splash append={append} setDirectory={setDirectory} />
         ) : (
           <ScrollArea className="flex-1 px-[10px]" id="chat-scroll-area">
             <div className="block h-10" />
@@ -261,10 +259,6 @@ export default function ChatWindow() {
     }
   }, [directory, initializeGoosed, isGoosedStarted]);
 
-  // Shared function to create a chat window
-  const openNewChatWindow = () => {
-    window.electron.createChatWindow();
-  };
 
   // Add keyboard shortcut handler
   useEffect(() => {
@@ -272,7 +266,7 @@ export default function ChatWindow() {
       // Check for Command+N (Mac) or Control+N (Windows/Linux)
       if ((event.metaKey || event.ctrlKey) && event.key === 'n') {
         event.preventDefault(); // Prevent default browser behavior
-        openNewChatWindow();
+        window.electron.createChatWindow();
       }
     };
 
@@ -343,6 +337,7 @@ export default function ChatWindow() {
                     initialQuery={initialQuery}
                     setProgressMessage={setProgressMessage}
                     setWorking={setWorking}
+                    setDirectory={setDirectory}
                   />
                 }
               />
