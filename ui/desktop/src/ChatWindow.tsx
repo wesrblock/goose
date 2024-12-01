@@ -224,7 +224,7 @@ export default function ChatWindow() {
 
   // Function to initialize Goosed
   const initializeGoosed = useCallback(async () => {
-    window.electron.logInfo('Initializing Goosed...', { directory, isGoosedStarted });
+    window.electron.logInfo(`Initializing Goosed...${directory} `);
     if (isGoosedStarted) {
       window.electron.logInfo('Goosed already started');
       return;
@@ -238,15 +238,13 @@ export default function ChatWindow() {
     try {
       if (directory === 'default') {
         window.electron.logInfo('Starting Goosed server with default directory...');
-        const port = await window.electron.startGoosed();
-        window.electron.logInfo(`Goosed started successfully on port ${port}`);
-        window.goosedPort = port;
+        window.goosedPort = await window.electron.startGoosed();
+        window.electron.logInfo(`Goosed started successfully on port ${window.goosedPort}`);
         setIsGoosedStarted(true);
       } else {
         window.electron.logInfo(`Starting Goosed server for directory: ${directory}...`);
-        const port = await window.electron.startGoosed(directory);
-        window.electron.logInfo(`Goosed started successfully on port ${port}`);
-        window.goosedPort = port;
+        window.goosedPort = await window.electron.startGoosed(directory);
+        window.electron.logInfo(`Goosed started successfully on port ${window.goosedPort}`);
         setIsGoosedStarted(true);
       }
     } catch (error) {
