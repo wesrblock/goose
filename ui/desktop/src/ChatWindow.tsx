@@ -132,6 +132,7 @@ function ChatContent({
     console.log('Error:', error);
   }
 
+  // if user starts typing without having picked a dir, we set to default
   const inputChangeHandler = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (!window.goosedPort) {
       await setDirectory("default");
