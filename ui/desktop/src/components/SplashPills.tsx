@@ -6,7 +6,7 @@ function SplashPill({ content, append, setDirectory }) {
       className="px-16 py-8 text-14 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-splash-pills hover:bg-splash-pills/90 hover:scale-[1.02] rounded-lg inline-block transition-all duration-150"
       onClick={async () => {
         if (!window.goosedPort) {
-         setDirectory("default");
+         await setDirectory("default");
         }
         const message = {
           content,
