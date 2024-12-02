@@ -3,10 +3,11 @@ import React, { useState, useRef } from 'react';
 declare global {
   interface Window {
     goosedPort: number;
+    directory?: string;
     electron: {
       hideWindow: () => void;
       listRecent: () => Promise<string[]>;
-      createChatWindow: (query?: string) => void;
+      createChatWindow: (query?: string, dir?: string) => void;
       startGoosed: (dir?: string) => number;
       logInfo: (info: string) => void;
     };
@@ -20,8 +21,10 @@ export default function SpotlightWindow() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
+      const dir = window.appConfig.get("GOOSE_DIR");
+      window.electron.logInfo('launcher dir ' + dir);
       // Create a new chat window with the query
-      window.electron.createChatWindow(query);
+      window.electron.createChatWindow(query, dir);
       setQuery('');
       inputRef.current.blur()
     }

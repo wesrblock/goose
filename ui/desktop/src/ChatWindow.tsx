@@ -241,11 +241,13 @@ export default function ChatWindow() {
         window.electron.logInfo('Starting Goosed server with default directory...');
         window.goosedPort = await window.electron.startGoosed();
         window.electron.logInfo(`Goosed started successfully on port ${window.goosedPort}`);
+        window.directory = 'default';
         console.log("Goosed started successfully on port (from window)", window.goosedPort);
         setIsGoosedStarted(true);
       } else {
         window.electron.logInfo(`Starting Goosed server for directory: ${directory}...`);
         window.goosedPort = await window.electron.startGoosed(directory);
+        window.directory = directory;
         window.electron.logInfo(`Goosed started successfully on port ${window.goosedPort}`);
         setIsGoosedStarted(true);
       }
