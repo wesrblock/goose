@@ -115,7 +115,7 @@ function ToolResult({ result }: ToolResultProps) {
   };
 
   return (
-    <div className="mt-2 pt-2 border-t border-gray-200">
+    <div className="mt-2 pt-2">
       {filteredResults.map((item: ResultItem, index: number) => {
         const isExpanded = shouldShowExpanded(item, index);
         const shouldMinimize = item.priority !== undefined && item.priority < 0.5;
