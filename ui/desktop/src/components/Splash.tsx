@@ -24,6 +24,9 @@ export default function Splash({ append, setDirectory, directory }: SplashProps)
       <div
         className="w-[312px] px-16 py-4 text-14 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-prev-goose-gradient text-prev-goose-text rounded-[14px] inline-block hover:scale-[1.02] transition-all duration-150"
         onClick={async () => {
+          if (!window.goosedPort) {
+            await setDirectory("default");
+           }          
           const message = {
             content: "What can Goose do?",
             role: "user",

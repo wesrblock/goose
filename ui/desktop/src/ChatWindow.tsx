@@ -28,6 +28,22 @@ export interface Chat {
 }
 
 
+// Custom fetch implementation
+const customFetch = async (
+  input: string | URL | globalThis.Request,
+  init?: RequestInit
+): Promise<Response> => {
+  // Dynamically look up the API URL for every call
+  let dynamicUrl = getApiUrl('/reply');
+  if (!window.goosedPort) {
+    // pause a sec to let goose start
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    dynamicUrl = getApiUrl('/reply');
+  }
+  // Pass through the request options unchanged
+  return globalThis.fetch(dynamicUrl, init);
+};
+
 function ChatContent({
   chats,
   setChats,
@@ -63,7 +79,6 @@ function ChatContent({
     isLoading,
     error,
   } = useChat({
-    api: getApiUrl('/reply'),
     initialMessages: chat?.messages || [],
     onToolCall: ({ toolCall }) => {
       setWorking(Working.Working);
@@ -78,6 +93,7 @@ function ChatContent({
         setWorking(Working.Working);
       }
     },
+    fetch: customFetch,
     onFinish: async (message, options) => {
       setProgressMessage('Task finished. Click here to expand.');
       setWorking(Working.Idle);
@@ -217,6 +233,7 @@ export default function ChatWindow() {
         window.electron.logInfo('Starting Goosed server with default directory...');
         window.goosedPort = await window.electron.startGoosed();
         window.electron.logInfo(`Goosed started successfully on port ${window.goosedPort}`);
+        console.log("Goosed started successfully on port (from window)", window.goosedPort);
         setIsGoosedStarted(true);
       } else {
         window.electron.logInfo(`Starting Goosed server for directory: ${directory}...`);
