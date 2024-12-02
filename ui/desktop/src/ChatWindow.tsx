@@ -132,6 +132,13 @@ function ChatContent({
     console.log('Error:', error);
   }
 
+  const inputChangeHandler = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (!window.goosedPort) {
+      await setDirectory("default");
+     }
+    return handleInputChange(e);
+  }
+
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <div className="relative block h-[20px] w-screen">
@@ -196,7 +203,7 @@ function ChatContent({
 
         <Input
           handleSubmit={handleSubmit}
-          handleInputChange={handleInputChange}
+          handleInputChange={inputChangeHandler}
           input={input}
           disabled={isLoading}
           isLoading={isLoading}
