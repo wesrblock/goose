@@ -89,7 +89,7 @@ function ChatContent({
     isLoading,
     error,
   } = useChat({
-    api: getApiUrl('/reply', setDirectory),
+    api: getApiUrl('/reply'),
     initialMessages: chat?.messages || [],
     onToolCall: ({ toolCall }) => {
       setWorking(Working.Working);
