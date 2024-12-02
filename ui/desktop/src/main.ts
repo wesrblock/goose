@@ -40,7 +40,19 @@ let appConfig = {
   GOOSE_DIR: null,
 };
 
-const createLauncher = () => {
+const createLauncher = async () => {
+  const focussed = BrowserWindow.getFocusedWindow();
+
+  // we always want launcher to have a default
+  let dir = "default";
+  try {
+    // Attempt to fetch directory from the focused window via webContents
+    dir = await focussed.webContents.executeJavaScript('window.directory || "default"');
+    console.log("Focused window has directory:", dir);
+  } catch (error) {
+    console.error("Failed to fetch directory from focused window. Using default value.", error);
+  }    
+  console.log("focussed window has directory", dir);
   const launcherWindow = new BrowserWindow({
     width: 600,
     height: 60,
@@ -48,7 +60,7 @@ const createLauncher = () => {
     transparent: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [JSON.stringify(appConfig)],
+      additionalArguments: [JSON.stringify({ ...appConfig, GOOSE_DIR: dir })],
     },
     skipTaskbar: true,
     alwaysOnTop: true,
@@ -211,9 +223,10 @@ app.whenReady().then(async () => {
   // Preserve existing menu and add new items
   const menu = Menu.getApplicationMenu();
   const fileMenu = menu?.items.find(item => item.label === 'File');
-
+  
   // Add 'New Chat Window' to File menu
-  if (fileMenu && fileMenu.submenu) {
+  if (fileMenu && fileMenu.submenu) {    
+    
     fileMenu.submenu.append(new MenuItem({
       label: 'New Chat Window',
       accelerator: 'CmdOrCtrl+N',
@@ -231,8 +244,8 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.on('create-chat-window', (_, query) => {
-    createChat(app, query);
+  ipcMain.on('create-chat-window', (_, query, dir) => {
+    createChat(app, query, dir);
   });
 
   ipcMain.on('notify', (event, data) => {
