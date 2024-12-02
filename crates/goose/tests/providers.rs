@@ -20,9 +20,9 @@ struct ProviderTester {
 }
 
 impl ProviderTester {
-    fn new(config: ProviderConfig) -> Result<Self> {
+    async fn new(config: ProviderConfig) -> Result<Self> {
         Ok(Self {
-            provider: get_provider(config)?,
+            provider: get_provider(config).await?,
         })
     }
 
@@ -121,7 +121,7 @@ async fn test_openai_provider() -> Result<()> {
         max_tokens: None,
     });
 
-    let tester = ProviderTester::new(config)?;
+    let tester = ProviderTester::new(config).await?;
     tester.run_test_suite().await?;
 
     Ok(())
@@ -149,7 +149,7 @@ async fn test_databricks_provider() -> Result<()> {
         image_format: goose::providers::utils::ImageFormat::Anthropic,
     });
 
-    let tester = ProviderTester::new(config)?;
+    let tester = ProviderTester::new(config).await?;
     tester.run_test_suite().await?;
 
     Ok(())
@@ -174,7 +174,7 @@ async fn test_databricks_provider_oauth() -> Result<()> {
         image_format: goose::providers::utils::ImageFormat::Anthropic,
     });
 
-    let tester = ProviderTester::new(config)?;
+    let tester = ProviderTester::new(config).await?;
     tester.run_test_suite().await?;
 
     Ok(())
@@ -198,7 +198,7 @@ async fn test_ollama_provider() -> Result<()> {
         max_tokens: None,
     });
 
-    let tester = ProviderTester::new(config)?;
+    let tester = ProviderTester::new(config).await?;
     tester.run_test_suite().await?;
 
     Ok(())

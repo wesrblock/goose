@@ -12,11 +12,11 @@ pub enum ProviderType {
     Ollama,
 }
 
-pub fn get_provider(config: ProviderConfig) -> Result<Box<dyn Provider + Send + Sync>> {
+pub async fn get_provider(config: ProviderConfig) -> Result<Box<dyn Provider + Send + Sync>> {
     match config {
         ProviderConfig::OpenAi(openai_config) => Ok(Box::new(OpenAiProvider::new(openai_config)?)),
         ProviderConfig::Databricks(databricks_config) => {
-            Ok(Box::new(DatabricksProvider::new(databricks_config)?))
+            Ok(Box::new(DatabricksProvider::new(databricks_config).await?))
         }
         ProviderConfig::Ollama(ollama_config) => Ok(Box::new(OllamaProvider::new(ollama_config)?)),
     }

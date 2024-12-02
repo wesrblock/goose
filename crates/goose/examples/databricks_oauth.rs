@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
     let config = ProviderConfig::Databricks(DatabricksProviderConfig::with_oauth(host, model));
 
     // Create the provider
-    let provider = get_provider(config)?;
+    let provider = get_provider(config).await?;
 
     // Create a simple message
     let message = Message::user().with_text("Tell me a short joke about programming.");

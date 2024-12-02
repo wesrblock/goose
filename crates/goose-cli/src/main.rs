@@ -231,7 +231,7 @@ async fn main() -> Result<()> {
             resume,
         }) => {
             let mut session = build_session(session, profile, resume);
-            let _ = session.start().await;
+            let _ = session.await.start().await;
             return Ok(());
         }
         Some(Command::Run {
@@ -254,7 +254,7 @@ async fn main() -> Result<()> {
                 stdin
             };
             let mut session = build_session(session, profile, resume);
-            let _ = session.headless_start(contents.clone()).await;
+            let _ = session.await.headless_start(contents.clone()).await;
             return Ok(());
         }
         None => {

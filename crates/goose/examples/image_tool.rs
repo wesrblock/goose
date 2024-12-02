@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
 
     for config in [config1, config2] {
         // Create the provider
-        let provider = get_provider(config)?;
+        let provider = get_provider(config).await?;
 
         // Read and encode test image
         let image_data = fs::read("crates/goose/examples/test_assets/test_image.png")?;

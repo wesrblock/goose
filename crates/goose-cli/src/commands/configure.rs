@@ -41,7 +41,7 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
 async fn check_configuration(provider_config: ProviderConfig) -> Result<(), Box<dyn Error>> {
     let spin = spinner();
     spin.start("Now let's check your configuration...");
-    let provider = factory::get_provider(provider_config).unwrap();
+    let provider = factory::get_provider(provider_config).await.unwrap();
     let message = Message::user().with_text("Please give a nice welcome messsage (one sentence) and let them know they are all set to use this agent");
     let result = provider.complete(
                                    "You are an AI agent called Goose. You use tools of connected systems to solve problems.",

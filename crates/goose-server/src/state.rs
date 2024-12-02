@@ -14,8 +14,8 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(provider_config: ProviderConfig) -> Result<Self> {
-        let provider = factory::get_provider(provider_config.clone())?;
+    pub async fn new(provider_config: ProviderConfig) -> Result<Self> {
+        let provider = factory::get_provider(provider_config.clone()).await?;
         let mut agent = Agent::new(provider);
         agent.add_system(Box::new(DeveloperSystem::new()));
 

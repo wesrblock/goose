@@ -20,12 +20,16 @@ pub struct DatabricksProvider {
 }
 
 impl DatabricksProvider {
-    pub fn new(config: DatabricksProviderConfig) -> Result<Self> {
+    pub async fn new(config: DatabricksProviderConfig) -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(600)) // 10 minutes timeout
             .build()?;
 
-        Ok(Self { client, config })
+        let dp = Self { client, config };
+
+        dp.ensure_auth_header().await.expect("Failed to get auth token");
+
+        Ok(dp)
     }
 
     async fn ensure_auth_header(&self) -> Result<String> {
@@ -223,7 +227,7 @@ mod tests {
             image_format: crate::providers::utils::ImageFormat::Anthropic,
         };
 
-        let provider = DatabricksProvider::new(config)?;
+        let provider = DatabricksProvider::new(config).await?;
 
         // Prepare input
         let messages = vec![Message::user().with_text("Hello")];

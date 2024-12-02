@@ -14,7 +14,7 @@ use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::Prompt;
 use crate::session::{ensure_session_dir, Session};
 
-pub fn build_session<'a>(
+pub async fn build_session<'a>(
     session: Option<String>,
     profile: Option<String>,
     resume: bool,
@@ -45,7 +45,7 @@ pub fn build_session<'a>(
         set_provider_config(&loaded_profile.provider, loaded_profile.model.clone());
 
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
-    let provider = factory::get_provider(provider_config).unwrap();
+    let provider = factory::get_provider(provider_config).await.unwrap();
     let agent = Box::new(Agent::new(provider));
     let prompt = match std::env::var("GOOSE_INPUT") {
         Ok(val) => match val.as_str() {
