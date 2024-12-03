@@ -23,7 +23,6 @@ export default function Input({
   const [value, setValue] = useState(input);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Ensure focus is maintained
   useEffect(() => {
     if (textAreaRef.current && !disabled) {
       textAreaRef.current.focus();
