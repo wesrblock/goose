@@ -8,7 +8,7 @@ use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
 use crate::models::tool::Tool;
 use crate::models::tool::ToolCall;
-use crate::systems::System;
+use crate::systems::{System, system::ResourceOutput};
 
 pub struct GooseHintsSystem {
     instructions: String,
@@ -69,8 +69,8 @@ impl System for GooseHintsSystem {
         &[]
     }
 
-    async fn status(&self) -> AnyhowResult<HashMap<String, Value>> {
-        Ok(HashMap::new())
+    async fn status(&self) -> AnyhowResult<Vec<ResourceOutput>> {
+        Ok(Vec::new())
     }
 
     async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {

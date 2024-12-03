@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use base64::Engine;
 use indoc::{formatdoc, indoc};
 use serde_json::{json, Value};
+use chrono::Utc;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -16,7 +17,7 @@ use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
 use crate::models::role::Role;
 use crate::models::tool::{Tool, ToolCall};
-use crate::systems::System;
+use crate::systems::{System, system::ResourceOutput};
 
 pub struct DeveloperSystem {
     tools: Vec<Tool>,
@@ -598,14 +599,17 @@ running commands on the shell."
         &self.tools
     }
 
-    async fn status(&self) -> AnyhowResult<HashMap<String, Value>> {
+    async fn status(&self) -> AnyhowResult<Vec<ResourceOutput>> {
+        let mut outputs = Vec::new();
+        
+        // Add current working directory with high priority
         let cwd = self.cwd.lock().unwrap().display().to_string();
-        let mut file_contents = HashMap::new();
+        outputs.push(ResourceOutput::new(format!("Current directory: {}", cwd), 1.0, Utc::now()));
 
         // Get mutable access to active_files to remove any we can't read
         let mut active_files = self.active_files.lock().unwrap();
 
-        // Use retain to keep only the files we can successfully read
+        // Use retain to keep only the files we can successfully read and add them to outputs
         active_files.retain(|path| {
             if !path.exists() {
                 return false;
@@ -613,17 +617,24 @@ running commands on the shell."
 
             match std::fs::read_to_string(path) {
                 Ok(content) => {
-                    file_contents.insert(path.display().to_string(), content);
+                    // Add file path and content as separate resources
+                    outputs.push(ResourceOutput::new(
+                        format!("Active file: {}", path.display()), 
+                        0.8,
+                        Utc::now()
+                    ));
+                    outputs.push(ResourceOutput::new(
+                        format!("Content of {}:\n{}", path.display(), content),
+                        0.5,
+                        Utc::now()
+                    ));
                     true
                 }
                 Err(_) => false,
             }
         });
-
-        Ok(HashMap::from([
-            ("cwd".to_string(), json!(cwd)),
-            ("files".to_string(), json!(file_contents)),
-        ]))
+        
+        Ok(outputs)
     }
 
     async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {

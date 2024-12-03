@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use goose::errors::{AgentError, AgentResult};
 use goose::models::content::Content;
 use goose::models::tool::{Tool, ToolCall};
-use goose::systems::System;
+use goose::systems::{System, system::ResourceOutput};
 
 /// A simple system that echoes input back to the caller
 pub struct EchoSystem {
@@ -67,8 +67,8 @@ impl System for EchoSystem {
         &self.tools
     }
 
-    async fn status(&self) -> AnyhowResult<HashMap<String, Value>> {
-        Ok(HashMap::new()) // Echo system has no state to report
+    async fn status(&self) -> AnyhowResult<Vec<ResourceOutput>> {
+        Ok(Vec::new()) // Echo system has no state to report
     }
 
     async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {

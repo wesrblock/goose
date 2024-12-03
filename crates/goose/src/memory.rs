@@ -1,11 +1,12 @@
 use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
 use crate::models::tool::{Tool, ToolCall};
-use crate::systems::System;
+use crate::systems::{System, system::ResourceOutput};
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
 use indoc::formatdoc;
 use serde_json::{json, Value};
+use chrono::Utc;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -395,11 +396,20 @@ impl System for MemorySystem {
         &self.memory_tools
     }
 
-    async fn status(&self) -> AnyhowResult<HashMap<String, Value>> {
-        Ok(HashMap::from([(
-            "active_memories".to_string(),
-            json!(self.active_memories),
-        )]))
+    async fn status(&self) -> AnyhowResult<Vec<ResourceOutput>> {
+        let mut outputs = Vec::new();
+        
+        // Add active memories with high priority
+        for (category, memories) in &self.active_memories {
+            let content = format!("Category '{}': {} memories", category, memories.len());
+            outputs.push(ResourceOutput::new(content, 0.8, Utc::now()));
+            
+            for memory in memories {
+                outputs.push(ResourceOutput::new(format!("  {}", memory), 0.5, Utc::now()));
+            }
+        }
+        
+        Ok(outputs)
     }
 
     async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {

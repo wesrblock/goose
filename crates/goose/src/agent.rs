@@ -139,8 +139,12 @@ impl Agent {
                     .await
                     .map_err(|e| AgentError::Internal(e.to_string()))?;
 
-                // Format the status into a readable string
-                let status_str = serde_json::to_string(&system_status).unwrap_or_default();
+                // Format the ResourceOutputs into a readable string
+                let status_str = system_status
+                    .iter()
+                    .map(|output| format!("[{:.1}] {}", output.priority, output.content))
+                    .collect::<Vec<_>>()
+                    .join("\n");
 
                 systems_status.push(SystemStatus::new(system.name(), status_str));
             }
@@ -278,10 +282,10 @@ mod tests {
     use super::*;
     use crate::models::message::MessageContent;
     use crate::providers::mock::MockProvider;
+    use crate::systems::system::ResourceOutput;
     use async_trait::async_trait;
     use futures::TryStreamExt;
     use serde_json::json;
-    use std::collections::HashMap;
 
     // Mock system for testing
     struct MockSystem {
@@ -320,8 +324,8 @@ mod tests {
             &self.tools
         }
 
-        async fn status(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
-            Ok(HashMap::new())
+        async fn status(&self) -> anyhow::Result<Vec<ResourceOutput>> {
+            Ok(Vec::new())
         }
 
         async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
