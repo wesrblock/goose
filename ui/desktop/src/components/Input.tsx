@@ -27,7 +27,7 @@ export default function Input({
     if (textAreaRef.current && !disabled) {
       textAreaRef.current.focus();
     }
-  }, [disabled, value]); // Add dependencies as needed
+  }, [disabled, value]);
 
   const useAutosizeTextArea = (textAreaRef: HTMLTextAreaElement | null, value: string) => {
     useEffect(() => {
@@ -35,7 +35,6 @@ export default function Input({
         textAreaRef.style.height = "0px"; // Reset height
         const scrollHeight = textAreaRef.scrollHeight;
         textAreaRef.style.height = Math.min(scrollHeight, maxHeight) + "px";
-        textAreaRef.focus();
       }
     }, [textAreaRef, value]);
   };
