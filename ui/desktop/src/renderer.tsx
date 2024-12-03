@@ -5,7 +5,6 @@ import App from './App'
 
 // Initialize Datadog RUM
 import { datadogRum } from '@datadog/browser-rum';
-import dotenv from 'dotenv';
 
 datadogRum.init({
     applicationId: process.env.DATADOG_APPLICATION_ID,
