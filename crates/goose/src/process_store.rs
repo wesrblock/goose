@@ -57,3 +57,95 @@ pub fn kill_processes() {
         remove_process(pid);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::Duration;
+    use std::{fs, thread};
+    use sysinfo::{Pid, ProcessesToUpdate, System};
+    use tokio::process::Command;
+
+    #[tokio::test]
+    async fn test_kill_processes_with_children() {
+        // Create a temporary script that spawns a child process
+        let temp_dir = std::env::temp_dir();
+        let script_path = temp_dir.join("test_script.sh");
+        let script_content = r#"#!/bin/bash
+        # Sleep in the parent process
+        sleep 300
+        "#;
+
+        fs::write(&script_path, script_content).unwrap();
+        fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        // Start the parent process which will spawn a child
+        let parent = Command::new("bash")
+            .arg("-c")
+            .arg(script_path.to_str().unwrap())
+            .spawn()
+            .expect("Failed to start parent process");
+
+        let parent_pid = parent.id().unwrap() as u32;
+
+        // Store the parent process ID
+        store_process(parent_pid);
+
+        // Give processes time to start
+        thread::sleep(Duration::from_secs(1));
+
+        // Get the child process ID using pgrep
+        let child_pids = Command::new("pgrep")
+            .arg("-P")
+            .arg(parent_pid.to_string())
+            .output()
+            .await
+            .expect("Failed to get child PIDs");
+
+        let child_pid_str = String::from_utf8_lossy(&child_pids.stdout);
+        let child_pids: Vec<u32> = child_pid_str
+            .lines()
+            .filter_map(|line| line.trim().parse::<u32>().ok())
+            .collect();
+        assert!(child_pids.len() == 1);
+
+        // Verify processes are running
+        assert!(is_process_running(parent_pid).await);
+        assert!(is_process_running(child_pids[0]).await);
+
+        kill_processes();
+
+        // Wait until processes are killed
+        let mut attempts = 0;
+        while attempts < 10 {
+            if !is_process_running(parent_pid).await && !is_process_running(child_pids[0]).await {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+            attempts += 1;
+        }
+
+        // Verify processes are dead
+        assert!(!is_process_running(parent_pid).await);
+        assert!(!is_process_running(child_pids[0]).await);
+
+        // Clean up the temporary script
+        fs::remove_file(script_path).unwrap();
+    }
+
+    async fn is_process_running(pid: u32) -> bool {
+        let mut system = System::new_all();
+        system.refresh_processes(ProcessesToUpdate::All, true);
+
+        match system.process(Pid::from_u32(pid)) {
+            Some(process) => !matches!(
+                process.status(),
+                sysinfo::ProcessStatus::Stop
+                    | sysinfo::ProcessStatus::Zombie
+                    | sysinfo::ProcessStatus::Dead
+            ),
+            None => false,
+        }
+    }
+}
