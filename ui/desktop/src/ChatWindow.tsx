@@ -147,7 +147,7 @@ function ChatContent({
       // TODO: Using setInput seems to change the ongoing request message and prevents stop from stopping.
       // It would be nice to find a way to populate the input field with the last message when interrupted.
       // setInput("stop");
-      
+
       // Remove the last user message.
       if (messages.length > 1) {
         setMessages(messages.slice(0, -1));
@@ -156,9 +156,7 @@ function ChatContent({
       }
     } else if (lastMessage.role === 'assistant' && lastMessage.toolInvocations !== undefined) {
       // Add messaging about interrupted ongoing tool invocations.
-      let newLastMessage = lastMessage;
-      if (lastMessage.toolInvocations) {
-        newLastMessage = {
+      const newLastMessage = {
           ...lastMessage,
           toolInvocations: lastMessage.toolInvocations.map((invocation) => {
             if (invocation.state !== 'result') {
@@ -186,8 +184,7 @@ function ChatContent({
             return invocation;
           }
         }),
-        };
-      }
+      };
         
       const updatedMessages = messages.slice(0, -1).concat(newLastMessage);
       setMessages(updatedMessages);
