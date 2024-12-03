@@ -1,11 +1,12 @@
 import 'dotenv/config';
 import { loadZshEnv } from './utils/loadEnv';
-import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem } from 'electron';
+import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem, dialog } from 'electron';
 import path from 'node:path';
 import { findAvailablePort, startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
 import log from './utils/logger';
 import { exec } from 'child_process';
+import { addRecentDir, loadRecentDirs } from './utils/recentDirs';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -37,6 +38,7 @@ let appConfig = {
   apiCredsMissing: !checkApiCredentials(),
   GOOSE_API_HOST: 'http://127.0.0.1',
   GOOSE_SERVER__PORT: 0,
+  GOOSE_WORKING_DIR: '',
 };
 
 const createLauncher = () => {
@@ -85,9 +87,9 @@ const createLauncher = () => {
 let windowCounter = 0;
 const windowMap = new Map<number, BrowserWindow>();
 
-const createChat = async (app, query?: string) => {
+const createChat = async (app, query?: string, dir?: string) => {
 
-  const port = await startGoosed(app);  
+  const [port, working_dir] = await startGoosed(app, dir);  
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 10 },
@@ -100,7 +102,7 @@ const createChat = async (app, query?: string) => {
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [JSON.stringify({ ...appConfig, GOOSE_SERVER__PORT: port })],
+      additionalArguments: [JSON.stringify({ ...appConfig, GOOSE_SERVER__PORT: port, GOOSE_WORKING_DIR: working_dir })],
     },
   });
 
@@ -199,6 +201,27 @@ const showWindow = () => {
   });
 };
 
+const buildRecentFilesMenu = () => {
+  const recentDirs = loadRecentDirs();
+  return recentDirs.map(dir => ({
+    label: dir,
+    click: () => {
+      createChat(app, undefined, dir);
+    }
+  }));
+};
+
+const openDirectoryDialog = async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  });
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    addRecentDir(result.filePaths[0]);
+    createChat(app, undefined, result.filePaths[0]);
+  }
+};
+
 app.whenReady().then(async () => {
   // Load zsh environment variables in production mode only
   
@@ -211,8 +234,27 @@ app.whenReady().then(async () => {
   // Preserve existing menu and add new items
   const menu = Menu.getApplicationMenu();
   const fileMenu = menu?.items.find(item => item.label === 'File');
+  
+  // open goose to specific dir and set that as its working space
+  fileMenu.submenu.append(new MenuItem({
+    label: 'Open Directory...',
+    accelerator: 'CmdOrCtrl+O',
+    click() {
+      openDirectoryDialog();
+    },
+  }));
 
-  // Add 'New Chat Window' to File menu
+  // Add Recent Files submenu
+  const recentFilesSubmenu = buildRecentFilesMenu();
+  if (recentFilesSubmenu.length > 0) {
+    fileMenu.submenu.append(new MenuItem({ type: 'separator' }));
+    fileMenu.submenu.append(new MenuItem({
+      label: 'Recent Directories',
+      submenu: recentFilesSubmenu
+    }));
+  }
+
+  // Add 'New Chat Window' and 'Open Directory' to File menu
   if (fileMenu && fileMenu.submenu) {
     fileMenu.submenu.append(new MenuItem({
       label: 'New Chat Window',
@@ -221,6 +263,7 @@ app.whenReady().then(async () => {
         ipcMain.emit('create-chat-window');
       },
     }));
+
   }
 
   Menu.setApplicationMenu(menu);
@@ -284,4 +327,3 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-
