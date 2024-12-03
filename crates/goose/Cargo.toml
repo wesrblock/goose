@@ -39,7 +39,7 @@ webbrowser = "0.8"
 dotenv = "0.15"
 xcap = "0.0.14"
 libc = "=0.2.164"
-lazy_static = "1.4"
+lazy_static = "1.5"
 kill_tree = "0.2.4"
 
 keyring = { version = "3.6.1", features = ["apple-native", "windows-native", "sync-secret-service"] }
