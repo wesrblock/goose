@@ -6,9 +6,10 @@ interface MoreMenuProps {
   className?: string;
   onClearContext: () => void;
   onRestartGoose: () => void;
+  onLoadSession: () => void;
 }
 
-export default function MoreMenu({ onClearContext, onRestartGoose }: MoreMenuProps) {
+export default function MoreMenu({ onClearContext, onRestartGoose, onLoadSession }: MoreMenuProps) {
   const [open, setOpen] = useState(false);
 
   const handleAction = (action: () => void) => {
@@ -25,6 +26,12 @@ export default function MoreMenu({ onClearContext, onRestartGoose }: MoreMenuPro
       </PopoverTrigger>
       <PopoverContent className="w-48 rounded-md">
         <div className="flex flex-col bg-black text-white rounded-md">
+          <button
+            onClick={() => handleAction(onLoadSession)}
+            className="w-full text-left px-2 py-1.5 text-sm"
+          >
+            Load session
+          </button>
           <button
             onClick={() => handleAction(onClearContext)}
             className="w-full text-left px-2 py-1.5 text-sm"

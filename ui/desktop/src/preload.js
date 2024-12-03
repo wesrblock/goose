@@ -1,6 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
-
 const config = JSON.parse(process.argv.find((arg) => arg.startsWith('{')) || '{}');
 
 contextBridge.exposeInMainWorld('appConfig', {
@@ -17,4 +16,7 @@ contextBridge.exposeInMainWorld('electron', {
   createWingToWingWindow: (query) => ipcRenderer.send('create-wing-to-wing-window', query),
   openInChrome: (url) => ipcRenderer.send('open-in-chrome', url),
   fetchMetadata: (url) => ipcRenderer.invoke('fetch-metadata', url),
+  // Add session management functions
+  loadSessions: () => ipcRenderer.invoke('loadSessions'),
+  saveSession: (session) => ipcRenderer.invoke('saveSession', session),
 })

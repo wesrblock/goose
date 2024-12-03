@@ -12,6 +12,7 @@ import MoreMenu from './components/MoreMenu';
 import { Bird } from './components/ui/icons';
 import LoadingGoose from './components/LoadingGoose';
 import { ApiKeyWarning } from './components/ApiKeyWarning';
+import { SessionManager, Session } from './components/SessionManager';
 // import fakeToolInvocations from './fixtures/tool-calls-and-results.json';
 
 export interface Chat {
@@ -157,6 +158,7 @@ function ChatContent({
               content: 'Goose restarted',
             });
           }}
+          onLoadSession={() => setIsSessionManagerOpen(true)}
         />
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
@@ -265,6 +267,37 @@ export default function ChatWindow() {
 
   const [working, setWorking] = useState<Working>(Working.Idle);
   const [progressMessage, setProgressMessage] = useState<string>('');
+  const [isSessionManagerOpen, setIsSessionManagerOpen] = useState<boolean>(false);
+
+  // Save session on window close
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      const currentChat = chats.find((c) => c.id === selectedChatId);
+      if (currentChat && currentChat.messages.length > 0) {
+        await window.electron.saveSession({
+          id: `${Date.now().toString(36)}${Math.random().toString(36).substr(2)}`,
+          title: currentChat.title,
+          lastModified: new Date(),
+          messages: currentChat.messages,
+        });
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [chats, selectedChatId]);
+
+  const handleSessionSelect = (session: Session) => {
+    const newChat = {
+      id: chats.length + 1,
+      title: session.title,
+      messages: session.messages,
+    };
+    setChats([...chats, newChat]);
+    setSelectedChatId(newChat.id);
+  };
 
   const toggleMode = () => {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
@@ -306,6 +339,13 @@ export default function ChatWindow() {
 
           {/* Always render WingView but control its visibility */}
           <WingView onExpand={toggleMode} progressMessage={progressMessage} working={working} />
+          
+          {/* Session Manager */}
+          <SessionManager
+            isOpen={isSessionManagerOpen}
+            onClose={() => setIsSessionManagerOpen(false)}
+            onSessionSelect={handleSessionSelect}
+          />
         </>
       )}
     </div>

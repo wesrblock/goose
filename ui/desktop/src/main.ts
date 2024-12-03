@@ -4,6 +4,7 @@ import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, 
 import path from 'node:path';
 import { findAvailablePort, startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
+import { SessionManager } from './main/sessionManager';
 import log from './utils/logger';
 import { exec } from 'child_process';
 
@@ -199,7 +200,11 @@ const showWindow = () => {
   });
 };
 
+// Initialize session manager
+const sessionManager = new SessionManager();
+
 app.whenReady().then(async () => {
+  await sessionManager.initialize();
   // Load zsh environment variables in production mode only
   
   createTray();
@@ -262,6 +267,15 @@ app.whenReady().then(async () => {
       console.error('Error fetching metadata:', error);
       throw error;
     }
+  });
+
+  // Session management handlers
+  ipcMain.handle('loadSessions', async () => {
+    return await sessionManager.loadSessions();
+  });
+
+  ipcMain.handle('saveSession', async (_, session) => {
+    await sessionManager.saveSession(session);
   });
 
   ipcMain.on('open-in-chrome', (_, url) => {
