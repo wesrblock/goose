@@ -27,7 +27,7 @@ export default function Splash({ append }) {
       </div>
       <div className="flex flex-1" />
           <div
-            className="w-[312px] px-16 py-4 text-14 text-center text-splash-pills-text whitespace-nowrap cursor-pointer text-prev-goose-text rounded-[14px] inline-block hover:scale-[1.02] hover:underline transition-all duration-150"
+            className="px-16 py-4 text-14 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-prev-goose-gradient text-prev-goose-text rounded-[14px] inline-block hover:scale-[1.02] transition-all duration-150"
             onClick={async () => {
               window.electron.directoryChooser();
             }}>
