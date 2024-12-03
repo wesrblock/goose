@@ -1,10 +1,3 @@
-use std::collections::HashMap;
-use std::error::Error;
-use std::fs;
-use std::path::PathBuf;
-
-use crate::inputs::{get_env_value_or_input, get_user_input};
-use goose::key_manager::{get_keyring_secret, save_to_keyring, KeyRetrievalStrategy};
 use goose::providers::configs::{
     DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig,
     ProviderConfig,
@@ -12,7 +5,12 @@ use goose::providers::configs::{
 use goose::providers::factory::ProviderType;
 use goose::providers::ollama::OLLAMA_HOST;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::error::Error;
+use std::fs;
+use std::path::PathBuf;
 use strum::IntoEnumIterator;
+use crate::key_handler::key_handler::get_or_set_key;
 
 // Profile types and structures
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -88,6 +86,7 @@ pub fn find_existing_profile(name: &str) -> Option<Profile> {
     }
 }
 
+<<<<<<< HEAD
 pub fn has_no_profiles() -> Result<bool, Box<dyn Error>> {
     load_profiles().map(|profiles| Ok(profiles.is_empty()))?
 }
@@ -129,7 +128,7 @@ pub fn get_or_set_key(
 pub fn set_provider_config(provider_name: &str, model: String) -> ProviderConfig {
     match provider_name.to_lowercase().as_str() {
         PROVIDER_OPEN_AI => {
-            let api_key = get_or_set_key("OPENAI_API_KEY", "OPENAI_API_KEY")
+            let api_key = get_or_set_key("OpenAI API key", "OPENAI_API_KEY")
                 .expect("Failed to get OpenAI API key");
             ProviderConfig::OpenAi(OpenAiProviderConfig {
                 host: "https://api.openai.com".to_string(),

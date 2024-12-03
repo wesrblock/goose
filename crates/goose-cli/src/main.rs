@@ -11,6 +11,7 @@ mod prompt;
 pub mod session;
 
 mod systems;
+mod key_handler;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
