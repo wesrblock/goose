@@ -22,7 +22,7 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
     let provider_name = select_provider(existing_profile);
     let recommended_models = get_recommended_models(provider_name);
     let model = set_model(existing_profile, &recommended_models)?;
-    let provider_config = set_provider_config(provider_name, model.clone());
+    let provider_config = set_provider_config(provider_name, model.clone(), false);
     let additional_systems =
         existing_profile.map_or(Vec::new(), |profile| profile.additional_systems.clone());
     let profile = Profile {
