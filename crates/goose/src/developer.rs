@@ -638,8 +638,7 @@ running commands on the shell."
         &self.tools
     }
 
-    async fn status(&self) -> AnyhowResult<HashMap<String, Value>> {
-        let cwd = self.cwd.lock().unwrap().display().to_string();
+    async fn status(&self) -> AnyhowResult<Vec<Resource>> {
         let mut active_resources = self.active_resources.lock().unwrap();
 
         // Update resources and remove any that can't be read
@@ -657,25 +656,13 @@ running commands on the shell."
             }
         });
 
-        // Convert resources to a format suitable for status
-        let resources: HashMap<String, Value> = active_resources
+        // Convert active resources to a Vec<Resource>
+        let resources: Vec<Resource> = active_resources
             .iter()
-            .map(|(path, resource)| {
-                (
-                    path.display().to_string(),
-                    json!({
-                        "content": resource.content,
-                        "timestamp": resource.timestamp,
-                        "priority": resource.priority
-                    }),
-                )
-            })
+            .map(|(_, resource)| resource.clone())
             .collect();
 
-        Ok(HashMap::from([
-            ("cwd".to_string(), json!(cwd)),
-            ("resources".to_string(), json!(resources)),
-        ]))
+        Ok(resources)
     }
 
     async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {

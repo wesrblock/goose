@@ -278,10 +278,10 @@ mod tests {
     use super::*;
     use crate::models::message::MessageContent;
     use crate::providers::mock::MockProvider;
+    use crate::systems::Resource;
     use async_trait::async_trait;
     use futures::TryStreamExt;
     use serde_json::json;
-    use std::collections::HashMap;
 
     // Mock system for testing
     struct MockSystem {
@@ -320,8 +320,8 @@ mod tests {
             &self.tools
         }
 
-        async fn status(&self) -> anyhow::Result<HashMap<String, serde_json::Value>> {
-            Ok(HashMap::new())
+        async fn status(&self) -> anyhow::Result<Vec<Resource>> {
+            Ok(Vec::new())
         }
 
         async fn call(&self, tool_call: ToolCall) -> AgentResult<Vec<Content>> {
