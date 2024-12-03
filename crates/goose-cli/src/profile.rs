@@ -113,12 +113,16 @@ pub fn set_provider_config(provider_name: &str, model: String, only_get_key: boo
                 image_format: goose::providers::utils::ImageFormat::Anthropic,
             })
         }
-        PROVIDER_OLLAMA => ProviderConfig::Ollama(OllamaProviderConfig {
-            host: std::env::var("OLLAMA_HOST").unwrap_or_else(|_| String::from(OLLAMA_HOST)),
-            model,
-            temperature: None,
-            max_tokens: None,
-        }),
+        PROVIDER_OLLAMA => {
+            let host = get_or_set_key("ollama host url", "OLLAMA_HOST", only_get_key)
+                .expect("Failed to get databricks host");
+            ProviderConfig::Ollama(OllamaProviderConfig {
+                host: host.clone(),
+                model,
+                temperature: None,
+                max_tokens: None,
+            })
+        },
         _ => panic!("Invalid provider name"),
     }
 }
