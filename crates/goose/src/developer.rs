@@ -5,13 +5,14 @@ use async_trait::async_trait;
 use base64::Engine;
 use indoc::{formatdoc, indoc};
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Mutex;
 use tokio::process::Command;
 use xcap::Monitor;
+use crate::systems::Resource;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
@@ -22,7 +23,7 @@ use crate::systems::System;
 pub struct DeveloperSystem {
     tools: Vec<Tool>,
     cwd: Mutex<PathBuf>,
-    active_files: Mutex<HashSet<PathBuf>>,
+    active_resources: Mutex<HashMap<PathBuf, Resource>>,
     file_history: Mutex<HashMap<PathBuf, Vec<String>>>,
     instructions: String,
 }
@@ -150,7 +151,7 @@ impl DeveloperSystem {
         Self {
             tools: vec![bash_tool, text_editor_tool, screen_capture_tool],
             cwd: Mutex::new(std::env::current_dir().unwrap()),
-            active_files: Mutex::new(HashSet::new()),
+            active_resources: Mutex::new(HashMap::new()),
             file_history: Mutex::new(HashMap::new()),
             instructions,
         }
@@ -301,11 +302,15 @@ impl DeveloperSystem {
 
     async fn text_editor_view(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
         if path.is_file() {
-            let content = std::fs::read_to_string(path)
-                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
-
-            // Add to active files
-            self.active_files.lock().unwrap().insert(path.clone());
+            // Create a new resource and add it to active_resources
+            let resource = Resource::new(path)
+                .map_err(|e| AgentError::ExecutionError(format!("Failed to create resource: {}", e)))?;
+            
+            let content = resource.content.clone();
+            self.active_resources
+                .lock()
+                .unwrap()
+                .insert(path.clone(), resource);
 
             let language = lang::get_language_identifier(path);
             let formatted = formatdoc! {"
@@ -345,7 +350,7 @@ impl DeveloperSystem {
         file_text: &str,
     ) -> AgentResult<Vec<Content>> {
         // Check if file already exists and is active
-        if path.exists() && !self.active_files.lock().unwrap().contains(path) {
+        if path.exists() && !self.active_resources.lock().unwrap().contains_key(path) {
             return Err(AgentError::InvalidParameters(format!(
                 "File '{}' exists but is not active. View it first before overwriting.",
                 path.display()
@@ -359,8 +364,12 @@ impl DeveloperSystem {
         std::fs::write(path, file_text)
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
-        // Add to active files
-        self.active_files.lock().unwrap().insert(path.clone());
+        // Create and store resource
+        let resource = Resource::with_content(path, file_text, 0);
+        self.active_resources
+            .lock()
+            .unwrap()
+            .insert(path.clone(), resource);
 
         // Try to detect the language from the file extension
         let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
@@ -396,7 +405,7 @@ impl DeveloperSystem {
                 path.display()
             )));
         }
-        if !self.active_files.lock().unwrap().contains(path) {
+        if !self.active_resources.lock().unwrap().contains_key(path) {
             return Err(AgentError::InvalidParameters(format!(
                 "You must view '{}' before editing it",
                 path.display()
@@ -425,8 +434,13 @@ impl DeveloperSystem {
 
         // Replace and write back
         let new_content = content.replace(old_str, new_str);
-        std::fs::write(path, new_content)
+        std::fs::write(path, &new_content)
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
+
+        // Update resource
+        if let Some(resource) = self.active_resources.lock().unwrap().get_mut(path) {
+            resource.update_content(new_content);
+        }
 
         // Try to detect the language from the file extension
         let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
@@ -469,7 +483,7 @@ impl DeveloperSystem {
                 path.display()
             )));
         }
-        if !self.active_files.lock().unwrap().contains(path) {
+        if !self.active_resources.lock().unwrap().contains_key(path) {
             return Err(AgentError::InvalidParameters(format!(
                 "You must view '{}' before editing it",
                 path.display()
@@ -495,8 +509,14 @@ impl DeveloperSystem {
         lines.insert(insert_line, new_str.to_string());
 
         // Write back to file
-        std::fs::write(path, lines.join("\n"))
+        let new_content = lines.join("\n");
+        std::fs::write(path, &new_content)
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
+
+        // Update resource
+        if let Some(resource) = self.active_resources.lock().unwrap().get_mut(path) {
+            resource.update_content(new_content);
+        }
 
         // Try to detect the language from the file extension
         let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
@@ -620,29 +640,41 @@ running commands on the shell."
 
     async fn status(&self) -> AnyhowResult<HashMap<String, Value>> {
         let cwd = self.cwd.lock().unwrap().display().to_string();
-        let mut file_contents = HashMap::new();
+        let mut active_resources = self.active_resources.lock().unwrap();
 
-        // Get mutable access to active_files to remove any we can't read
-        let mut active_files = self.active_files.lock().unwrap();
-
-        // Use retain to keep only the files we can successfully read
-        active_files.retain(|path| {
+        // Update resources and remove any that can't be read
+        active_resources.retain(|path, resource| {
             if !path.exists() {
                 return false;
             }
 
             match std::fs::read_to_string(path) {
                 Ok(content) => {
-                    file_contents.insert(path.display().to_string(), content);
+                    resource.update_content(content);
                     true
                 }
                 Err(_) => false,
             }
         });
 
+        // Convert resources to a format suitable for status
+        let resources: HashMap<String, Value> = active_resources
+            .iter()
+            .map(|(path, resource)| {
+                (
+                    path.display().to_string(),
+                    json!({
+                        "content": resource.content,
+                        "timestamp": resource.timestamp,
+                        "priority": resource.priority
+                    }),
+                )
+            })
+            .collect();
+
         Ok(HashMap::from([
             ("cwd".to_string(), json!(cwd)),
-            ("files".to_string(), json!(file_contents)),
+            ("resources".to_string(), json!(resources)),
         ]))
     }
 
