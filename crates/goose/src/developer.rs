@@ -2,11 +2,12 @@ mod lang;
 
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
+use crate::systems::system::{Resource, ResourceOutput};
 use base64::Engine;
 use indoc::{formatdoc, indoc};
 use serde_json::{json, Value};
 use chrono::Utc;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -17,12 +18,12 @@ use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
 use crate::models::role::Role;
 use crate::models::tool::{Tool, ToolCall};
-use crate::systems::{System, system::ResourceOutput};
+use crate::systems::System;
 
 pub struct DeveloperSystem {
     tools: Vec<Tool>,
     cwd: Mutex<PathBuf>,
-    active_files: Mutex<HashSet<PathBuf>>,
+    active_resources: Mutex<Vec<Resource>>,
     file_history: Mutex<HashMap<PathBuf, Vec<String>>>,
     instructions: String,
 }
@@ -150,7 +151,7 @@ impl DeveloperSystem {
         Self {
             tools: vec![bash_tool, text_editor_tool, screen_capture_tool],
             cwd: Mutex::new(std::env::current_dir().unwrap()),
-            active_files: Mutex::new(HashSet::new()),
+            active_resources: Mutex::new(Vec::new()),
             file_history: Mutex::new(HashMap::new()),
             instructions,
         }
@@ -285,8 +286,14 @@ impl DeveloperSystem {
             let content = std::fs::read_to_string(path)
                 .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
 
-            // Add to active files
-            self.active_files.lock().unwrap().insert(path.clone());
+            // Add to active resources
+            let resource = Resource::new(
+                path.clone(),
+                content.clone(),
+                0.8, // High priority for viewed files
+                Utc::now()
+            );
+            self.active_resources.lock().unwrap().push(resource);
 
             let language = lang::get_language_identifier(path);
             let formatted = formatdoc! {"
@@ -326,7 +333,7 @@ impl DeveloperSystem {
         file_text: &str,
     ) -> AgentResult<Vec<Content>> {
         // Check if file already exists and is active
-        if path.exists() && !self.active_files.lock().unwrap().contains(path) {
+        if path.exists() && !self.active_resources.lock().unwrap().iter().any(|r| r.path == *path) {
             return Err(AgentError::InvalidParameters(format!(
                 "File '{}' exists but is not active. View it first before overwriting.",
                 path.display()
@@ -340,8 +347,14 @@ impl DeveloperSystem {
         std::fs::write(path, file_text)
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
-        // Add to active files
-        self.active_files.lock().unwrap().insert(path.clone());
+        // Add to active resources
+        let resource = Resource::new(
+            path.clone(),
+            file_text.to_string(),
+            0.8, // High priority for newly created files
+            Utc::now()
+        );
+        self.active_resources.lock().unwrap().insert(resource);
 
         // Try to detect the language from the file extension
         let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
@@ -606,28 +619,24 @@ running commands on the shell."
         let cwd = self.cwd.lock().unwrap().display().to_string();
         outputs.push(ResourceOutput::new(format!("Current directory: {}", cwd), 1.0, Utc::now()));
 
-        // Get mutable access to active_files to remove any we can't read
-        let mut active_files = self.active_files.lock().unwrap();
+        // Get mutable access to active_resources to remove any we can't read
+        let mut active_resources = self.active_resources.lock().unwrap();
 
-        // Use retain to keep only the files we can successfully read and add them to outputs
-        active_files.retain(|path| {
-            if !path.exists() {
+        // Use retain to keep only resources with files that still exist and can be read
+        active_resources.retain(|resource| {
+            if !resource.path.exists() {
                 return false;
             }
 
-            match std::fs::read_to_string(path) {
+            match std::fs::read_to_string(&resource.path) {
                 Ok(content) => {
                     // Add file path and content as separate resources
                     outputs.push(ResourceOutput::new(
-                        format!("Active file: {}", path.display()), 
-                        0.8,
-                        Utc::now()
+                        format!("Active file: {}", resource.path.display()), 
+                        resource.priority,
+                        resource.timestamp
                     ));
-                    outputs.push(ResourceOutput::new(
-                        format!("Content of {}:\n{}", path.display(), content),
-                        0.5,
-                        Utc::now()
-                    ));
+                    outputs.push(resource.into_output());
                     true
                 }
                 Err(_) => false,
