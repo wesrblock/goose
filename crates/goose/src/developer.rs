@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::Mutex;
 use tokio::process::Command;
 use xcap::Monitor;
@@ -192,13 +193,31 @@ impl DeveloperSystem {
         let cmd_with_redirect = format!("{} 2>&1", command);
 
         // Execute the command
-        let output = Command::new("bash")
+        let child = Command::new("bash")
+            .stdout(Stdio::piped()) // These two pipes required to capture output later.
+            .stderr(Stdio::piped())
             .kill_on_drop(true) // Critical so that the command is killed when the agent.reply stream is interrupted.
             .arg("-c")
             .arg(cmd_with_redirect)
-            .output()
+            .spawn()
+            .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+
+        // Store the process ID with the command as the key
+        let pid: Option<u32> = child.id();
+        if let Some(pid) = pid {
+            crate::process_store::store_process(pid);
+        }
+
+        // Wait for the command to complete and get output
+        let output = child
+            .wait_with_output()
             .await
             .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+
+        // Remove the process ID from the store
+        if let Some(pid) = pid {
+            crate::process_store::remove_process(pid);
+        }
 
         let output_str = format!(
             "Finished with Status Code: {}\nOutput:\n{}",

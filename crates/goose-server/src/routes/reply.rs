@@ -305,6 +305,8 @@ async fn handler(
                         }
                         Err(_) => { // Heartbeat, used to detect disconnected clients and then end running tools.
                             if tx.is_closed() {
+                                // Kill any running processes when the client disconnects
+                                goose::process_store::kill_processes();
                                 break;
                             }
                             continue;
