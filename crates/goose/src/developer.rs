@@ -191,13 +191,26 @@ impl DeveloperSystem {
         let cmd_with_redirect = format!("{} 2>&1", command);
 
         // Execute the command
-        let output = Command::new("bash")
+        let mut child = Command::new("bash")
             .kill_on_drop(true) // Critical so that the command is killed when the agent.reply stream is interrupted.
             .arg("-c")
             .arg(cmd_with_redirect)
-            .output()
+            .spawn()
+            .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+            
+        // Store the process ID with the command as the key
+        if let Some(pid) = child.id() {
+            crate::process_store::store_process(command.to_string(), pid);
+        }
+        
+        // Wait for the command to complete and get output
+        let output = child
+            .wait_with_output()
             .await
             .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+            
+        // Remove the process ID from the store
+        crate::process_store::remove_process(command);
 
         let output_str = format!(
             "Finished with Status Code: {}\nOutput:\n{}",

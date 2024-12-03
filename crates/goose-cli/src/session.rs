@@ -173,6 +173,8 @@ We've removed the conversation up to the most recent user message
                     }
                 }
                 _ = tokio::signal::ctrl_c() => {
+                    // Kill any running processes when the client disconnects
+                    goose::process_store::kill_processes();
                     drop(stream);
                     self.handle_interrupted_messages();
                     break;
