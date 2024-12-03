@@ -197,19 +197,19 @@ impl DeveloperSystem {
             .arg(cmd_with_redirect)
             .spawn()
             .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
-            
+
         // Store the process ID with the command as the key
         let pid: Option<u32> = child.id();
         if let Some(pid) = pid {
             crate::process_store::store_process(pid);
         }
-        
+
         // Wait for the command to complete and get output
         let output = child
             .wait_with_output()
             .await
             .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
-            
+
         // Remove the process ID from the store
         if let Some(pid) = pid {
             crate::process_store::remove_process(pid);

@@ -1,6 +1,6 @@
+use kill_tree::{blocking::kill_tree_with_config, Config};
 use lazy_static::lazy_static;
 use std::sync::Mutex;
-use kill_tree::{blocking::kill_tree_with_config, Config};
 
 // Singleton that will store process IDs for spawned child processes implementing agent tasks.
 lazy_static! {
