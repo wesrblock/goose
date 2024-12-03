@@ -25,6 +25,8 @@ http-body-util = "0.1"
 http = "1.0"
 config = { version = "0.14.1", features = ["toml"] }
 thiserror = "1.0"
+tempfile = "3.2"
+dirs = "5.0"
 
 [[bin]]
 name = "goosed"
