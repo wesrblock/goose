@@ -7,6 +7,7 @@ import started from "electron-squirrel-startup";
 import log from './utils/logger';
 import { exec } from 'child_process';
 import { addRecentDir, loadRecentDirs } from './utils/recentDirs';
+import { loadSession, saveSession } from './sessions';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -321,6 +322,24 @@ app.whenReady().then(async () => {
     } else {
       // On Linux, use xdg-open with chrome
       exec(`xdg-open "${url}"`);
+    }
+  });
+
+  ipcMain.handle('load-session', () => {
+    try {
+      return loadSession()
+    } catch (error) {
+      console.error('Failed to load session:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('save-session', (messages) => {
+    try {
+      return saveSession(messages)
+    } catch (error) {
+      console.error('Failed to save session:', error);
+      throw error;
     }
   });
 });

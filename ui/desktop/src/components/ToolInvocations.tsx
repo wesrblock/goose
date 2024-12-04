@@ -9,12 +9,14 @@ import { LoadingPlaceholder } from './LoadingPlaceholder';
 export default function ToolInvocations({ toolInvocations }) {
   return (
     <div className="flex flex-col">
-      {toolInvocations.map((toolInvocation) => (
-        <ToolInvocation
-          key={toolInvocation.toolCallId}
-          toolInvocation={toolInvocation}
-        />
-      ))}
+      {toolInvocations
+        .filter((toolInvocation) => toolInvocation !== null)
+        .map((toolInvocation) => (
+          <ToolInvocation
+            key={toolInvocation.toolCallId}
+            toolInvocation={toolInvocation}
+          />
+        ))}
     </div>
   )
 }

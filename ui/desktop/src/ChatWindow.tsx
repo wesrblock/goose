@@ -44,6 +44,14 @@ function ChatContent({
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
   const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});
 
+  useEffect(() => {
+    window.electron.loadSession().then(loadedMessages => {
+      if (loadedMessages && loadedMessages.length > 0) {
+        setMessages(loadedMessages);
+      }
+    });
+  }, []);
+
   const {
     messages,
     append,
