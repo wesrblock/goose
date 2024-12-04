@@ -17,6 +17,7 @@ use clap::{Parser, Subcommand};
 use commands::configure::handle_configure;
 use commands::session::build_session;
 use commands::version::print_version;
+use profile::has_no_profiles;
 use std::io::{self, Read};
 
 use crate::systems::system_handler::{add_system, remove_system};
@@ -258,7 +259,10 @@ async fn main() -> Result<()> {
             return Ok(());
         }
         None => {
-            println!("No command provided");
+            println!("No command provided - Run 'goose help' to see available commands.");
+            if has_no_profiles().unwrap_or(false) {
+                println!("\nRun 'goose configure' to setup goose for the first time.");
+            }
         }
     }
     Ok(())

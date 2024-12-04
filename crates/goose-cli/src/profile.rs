@@ -88,6 +88,10 @@ pub fn find_existing_profile(name: &str) -> Option<Profile> {
     }
 }
 
+pub fn has_no_profiles() -> Result<bool, Box<dyn Error>> {
+    load_profiles().map(|profiles| Ok(profiles.is_empty()))?
+}
+
 pub fn get_or_set_key(
     human_readable_name: &str,
     key_name: &str,
