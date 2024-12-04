@@ -42,14 +42,10 @@ function ChatContent({
   setWorking: React.Dispatch<React.SetStateAction<Working>>;
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
-
   const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});
 
   const {
     messages,
-    input,
-    handleInputChange,
-    handleSubmit,
     append,
     stop,
     isLoading,
@@ -78,7 +74,6 @@ function ChatContent({
 
       const promptTemplates = getPromptTemplates(message.content);
       const fetchResponses = await askAi(promptTemplates);
-
       setMessageMetadata((prev) => ({ ...prev, [message.id]: fetchResponses }));
     },
   });
@@ -98,6 +93,17 @@ function ChatContent({
       initialQueryAppended.current = true;
     }
   }, [initialQuery]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    const customEvent = e as CustomEvent;
+    const content = customEvent.detail?.value || '';
+    if (content.trim()) {
+      append({
+        role: 'user',
+        content: content,
+      });
+    }
+  };
 
   if (error) {
     console.log('Error:', error);
@@ -208,8 +214,6 @@ function ChatContent({
 
         <Input
           handleSubmit={handleSubmit}
-          handleInputChange={handleInputChange}
-          input={input}
           disabled={isLoading}
           isLoading={isLoading}
           onStop={onStopGoose}
@@ -263,11 +267,9 @@ export default function ChatWindow() {
   });
 
   const [selectedChatId, setSelectedChatId] = useState(1);
-
   const [mode, setMode] = useState<'expanded' | 'compact'>(
     initialQuery ? 'compact' : 'expanded'
   );
-
   const [working, setWorking] = useState<Working>(Working.Idle);
   const [progressMessage, setProgressMessage] = useState<string>('');
 
