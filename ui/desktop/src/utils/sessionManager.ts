@@ -17,7 +17,7 @@ interface Session {
     directory: string;
 }
 
-function generateSessionName(messages: object[]): string {
+function generateSessionName(messages: {id: number, role: string, content: string}[]): string {
     // Create a session name based on the first message or a combination of initial messages
     if (messages === undefined || messages.length === 0) return 'empty_session';
     return messages[0].content.split(' ').slice(0, 5).join(' ');
@@ -41,13 +41,40 @@ export function saveSession(session: Session): string {
 export function loadSessions(): Session[] {
     try {
         console.log('Attempting to load sessions from:', SESSIONS_PATH);
-    const files = fs.readdirSync(SESSIONS_PATH);
-    if (files.length === 0) {
-        console.warn('No session files found in directory');
-    } else {
-        console.log('Session files found:', files);
-    }
-        return files.map(file => {
+        const MAX_FILES = 100;
+        const MAX_AGE_DAYS = 10;
+        // Get the current date
+        const now = Date.now();
+        const maxAgeMs = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
+        // Get all files in the directory
+        const files = fs.readdirSync(SESSIONS_PATH);
+
+        if (files.length === 0) {
+            console.warn('No session files found in directory');
+            return [];
+        }
+
+        // Filter files based on their age and limit to max 100 files
+        const filteredFiles = files
+            .map(file => {
+                const filePath = path.join(SESSIONS_PATH, file);
+                const stats = fs.statSync(filePath);
+                const age = now - stats.mtimeMs;
+                return { file, age };
+            })
+            .filter(({ age }) => age <= maxAgeMs)
+            .slice(0, MAX_FILES);
+
+        if (filteredFiles.length === 0) {
+            console.warn('No session files meet the age criteria');
+            return [];
+        }
+
+        console.log('Filtered session files:', filteredFiles.map(f => f.file));
+
+        // Load the filtered files and parse them into sessions
+        return filteredFiles.map(({ file }) => {
             const data = fs.readFileSync(path.join(SESSIONS_PATH, file), 'utf8');
             return JSON.parse(data) as Session;
         });
