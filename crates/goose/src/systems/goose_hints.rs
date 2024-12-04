@@ -1,6 +1,5 @@
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
-use url::Url;
 use std::fs;
 
 use crate::errors::{AgentError, AgentResult};
@@ -77,7 +76,7 @@ impl System for GooseHintsSystem {
         Err(AgentError::ToolNotFound(tool_call.name))
     }
 
-    async fn read_resource(&self, uri: &str) -> AgentResult<String> {
+    async fn read_resource(&self, _uri: &str) -> AgentResult<String> {
         Ok("".to_string())
     }
 }
