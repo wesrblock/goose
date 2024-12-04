@@ -93,7 +93,7 @@ const createChat = async (app, query?: string, dir?: string) => {
   const mainWindow = new BrowserWindow({
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 16, y: 10 },
-    width: 650,
+    width: 750,
     height: 800,
     minWidth: 650,
     minHeight: 800,

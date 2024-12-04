@@ -9,6 +9,7 @@ import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import MoreMenu from './components/MoreMenu';
+import BottomMenu from './components/BottomMenu';
 import LoadingGoose from './components/LoadingGoose';
 import { ApiKeyWarning } from './components/ApiKeyWarning';
 import { askAi, getPromptTemplates } from './utils/askAI';
@@ -164,9 +165,6 @@ function ChatContent({
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <div className="relative block h-[20px] w-screen">
-        <div className="text-center text-splash-pills-text">
-          {window.appConfig.get("GOOSE_WORKING_DIR")}
-        </div>
         <MoreMenu />
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
@@ -233,6 +231,8 @@ function ChatContent({
           isLoading={isLoading}
           onStop={onStopGoose}
         />
+        <div className="self-stretch h-px bg-black/5 rounded-sm" />
+        <BottomMenu />
       </Card>
     </div>
   );
