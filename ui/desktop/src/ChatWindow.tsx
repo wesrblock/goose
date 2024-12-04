@@ -51,7 +51,6 @@ function ChatContent({
     isLoading,
     error,
     setMessages,
-    setInput,
   } = useChat({
     api: getApiUrl('/reply'),
     initialMessages: chat?.messages || [],
@@ -202,9 +201,25 @@ function ChatContent({
               </div>
             )}
             {error && (
-              <div className="flex items-center justify-center p-4">
-                <div className="text-red-500 bg-red-100 p-3 rounded-lg">
-                  {error.message || 'An error occurred while processing your request'}
+              <div className="flex flex-col items-center justify-center p-4">
+                <div className="text-red-700 bg-red-400/50 p-3 rounded-lg mb-2">
+                  {error.message || 'Honk! Goose experienced an error while responding'}
+                  {error.status && (
+                    <span className="ml-2">(Status: {error.status})</span>
+                  )}
+                </div>
+                <div
+                  className="p-4 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-prev-goose-gradient text-prev-goose-text rounded-[14px] inline-block hover:scale-[1.02] transition-all duration-150"
+                  onClick={async () => {
+                    const lastUserMessage = messages.reduceRight((found, m) => found || (m.role === 'user' ? m : null), null);
+                    if (lastUserMessage) {
+                      append({
+                        role: 'user',
+                        content: lastUserMessage.content
+                      });
+                    }
+                  }}>
+                  Retry Last Message
                 </div>
               </div>
             )}
