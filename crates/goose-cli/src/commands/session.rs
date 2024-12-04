@@ -5,9 +5,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use std::path::{Path, PathBuf};
 use std::process;
 
-use crate::profile::{
-    load_profiles, set_provider_config, Profile, PROFILE_DEFAULT_NAME,
-};
+use crate::profile::{get_provider_config, load_profiles, Profile};
 use crate::prompt::cliclack::CliclackPrompt;
 use crate::prompt::rustyline::RustylinePrompt;
 use crate::prompt::Prompt;
@@ -39,9 +37,8 @@ pub fn build_session<'a>(
 
     let loaded_profile = load_profile(profile);
 
-    // TODO: Reconsider fn name as we are just using the fn to ask the user if env vars are not set
     let provider_config =
-        set_provider_config(&loaded_profile.provider, loaded_profile.model.clone(), true);
+        get_provider_config(&loaded_profile.provider, loaded_profile.model.clone());
 
     // TODO: Odd to be prepping the provider rather than having that done in the agent?
     let provider = factory::get_provider(provider_config).unwrap();
@@ -129,17 +126,17 @@ fn load_profile(profile_name: Option<String>) -> Box<Profile> {
             Some(name) => match profiles.get(name.as_str()) {
                 Some(profile) => Box::new(profile.clone()),
                 None => {
-                    println!("Profile '{}' not found. {}", name, configure_profile_message);
+                    println!(
+                        "Profile '{}' not found. {}",
+                        name, configure_profile_message
+                    );
                     process::exit(1);
-                },
+                }
             },
-            None => match profiles.get(PROFILE_DEFAULT_NAME) {
+            None => match profiles.get("default") {
                 Some(profile) => Box::new(profile.clone()),
                 None => {
-                    println!(
-                        "No '{}' profile found. {}",
-                        PROFILE_DEFAULT_NAME, configure_profile_message
-                    );
+                    println!("No 'default' profile found. {}", configure_profile_message);
                     process::exit(1);
                 }
             },

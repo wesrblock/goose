@@ -1,17 +1,14 @@
 mod commands {
     pub mod configure;
-    pub mod expected_config;
     pub mod session;
     pub mod version;
 }
 pub mod agents;
-mod inputs;
 mod profile;
 mod prompt;
 pub mod session;
 
 mod systems;
-mod key_handler;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -83,10 +80,7 @@ enum Command {
     },
 
     /// Start or resume interactive chat sessions
-    #[command(
-        about = "Start or resume interactive chat sessions",
-        alias = "s",
-    )]
+    #[command(about = "Start or resume interactive chat sessions", alias = "s")]
     Session {
         /// Name for the chat session
         #[arg(
@@ -127,7 +121,7 @@ enum Command {
             long,
             required = true,
             value_name = "FILE",
-            help = "Path to instruction file containing commands",
+            help = "Path to instruction file containing commands"
         )]
         instructions: Option<String>,
 
@@ -143,11 +137,11 @@ enum Command {
 
         /// Input text containing commands
         #[arg(
-          short = 't',
-          long = "text",
-          value_name = "TEXT",
-          help = "Input text to provide to Goose directly",
-          long_help = "Input text containing commands for Goose. Use this in lieu of the instructions argument."
+            short = 't',
+            long = "text",
+            value_name = "TEXT",
+            help = "Input text to provide to Goose directly",
+            long_help = "Input text containing commands for Goose. Use this in lieu of the instructions argument."
         )]
         input_text: Option<String>,
 

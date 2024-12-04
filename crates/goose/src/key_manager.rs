@@ -69,7 +69,7 @@ pub fn get_keyring_secret(
 
 pub fn key_value_in_environment_variable(key_name: &str) -> Option<String> {
     match env::var(key_name) {
-        Ok(value) => { Some(value)}
+        Ok(value) => Some(value),
         Err(_) => None,
     }
 }

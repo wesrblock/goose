@@ -1,16 +1,13 @@
+use goose::key_manager::{get_keyring_secret, KeyRetrievalStrategy};
 use goose::providers::configs::{
     DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig,
     ProviderConfig,
 };
-use goose::providers::factory::ProviderType;
-use goose::providers::ollama::OLLAMA_HOST;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
-use strum::IntoEnumIterator;
-use crate::key_handler::key_handler::get_or_set_key;
 
 // Profile types and structures
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -30,22 +27,6 @@ pub struct Profiles {
 pub struct AdditionalSystem {
     pub name: String,
     pub location: String,
-}
-
-// Provider helper constants and functions
-pub const PROVIDER_OPEN_AI: &str = "openai";
-pub const PROVIDER_DATABRICKS: &str = "databricks";
-pub const PROVIDER_OLLAMA: &str = "ollama";
-pub const PROFILE_DEFAULT_NAME: &str = "default";
-
-pub fn select_provider_lists() -> Vec<(&'static str, String, &'static str)> {
-    ProviderType::iter()
-        .map(|provider| match provider {
-            ProviderType::OpenAi => (PROVIDER_OPEN_AI, PROVIDER_OPEN_AI.to_string(), ""),
-            ProviderType::Databricks => (PROVIDER_DATABRICKS, PROVIDER_DATABRICKS.to_string(), ""),
-            ProviderType::Ollama => (PROVIDER_OLLAMA, PROVIDER_OLLAMA.to_string(), ""),
-        })
-        .collect()
 }
 
 pub fn profile_path() -> Result<PathBuf, Box<dyn Error>> {
@@ -86,11 +67,13 @@ pub fn find_existing_profile(name: &str) -> Option<Profile> {
     }
 }
 
-pub fn set_provider_config(provider_name: &str, model: String, only_get_key: bool) -> ProviderConfig {
+pub fn get_provider_config(provider_name: &str, model: String) -> ProviderConfig {
     match provider_name.to_lowercase().as_str() {
-        PROVIDER_OPEN_AI => {
-            let api_key = get_or_set_key("OpenAI API key", "OPENAI_API_KEY", only_get_key)
-                .expect("Failed to get OpenAI API key");
+        "openai" => {
+            // TODO error propagation throughout the CLI
+            let api_key = get_keyring_secret("OPENAI_API_KEY", KeyRetrievalStrategy::Both)
+                .expect("OPENAI_API_KEY not available in env or the keychain\nSet an env var or rerun `goose configure`");
+
             ProviderConfig::OpenAi(OpenAiProviderConfig {
                 host: "https://api.openai.com".to_string(),
                 api_key,
@@ -99,9 +82,9 @@ pub fn set_provider_config(provider_name: &str, model: String, only_get_key: boo
                 max_tokens: None,
             })
         }
-        PROVIDER_DATABRICKS => {
-            let host = get_or_set_key("databricks host url", "DATABRICKS_HOST", only_get_key)
-                .expect("Failed to get databricks host");
+        "databricks" => {
+            let host = get_keyring_secret("DATABRICKS_HOST", KeyRetrievalStrategy::Both)
+                .expect("DATABRICKS_HOST not available in env or the keychain\nSet an env var or rerun `goose configure`");
 
             ProviderConfig::Databricks(DatabricksProviderConfig {
                 host: host.clone(),
@@ -113,16 +96,16 @@ pub fn set_provider_config(provider_name: &str, model: String, only_get_key: boo
                 image_format: goose::providers::utils::ImageFormat::Anthropic,
             })
         }
-        PROVIDER_OLLAMA => {
-            let host = get_or_set_key("ollama host url", "OLLAMA_HOST", only_get_key)
-                .expect("Failed to get databricks host");
+        "ollama" => {
+            let host = get_keyring_secret("OLLAMA_HOST", KeyRetrievalStrategy::Both)
+                .expect("DATABRICKS_HOST not available in env or the keychain\nSet an env var or rerun `goose configure`");
             ProviderConfig::Ollama(OllamaProviderConfig {
                 host: host.clone(),
                 model,
                 temperature: None,
                 max_tokens: None,
             })
-        },
+        }
         _ => panic!("Invalid provider name"),
     }
 }
