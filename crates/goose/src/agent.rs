@@ -143,7 +143,7 @@ impl Agent {
                 let mut status_content = Vec::new();
                 for resource in system_status {
                     if let Ok(content) = system.read_resource(&resource.uri).await {
-                        status_content.push(format!("{}: {}", resource.name, content));
+                        status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
                     }
                 }
 
