@@ -76,6 +76,10 @@ impl System for EchoSystem {
             _ => Err(AgentError::ToolNotFound(tool_call.name)),
         }
     }
+
+    async fn read_resource(&self, uri: &str) -> AgentResult<String> {
+        Ok("".to_string())
+    }
 }
 
 mod tests {

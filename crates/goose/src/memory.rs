@@ -399,14 +399,15 @@ impl System for MemorySystem {
 
     async fn status(&self) -> AnyhowResult<Vec<Resource>> {
         // Convert active memories to resources
-        let resources = self.active_memories
+        let resources: Vec<Resource> = self.active_memories
             .iter()
-            .map(|(category, memories)| {
-                Resource::with_content(
-                    format!("memory/{}.txt", category),
-                    format!("{:?}", memories),
-                    0
-                )
+            .filter_map(|(category, memories)| {
+                Resource::with_uri(
+                    format!("str:///{}.txt", memories.join(" ")),
+                    format!("{}.txt", category),
+                    0,
+                    Some("text".to_string())
+                ).ok()
             })
             .collect();
         Ok(resources)
@@ -417,6 +418,11 @@ impl System for MemorySystem {
             Ok(result) => Ok(vec![Content::text(result)]),
             Err(err) => Err(AgentError::ExecutionError(err.to_string())),
         }
+    }
+
+    async fn read_resource(&self, uri: &str) -> AgentResult<String> {
+        let memories = uri.split("/").next().unwrap();
+        Ok(memories.to_string())
     }
 }
 

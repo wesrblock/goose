@@ -36,15 +36,15 @@ impl Default for DeveloperSystem {
 }
 
 impl DeveloperSystem {
-    /// Reads a resource from a URI and returns its content.
-    /// The resource is added to active_resources if successfully loaded.
+    // Reads a resource from a URI and returns its content.
+    // The resource is added to active_resources if successfully loaded.
     pub async fn read_resource(&self, uri: &str) -> AgentResult<String> {
         let url = Url::parse(uri)
             .map_err(|e| AgentError::InvalidParameters(format!("Invalid URI: {}", e)))?;
         
-        // Create a resource with the given URI
-        let resource = Resource::new(uri, Some("text".to_string()))
-            .map_err(|e| AgentError::InvalidParameters(format!("Failed to create resource: {}", e)))?;
+        // get the resource from active_resources if it exists
+        let active_resources = self.active_resources.lock().unwrap();
+        let resource = active_resources.get(uri);
 
         // Load the content based on URI scheme
         let content = match url.scheme() {
@@ -52,16 +52,20 @@ impl DeveloperSystem {
                 let path = url.to_file_path()
                     .map_err(|_| AgentError::ExecutionError("Invalid file path in URI".into()))?;
                 
-                match resource.mime_type.as_str() {
-                    "text" => std::fs::read_to_string(&path)
-                        .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?,
-                    "blob" => {
-                        let data = std::fs::read(&path)
-                            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
-                        base64::engine::general_purpose::STANDARD.encode(data)
+                match resource {
+                    Some(r) => match r.mime_type.as_str() {
+                        "text" => std::fs::read_to_string(&path)
+                            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?,
+                        "blob" => {
+                            let data = std::fs::read(&path)
+                                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
+                            base64::engine::general_purpose::STANDARD.encode(data)
                     },
-                    _ => return Err(AgentError::ExecutionError(format!("Unsupported MIME type: {}", resource.mime_type))),
-                }
+                    _ => return Err(AgentError::ExecutionError(format!("Unsupported MIME type: {}", r.mime_type))),
+                },
+                None => std::fs::read_to_string(&path)
+                        .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?,
+                }   
             },
             "str" => {
                 // Extract content after "str:///" prefix and URL decode it
@@ -75,16 +79,6 @@ impl DeveloperSystem {
             },
             scheme => return Err(AgentError::InvalidParameters(format!("Unsupported URI scheme: {}", scheme))),
         };
-
-        // If this is a file resource, store it in active_resources using the path as the key
-        if url.scheme() == "file" {
-            if let Ok(_path) = url.to_file_path() {
-                self.active_resources
-                    .lock()
-                    .unwrap()
-                    .insert(uri.to_string(), resource);
-            }
-        }
 
         Ok(content)
     }
@@ -748,6 +742,11 @@ running commands on the shell."
             "screen_capture" => self.screen_capture(tool_call.arguments).await,
             _ => Err(AgentError::ToolNotFound(tool_call.name)),
         }
+    }
+
+    async fn read_resource(&self, uri: &str) -> AgentResult<String> {
+        let content = self.read_resource(uri).await?;
+        Ok(content)
     }
 }
 

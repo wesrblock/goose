@@ -139,9 +139,16 @@ impl Agent {
                     .await
                     .map_err(|e| AgentError::Internal(e.to_string()))?;
 
-                // Format the status into a readable string
-                let status_str = serde_json::to_string(&system_status).unwrap_or_default();
+                // For each resource, fetch its content
+                let mut status_content = Vec::new();
+                for resource in system_status {
+                    if let Ok(content) = system.read_resource(&resource.uri).await {
+                        status_content.push(format!("{}: {}", resource.name, content));
+                    }
+                }
 
+                // Join all resource content with newlines
+                let status_str = status_content.join("\n");
                 systems_status.push(SystemStatus::new(system.name(), status_str));
             }
             context.insert("systems", systems_status);
@@ -331,6 +338,10 @@ mod tests {
                 )]),
                 _ => Err(AgentError::ToolNotFound(tool_call.name)),
             }
+        }
+
+        async fn read_resource(&self, uri: &str) -> AgentResult<String> {
+            Ok("".to_string())
         }
     }
 
