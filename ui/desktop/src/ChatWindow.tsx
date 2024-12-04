@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useChat } from './ai-sdk-fork/useChat';
+import { Message, useChat } from './ai-sdk-fork/useChat';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { getApiUrl } from './config';
 import { Card } from './components/ui/card';
@@ -54,6 +54,8 @@ function ChatContent({
     stop,
     isLoading,
     error,
+    setMessages,
+    setInput,
   } = useChat({
     api: getApiUrl('/reply'),
     initialMessages: chat?.messages || [],
@@ -105,6 +107,59 @@ function ChatContent({
   if (error) {
     console.log('Error:', error);
   }
+
+  const onStopGoose = () => {
+    stop();
+
+    const lastMessage: Message = messages[messages.length - 1];
+    if (lastMessage.role === 'user' && lastMessage.toolInvocations === undefined) {
+      // TODO: Using setInput seems to change the ongoing request message and prevents stop from stopping.
+      // It would be nice to find a way to populate the input field with the last message when interrupted.
+      // setInput("stop");
+
+      // Remove the last user message.
+      if (messages.length > 1) {
+        setMessages(messages.slice(0, -1));
+      } else {
+        setMessages([]);
+      }
+    } else if (lastMessage.role === 'assistant' && lastMessage.toolInvocations !== undefined) {
+      // Add messaging about interrupted ongoing tool invocations.
+      const newLastMessage: Message = {
+          ...lastMessage,
+          toolInvocations: lastMessage.toolInvocations.map((invocation) => {
+            if (invocation.state !== 'result') {
+              return {
+                ...invocation,
+                result: [
+                  {
+                    "audience": [
+                      "user"
+                    ],
+                    "text": "Interrupted.\n",
+                    "type": "text"
+                  },
+                  {
+                    "audience": [
+                      "assistant"
+                    ],
+                    "text": "Interrupted by the user to make a correction.\n",
+                    "type": "text"
+                  }
+                ],
+                state: 'result',
+              };
+          } else {
+            return invocation;
+          }
+        }),
+      };
+        
+      const updatedMessages = [...messages.slice(0, -1), newLastMessage];
+      setMessages(updatedMessages);
+    }
+    
+  };
 
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
@@ -180,7 +235,7 @@ function ChatContent({
           input={input}
           disabled={isLoading}
           isLoading={isLoading}
-          onStop={stop}
+          onStop={onStopGoose}
         />
       </Card>
     </div>
