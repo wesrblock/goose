@@ -218,7 +218,16 @@ impl DeveloperSystem {
         Self {
             tools: vec![bash_tool, text_editor_tool, screen_capture_tool],
             cwd: Mutex::new(std::env::current_dir().unwrap()),
-            active_resources: Mutex::new(HashMap::new()),
+            active_resources: {
+                let mut resources = HashMap::new();
+                let cwd = std::env::current_dir().unwrap();
+                let uri: Option<String> = Some(format!("str:///{}", cwd.display()));
+                resources.insert(
+                    uri.clone().unwrap(),
+                    Resource::new(uri.unwrap(), Some("text".to_string()), Some("cwd".to_string())).unwrap()
+                );
+                Mutex::new(resources)
+            },
             file_history: Mutex::new(HashMap::new()),
             instructions,
         }
@@ -379,7 +388,7 @@ impl DeveloperSystem {
                 .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
             
             // Create and store the resource
-            let resource = Resource::new(uri.clone(), Some("text".to_string()))
+            let resource = Resource::new(uri.clone(), Some("text".to_string()), None)
                 .map_err(|e| AgentError::ExecutionError(format!("Failed to create resource: {}", e)))?;
             
             self.active_resources
@@ -445,7 +454,8 @@ impl DeveloperSystem {
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         // Create and store resource
-        let resource = Resource::new(uri.clone(), Some("text".to_string()))
+        
+        let resource = Resource::new(uri.clone(), Some("text".to_string()), None)
             .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
         self.active_resources
             .lock()
@@ -937,7 +947,7 @@ mod tests {
         // Test text mime type with file:// URI
         {
             let mut active_resources = system.active_resources.lock().unwrap();
-            let resource = Resource::new(uri.clone(), Some("text".to_string())).unwrap();
+            let resource = Resource::new(uri.clone(), Some("text".to_string()), None).unwrap();
             active_resources.insert(uri.clone(), resource);
         }
         let content = system.read_resource(&uri).await.unwrap();
@@ -950,7 +960,7 @@ mod tests {
         let blob_uri = Url::from_file_path(&blob_path).unwrap().to_string();
         {
             let mut active_resources = system.active_resources.lock().unwrap();
-            let resource = Resource::new(blob_uri.clone(), Some("blob".to_string())).unwrap();
+            let resource = Resource::new(blob_uri.clone(), Some("blob".to_string()), None).unwrap();
             active_resources.insert(blob_uri.clone(), resource);
         }
         let encoded_content = system.read_resource(&blob_uri).await.unwrap();
@@ -963,7 +973,7 @@ mod tests {
         let str_uri = format!("str:///{}", test_content);
         {
             let mut active_resources = system.active_resources.lock().unwrap();
-            let resource = Resource::new(str_uri.clone(), Some("text".to_string())).unwrap();
+            let resource = Resource::new(str_uri.clone(), Some("text".to_string()), None).unwrap();
             active_resources.insert(str_uri.clone(), resource);
         }
         let str_content = system.read_resource(&str_uri).await.unwrap();
@@ -973,7 +983,7 @@ mod tests {
         let str_blob_uri = format!("str:///{}", test_content);
         {
             let mut active_resources = system.active_resources.lock().unwrap();
-            let resource = Resource::new(str_blob_uri.clone(), Some("blob".to_string())).unwrap();
+            let resource = Resource::new(str_blob_uri.clone(), Some("blob".to_string()), None).unwrap();
             active_resources.insert(str_blob_uri.clone(), resource);
         }
         let error = system.read_resource(&str_blob_uri).await.unwrap_err();
@@ -999,7 +1009,7 @@ mod tests {
         eprintln!("Non-existent file path: {}", non_existent);
         {
             let mut active_resources = system.active_resources.lock().unwrap();
-            let resource = Resource::new(non_existent.clone(), Some("text".to_string())).unwrap();
+            let resource = Resource::new(non_existent.clone(), Some("text".to_string()), None).unwrap();
             active_resources.insert(non_existent.clone(), resource);
             eprintln!("Resource registered with URI: {}", non_existent);
         }
@@ -1015,7 +1025,7 @@ mod tests {
         {
             let mut active_resources = system.active_resources.lock().unwrap();
             // Create with text mime type but modify it to be invalid
-            let mut resource = Resource::new(invalid_mime.clone(), Some("text".to_string())).unwrap();
+            let mut resource = Resource::new(invalid_mime.clone(), Some("text".to_string()), None).unwrap();
             resource.mime_type = "invalid".to_string();
             active_resources.insert(invalid_mime.clone(), resource);
         }

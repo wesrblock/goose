@@ -28,16 +28,20 @@ fn default_mime_type() -> String {
 
 impl Resource {
     /// Creates a new Resource from a URI with explicit mime type
-    pub fn new<S: AsRef<str>>(uri: S, mime_type: Option<String>) -> Result<Self> {
+    pub fn new<S: AsRef<str>>(uri: S, mime_type: Option<String>, name: Option<String>) -> Result<Self> {
         let uri = uri.as_ref();
         let url = Url::parse(uri)
             .map_err(|e| anyhow!("Invalid URI: {}", e))?;
 
         // Extract name from the path component of the URI
-        let name = url.path_segments()
-            .and_then(|segments| segments.last())
-            .unwrap_or("unnamed")
-            .to_string();
+        // Use provided name if available, otherwise extract from URI
+        let name = match name {
+            Some(n) => n,
+            None => url.path_segments()
+                .and_then(|segments| segments.last())
+                .unwrap_or("unnamed")
+                .to_string()
+        };
 
         // Use provided mime_type or default
         let mime_type = match mime_type {
@@ -120,7 +124,7 @@ mod tests {
             .map_err(|_| anyhow!("Invalid file path"))?
             .to_string();
         
-        let resource = Resource::new(&uri, Some("text".to_string()))?;
+        let resource = Resource::new(&uri, Some("text".to_string()), None)?;
         assert!(resource.uri.starts_with("file:///"));
         assert_eq!(resource.priority, 0);
         assert_eq!(resource.mime_type, "text");
@@ -147,18 +151,18 @@ mod tests {
     #[test]
     fn test_mime_type_validation() -> Result<()> {
         // Test valid mime types
-        let resource = Resource::new("file:///test.txt", Some("text".to_string()))?;
+        let resource = Resource::new("file:///test.txt", Some("text".to_string()), None)?;
         assert_eq!(resource.mime_type, "text");
 
-        let resource = Resource::new("file:///test.bin", Some("blob".to_string()))?;
+        let resource = Resource::new("file:///test.bin", Some("blob".to_string()), None)?;
         assert_eq!(resource.mime_type, "blob");
 
         // Test invalid mime type defaults to "text"
-        let resource = Resource::new("file:///test.txt", Some("invalid".to_string()))?;
+        let resource = Resource::new("file:///test.txt", Some("invalid".to_string()), None)?;
         assert_eq!(resource.mime_type, "text");
 
         // Test None defaults to "text"
-        let resource = Resource::new("file:///test.txt", None)?;
+        let resource = Resource::new("file:///test.txt", None, None)?;
         assert_eq!(resource.mime_type, "text");
 
         Ok(())
@@ -188,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_invalid_uri() {
-        let result = Resource::new("not-a-uri", None);
+        let result = Resource::new("not-a-uri", None, None);
         assert!(result.is_err());
     }
 }
