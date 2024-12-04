@@ -12,6 +12,12 @@ interface InputProps {
   onStop?: () => void;
 }
 
+const id = 'dynamic-textarea';
+
+export function getInputElement(): HTMLElement | null {
+  return document.getElementById(id);
+}
+
 export default function Input({
   handleSubmit,
   handleInputChange,
@@ -65,7 +71,7 @@ export default function Input({
     }} className="flex relative bg-white h-auto px-[16px] pr-[38px] py-[1rem] rounded-b-2xl">
       <textarea
         autoFocus
-        id="dynamic-textarea"
+        id={id}
         placeholder="What should goose do?"
         value={value}
         onChange={handleChange}

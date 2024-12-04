@@ -7,7 +7,7 @@ import { ScrollArea } from './components/ui/scroll-area';
 import Splash from './components/Splash';
 import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
-import Input from './components/Input';
+import Input, { getInputElement } from './components/Input';
 import MoreMenu from './components/MoreMenu';
 import LoadingGoose from './components/LoadingGoose';
 import { ApiKeyWarning } from './components/ApiKeyWarning';
@@ -85,6 +85,12 @@ function ChatContent({
       const fetchResponses = await askAi(promptTemplates);
 
       setMessageMetadata((prev) => ({ ...prev, [message.id]: fetchResponses }));
+
+      // Return focus to the input field after the response is received so user can type immediately.
+      const textarea = getInputElement();
+      if (textarea) {
+        textarea.focus();
+      }
     },
   });
 
