@@ -7,7 +7,7 @@ import started from "electron-squirrel-startup";
 import log from './utils/logger';
 import { exec } from 'child_process';
 import { addRecentDir, loadRecentDirs } from './utils/recentDirs';
-import { loadSessions, saveSession, clearAllSessions } from './utils/sessionManager';
+import { loadSessions, saveSession, clearAllSessions, loadSession } from './utils/sessionManager';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -369,7 +369,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('get-session',  (_, sessionId) => {
     try {
       console.log("Loading session.....");
-      return loadSessions().find(session => session.name === sessionId);
+      return loadSession(sessionId)
     } catch (error) {
       console.error('Failed to load sessions:', error);
       throw error;
@@ -380,12 +380,11 @@ app.whenReady().then(async () => {
   ipcMain.handle('list-sessions',  (_, dir?: string) => {
     try {
       
-      const sessions = loadSessions();
+      const sessions = loadSessions(dir);
       
       if (dir) {
         console.log("server: looking for sessions that match directory", dir);
         const results = sessions
-          .filter(session => session.directory === dir)
           .map(session => session.name);
         console.log("server: found sessions:", results);
         return results;
