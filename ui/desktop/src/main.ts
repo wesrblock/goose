@@ -7,6 +7,7 @@ import started from "electron-squirrel-startup";
 import log from './utils/logger';
 import { exec } from 'child_process';
 import { addRecentDir, loadRecentDirs } from './utils/recentDirs';
+import { loadSessions, saveSession, clearAllSessions } from './utils/sessionManager';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) app.quit();
@@ -87,7 +88,7 @@ const createLauncher = () => {
 let windowCounter = 0;
 const windowMap = new Map<number, BrowserWindow>();
 
-const createChat = async (app, query?: string, dir?: string) => {
+const createChat = async (app, query?: string, dir?: string, sessionId?: string) => {
 
   const [port, working_dir] = await startGoosed(app, dir);  
   const mainWindow = new BrowserWindow({
@@ -102,7 +103,7 @@ const createChat = async (app, query?: string, dir?: string) => {
     icon: path.join(__dirname, '../images/icon'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      additionalArguments: [JSON.stringify({ ...appConfig, GOOSE_SERVER__PORT: port, GOOSE_WORKING_DIR: working_dir })],
+      additionalArguments: [JSON.stringify({ ...appConfig, GOOSE_SERVER__PORT: port, GOOSE_WORKING_DIR: working_dir, GOOSE_SESSION_ID: sessionId })],
     },
   });
 
@@ -211,6 +212,17 @@ const buildRecentFilesMenu = () => {
   }));
 };
 
+// Add Recent Sessions submenu
+const buildRecentSessionsMenu = () => {
+  const sessions = loadSessions();
+  return sessions.map(session => ({
+    label: session.name,
+    click: () => {
+      createChat(app, undefined, session.directory, session.name);
+    }
+  }));
+};
+
 const openDirectoryDialog = async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory']
@@ -244,6 +256,23 @@ app.whenReady().then(async () => {
     },
   }));
 
+  const recentSessionsSubmenu = buildRecentSessionsMenu();
+  if (recentSessionsSubmenu.length > 0) {
+    fileMenu.submenu.append(new MenuItem({ type: 'separator' }));
+    fileMenu.submenu.append(new MenuItem({
+      label: 'Recent Sessions',
+      submenu: recentSessionsSubmenu
+    }));
+  }
+
+  // Add option to clear session history
+  fileMenu.submenu.append(new MenuItem({
+    label: 'Clear Session History',
+    click() {
+      clearAllSessions();
+    },
+  }));
+
   // Add Recent Files submenu
   const recentFilesSubmenu = buildRecentFilesMenu();
   if (recentFilesSubmenu.length > 0) {
@@ -274,8 +303,41 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.on('save-session',  (_, session) => {
+  try {
+    return saveSession(session);
+  } catch (error) {
+    console.error('Failed to save session:', error);
+    throw error;
+  }
+});
+
+  ipcMain.on('get-session',  (_, sessionId) => {
+    try {
+      return loadSessions().find(session => session.name === sessionId);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      throw error;
+    }
+  });
+
   ipcMain.on('create-chat-window', (_, query) => {
-    createChat(app, query);
+      createChat(app, query);
+    });
+
+  ipcMain.on('clear-session-history', () => {
+    // Clear all stored session data
+    try {
+      // We'll simulate clearing session data - implement this using your session storage logic
+      clearAllSessions();
+      console.log('All session history cleared');
+      // Optionally notify all open chat windows to update/reset
+      windowMap.forEach(win => {
+        win.webContents.send('session-history-cleared');
+      });
+    } catch (error) {
+      console.error('Failed to clear session history:', error);
+    }
   });
 
   ipcMain.on('directory-chooser', (_) => {
