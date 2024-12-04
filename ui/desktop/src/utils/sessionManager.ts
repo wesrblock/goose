@@ -23,13 +23,23 @@ function generateSessionName(messages: {id: number, role: string, content: strin
     return messages[0].content.split(' ').slice(0, 5).join(' ');
 }
 
+function createSafeFilename(name: string): string {
+    // Replace unsafe characters with underscores and limit length
+    return name
+        .replace(/[^a-zA-Z0-9-_]/g, '_') // Replace unsafe chars with underscore
+        .replace(/_{2,}/g, '_')          // Replace multiple underscores with single
+        .replace(/^_|_$/g, '')           // Remove leading/trailing underscores
+        .substring(0, 100);              // Limit length to 100 chars
+}
+
 export function saveSession(session: Session): string {
     try {
         const sessionData = {
             ...session,
             name: generateSessionName(session.messages)
         };
-        const filePath = path.join(SESSIONS_PATH, `${sessionData.name}.json`);
+        const safeFileName = createSafeFilename(sessionData.name);
+        const filePath = path.join(SESSIONS_PATH, `${safeFileName}.json`);
         fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2));
         console.log('Session saved:', sessionData);
         return sessionData.name;
@@ -40,7 +50,8 @@ export function saveSession(session: Session): string {
 
 export function loadSession(sessionId: string): Session | undefined {
     try {
-        const filePath = path.join(SESSIONS_PATH, `${sessionId}.json`);
+        const safeFileName = createSafeFilename(sessionId);
+        const filePath = path.join(SESSIONS_PATH, `${safeFileName}.json`);
         if (!fs.existsSync(filePath)) {
             console.warn('Session file not found:', sessionId);
             return undefined;
