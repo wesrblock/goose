@@ -222,7 +222,34 @@ const openDirectoryDialog = async () => {
   }
 };
 
+// Global error handler
+const handleFatalError = (error: Error) => {
+  const windows = BrowserWindow.getAllWindows();
+  windows.forEach(win => {
+    win.webContents.send('fatal-error', error.message || 'An unexpected error occurred');
+  });
+};
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  handleFatalError(error);
+});
+
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled Rejection:', error);
+  handleFatalError(error instanceof Error ? error : new Error(String(error)));
+});
+
 app.whenReady().then(async () => {
+  // Test error feature - only enabled with GOOSE_TEST_ERROR=true
+  if (process.env.GOOSE_TEST_ERROR === 'true') {
+    console.log('Test error feature enabled, will throw error in 5 seconds');
+    setTimeout(() => {
+      console.log('Throwing test error now...');
+      throw new Error('Test error: This is a simulated fatal error after 5 seconds');
+    }, 5000);
+  }
+
   // Load zsh environment variables in production mode only
   
   createTray();
@@ -289,6 +316,11 @@ app.whenReady().then(async () => {
 
   ipcMain.on('logInfo', (_, info) => {
     log.info("from renderer:", info);
+  });
+
+  ipcMain.on('reload-app', () => {
+    app.relaunch();
+    app.exit(0);
   });
 
   // Handle metadata fetching from main process
