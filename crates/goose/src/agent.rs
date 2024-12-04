@@ -326,25 +326,12 @@ impl Agent {
             loop {
                 
                 let token_counter = TokenCounter::new();
-                // let approx_count = token_counter.count_chat_tokens(
-                //     system_prompt,
-                //     &messages,
-                //     &tools,
-                //     Some("gpt-4o"),
-                // );
-                // Count tokens for system prompt and messages
-                let mut approx_count = token_counter.count_tokens(&system_prompt, Some("gpt-4"));
-                for msg in &messages {
-                    for content in &msg.content {
-                        if let MessageContent::Text(text) = content {
-                            approx_count += token_counter.count_tokens(&text.text, Some("gpt-4"));
-                        }
-                    }
-                }
-                // Add estimated tokens for tools
-                for tool in &tools {
-                    approx_count += token_counter.count_tokens(&tool.description, Some("gpt-4"));
-                }
+                let approx_count = token_counter.count_chat_tokens(
+                    &system_prompt,
+                    &messages,
+                    &tools,
+                    Some("gpt-4"),
+                );
 
                 if approx_count > CONTEXT_LIMIT {
                     let status_counts = self.get_system_status_counts().await?;
