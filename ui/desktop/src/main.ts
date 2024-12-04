@@ -385,11 +385,11 @@ app.whenReady().then(async () => {
       if (dir) {
         console.log("server: looking for sessions that match directory", dir);
         const results = sessions
-          .map(session => session.name);
+          .map(session => ({ name: session.name, directory: session.directory }));
         console.log("server: found sessions:", results);
         return results;
       } else {
-        return sessions.map(session => session.name);
+        return sessions.map(session => ({ name: session.name, directory: session.directory }));
       }      
     } catch (error) {
       console.error('Failed to load sessions:', error);
