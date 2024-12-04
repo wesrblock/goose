@@ -375,6 +375,24 @@ app.whenReady().then(async () => {
     }
   });
 
+  // list sessions filtered by ones for the given directory
+  ipcMain.handle('list-sessions',  (_, dir?: string) => {
+    try {
+      console.log("Loading session.....");
+      const sessions = loadSessions();
+      if (dir) {
+        return sessions
+          .filter(session => session.directory === dir)
+          .map(session => session.name);
+      } else {
+        return sessions.map(session => session.name);
+      }      
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      throw error;
+    }
+  });  
+
 
   ipcMain.on('open-in-chrome', (_, url) => {
     // On macOS, use the 'open' command with Chrome

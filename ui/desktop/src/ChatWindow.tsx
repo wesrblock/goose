@@ -48,7 +48,6 @@ function ChatContent({
         }
       }
     }
-
     fetchSession();
   }, []);
 
