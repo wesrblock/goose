@@ -4,7 +4,7 @@
 
 If you need to customize goose, one way is via editing: `~/.config/goose/profiles.yaml`.
 
-By default, It looks like this:
+By default, it looks like this:
 
 ```yaml
 default:
