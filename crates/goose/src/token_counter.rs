@@ -133,7 +133,7 @@ impl TokenCounter {
         func_token_count
     }
 
-    pub fn count_tokens_for_chat_completion(
+    pub fn count_chat_tokens(
         &self,
         system_prompt: &str,
         messages: &[Message],
@@ -210,7 +210,7 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_count_tokens_for_chat_completion() {
+    fn test_count_chat_tokens() {
         let token_counter = TokenCounter::new();
 
         let system_prompt = "You are a helpful assistant that can answer questions about the weather.";
@@ -252,7 +252,7 @@ mod tests {
             }),
         }];
 
-        let token_count_without_tools = token_counter.count_tokens_for_chat_completion(
+        let token_count_without_tools = token_counter.count_chat_tokens(
             system_prompt,
             &messages,
             &vec![],
@@ -260,7 +260,7 @@ mod tests {
         );
         println!("Total tokens without tools: {}", token_count_without_tools);
 
-        let token_count_with_tools = token_counter.count_tokens_for_chat_completion(
+        let token_count_with_tools = token_counter.count_chat_tokens(
             system_prompt,
             &messages,
             &tools,
