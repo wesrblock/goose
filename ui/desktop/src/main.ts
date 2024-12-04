@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { loadZshEnv } from './utils/loadEnv';
-import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem, dialog } from 'electron';
+import { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, Notification, MenuItem, dialog, session } from 'electron';
 import path from 'node:path';
 import { findAvailablePort, startGoosed } from './goosed';
 import started from "electron-squirrel-startup";
@@ -313,9 +313,10 @@ app.whenReady().then(async () => {
 });
 
 
-  ipcMain.on('create-chat-window', (_, query) => {
-      createChat(app, query);
-    });
+  ipcMain.on('create-chat-window', (_, query, dir?, sessionId?) => {
+      //(app, query?: string, dir?: string, sessionId?: string)
+      createChat(app, query, dir, sessionId);
+  });
 
   ipcMain.on('clear-session-history', () => {
     // Clear all stored session data
@@ -378,12 +379,16 @@ app.whenReady().then(async () => {
   // list sessions filtered by ones for the given directory
   ipcMain.handle('list-sessions',  (_, dir?: string) => {
     try {
-      console.log("Loading session.....");
+      
       const sessions = loadSessions();
+      
       if (dir) {
-        return sessions
+        console.log("server: looking for sessions that match directory", dir);
+        const results = sessions
           .filter(session => session.directory === dir)
           .map(session => session.name);
+        console.log("server: found sessions:", results);
+        return results;
       } else {
         return sessions.map(session => session.name);
       }      

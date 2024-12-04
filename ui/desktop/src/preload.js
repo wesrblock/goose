@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('electron', {
   getConfig: () => config,
   hideWindow: () => ipcRenderer.send('hide-window'),
   directoryChooser: () => ipcRenderer.send('directory-chooser'),
-  createChatWindow: (query) => ipcRenderer.send('create-chat-window', query),
+  createChatWindow: (query, dir, sessionId) => ipcRenderer.send('create-chat-window', query, dir, sessionId),
   logInfo: (txt) => ipcRenderer.send('logInfo', txt),
   showNotification: (data) => ipcRenderer.send('notify', data),
   createWingToWingWindow: (query) => ipcRenderer.send('create-wing-to-wing-window', query),

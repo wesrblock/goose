@@ -71,7 +71,6 @@ export function loadSessions(): Session[] {
             return [];
         }
 
-        console.log('Filtered session files:', filteredFiles.map(f => f.file));
 
         // Load the filtered files and parse them into sessions
         return filteredFiles.map(({ file }) => {
