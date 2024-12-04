@@ -16,21 +16,16 @@ const useCombinedSessions = (workingDir: string) => {
 
   const getCombinedSessions = () => {
     if (sessions.length === 0 && latestSessions.length === 0) {
-      return { currentDirSessions: [], otherLocationSessions: [] };
+      return [];
     }
 
-    const currentDirSessions = [];
-    const otherLocationSessions = [];
+    const allSessions = [];
     const seenNames = new Set();
 
     // Process latest sessions first
     for (const session of latestSessions) {
       if (!seenNames.has(session.name)) {
-        if (session.directory === workingDir) {
-          currentDirSessions.push({ ...session, isLatest: true });
-        } else {
-          otherLocationSessions.push({ ...session, isLatest: true });
-        }
+        allSessions.push({ ...session, isLatest: true });
         seenNames.add(session.name);
       }
     }
@@ -38,23 +33,13 @@ const useCombinedSessions = (workingDir: string) => {
     // Process regular sessions
     for (const session of sessions) {
       if (!seenNames.has(session.name)) {
-        if (session.directory === workingDir) {
-          currentDirSessions.push({ ...session, isLatest: false });
-        } else {
-          otherLocationSessions.push({ ...session, isLatest: false });
-        }
+        allSessions.push({ ...session, isLatest: false });
         seenNames.add(session.name);
       }
     }
 
     // Sort sessions by name
-    currentDirSessions.sort((a, b) => a.name.localeCompare(b.name));
-    otherLocationSessions.sort((a, b) => a.name.localeCompare(b.name));
-
-    return {
-      currentDirSessions: currentDirSessions.slice(0, 5),
-      otherLocationSessions: otherLocationSessions.slice(0, 5)
-    };
+    return allSessions.sort((a, b) => a.name.localeCompare(b.name));
   };
 
   return getCombinedSessions();
@@ -62,10 +47,14 @@ const useCombinedSessions = (workingDir: string) => {
 
 export default function SessionPills() {
   const workingDir = window.appConfig.get("GOOSE_WORKING_DIR");
-  const { currentDirSessions, otherLocationSessions } = useCombinedSessions(workingDir);
+  const allSessions = useCombinedSessions(workingDir);
 
-  if (currentDirSessions.length === 0 && otherLocationSessions.length === 0) {
-    return null;
+  if (allSessions.length === 0) {
+    return (
+      <div className="text-center text-splash-pills-text text-14 mt-4">
+        No previous sessions found
+      </div>
+    );
   }
 
   const SessionPill = ({ session }) => (
@@ -77,37 +66,17 @@ export default function SessionPills() {
       }}
       title={session.directory}
     >
-      <div className="text-14">{`${session.name.slice(0, 50)}`}</div>
-      {session.directory !== workingDir && (
-        <div className="text-xs opacity-70 mt-1">{session.directory}</div>
-      )}
+      <div className="text-14">{session.name}</div>
+      <div className="text-xs opacity-70 mt-1 truncate">{session.directory}</div>
     </div>
   );
 
   return (
-      <div className="grid grid-cols-1  ">
-          {currentDirSessions.length > 0 && (
-              <div>
-                  <h3 className="text-11 text-splash-pills-text mb-2 text-center">Recent sessions in
-                      this directory</h3>
-                  <div className="grid grid-cols-1 gap-4 mb-[16px]">
-                      {currentDirSessions.map((session) => (
-                          <SessionPill key={session.directory + session.name} session={session}/>
-                      ))}
-                  </div>
-              </div>
-          )}
-          {otherLocationSessions.length > 0 && (
-              <div>
-                  <h3 className="text-11 text-splash-pills-text mb-2 text-center">Recent sessions in other
-                      locations</h3>
-                  <div className="grid grid-cols-1">
-                      {otherLocationSessions.map((session) => (
-                          <SessionPill key={session.directory + session.name} session={session}/>
-                      ))}
-                  </div>
-              </div>
-          )}
-      </div>
+    <div className="grid grid-cols-1 gap-2 mt-4 max-h-[80vh] overflow-y-auto px-4">
+      <h3 className="text-11 text-splash-pills-text mb-2 text-center">Previous Sessions</h3>
+      {allSessions.map((session) => (
+        <SessionPill key={session.directory + session.name} session={session} />
+      ))}
+    </div>
   );
 }
