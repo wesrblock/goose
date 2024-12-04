@@ -1,11 +1,9 @@
 mod commands {
     pub mod configure;
-    pub mod expected_config;
     pub mod session;
     pub mod version;
 }
 pub mod agents;
-mod inputs;
 mod profile;
 mod prompt;
 pub mod session;
@@ -25,35 +23,6 @@ use crate::systems::system_handler::{add_system, remove_system};
 #[derive(Parser)]
 #[command(author, about, long_about = None)]
 struct Cli {
-    /// Provider option (openai or databricks or ollama)
-    #[arg(short, long, default_value = "open-ai")]
-    #[arg(value_enum)]
-    provider: CliProviderVariant,
-
-    /// OpenAI API Key (can also be set via OPENAI_API_KEY environment variable)
-    #[arg(long)]
-    api_key: Option<String>,
-
-    /// Databricks host (can also be set via DATABRICKS_HOST environment variable)
-    #[arg(long)]
-    databricks_host: Option<String>,
-
-    /// Databricks token (can also be set via DATABRICKS_TOKEN environment variable)
-    #[arg(long)]
-    databricks_token: Option<String>,
-
-    /// The machine learning model to use for operations. Use 'gpt-4o' for enhanced competence.
-    #[arg(short, long, default_value = "gpt-4o")]
-    model: String,
-
-    /// Temperature (0.0 to 1.0)
-    #[arg(short, long)]
-    temperature: Option<f32>,
-
-    /// Maximum tokens to generate
-    #[arg(long)]
-    max_tokens: Option<i32>,
-
     #[arg(short = 'v', long = "version")]
     version: bool,
 
@@ -75,17 +44,14 @@ enum Command {
     },
 
     /// Manage system prompts and behaviors
-    #[command(about = "Manage system prompts and behaviors")]
+    #[command(about = "Manage the systems that goose can operate")]
     System {
         #[command(subcommand)]
         action: SystemCommands,
     },
 
     /// Start or resume interactive chat sessions
-    #[command(
-        about = "Start or resume interactive chat sessions",
-        alias = "s",
-    )]
+    #[command(about = "Start or resume interactive chat sessions", alias = "s")]
     Session {
         /// Name for the chat session
         #[arg(
@@ -95,7 +61,7 @@ enum Command {
             help = "Name for the chat session (e.g., 'project-x')",
             long_help = "Specify a name for your chat session. When used with --resume, will resume this specific session if it exists."
         )]
-        session: Option<String>,
+        name: Option<String>,
 
         /// Configuration profile to use
         #[arg(
@@ -118,7 +84,7 @@ enum Command {
     },
 
     /// Execute commands from an instruction file
-    #[command(about = "Execute commands from an instruction file")]
+    #[command(about = "Execute commands from an instruction file or stdin")]
     Run {
         /// Path to instruction file containing commands
         #[arg(
@@ -126,7 +92,7 @@ enum Command {
             long,
             required = true,
             value_name = "FILE",
-            help = "Path to instruction file containing commands",
+            help = "Path to instruction file containing commands"
         )]
         instructions: Option<String>,
 
@@ -142,11 +108,11 @@ enum Command {
 
         /// Input text containing commands
         #[arg(
-          short = 't',
-          long = "text",
-          value_name = "TEXT",
-          help = "Input text to provide to Goose directly",
-          long_help = "Input text containing commands for Goose. Use this in lieu of the instructions argument."
+            short = 't',
+            long = "text",
+            value_name = "TEXT",
+            help = "Input text to provide to Goose directly",
+            long_help = "Input text containing commands for Goose. Use this in lieu of the instructions argument."
         )]
         input_text: Option<String>,
 
@@ -158,7 +124,7 @@ enum Command {
             help = "Name for this run session (e.g., 'daily-tasks')",
             long_help = "Specify a name for this run session. This helps identify and resume specific runs later."
         )]
-        session: Option<String>,
+        name: Option<String>,
 
         /// Resume a previous run
         #[arg(
@@ -227,11 +193,11 @@ async fn main() -> Result<()> {
             }
         },
         Some(Command::Session {
-            session,
+            name,
             profile,
             resume,
         }) => {
-            let mut session = build_session(session, profile, resume);
+            let mut session = build_session(name, profile, resume);
             let _ = session.start().await;
             return Ok(());
         }
@@ -239,7 +205,7 @@ async fn main() -> Result<()> {
             instructions,
             input_text,
             profile,
-            session,
+            name,
             resume,
         }) => {
             let contents = if let Some(file_name) = instructions {
@@ -254,7 +220,7 @@ async fn main() -> Result<()> {
                     .expect("Failed to read from stdin");
                 stdin
             };
-            let mut session = build_session(session, profile, resume);
+            let mut session = build_session(name, profile, resume);
             let _ = session.headless_start(contents.clone()).await;
             return Ok(());
         }
