@@ -153,8 +153,20 @@ impl TokenCounter {
             num_tokens += tokens_per_message;
             // Count tokens in the content
             for content in &message.content {
-                let content_text = content.as_text().unwrap();
-                num_tokens += self.count_tokens(&content_text, model_name);
+                // content can either be text response or tool request
+                if let Some(content_text) = content.as_text() {
+                    num_tokens += self.count_tokens(&content_text, model_name);
+                } else if let Some(tool_request) = content.as_tool_request() {
+                    // TODO: count tokens for tool request
+                    let tool_call = tool_request.tool_call.as_ref().unwrap();
+                    let text = format!("{}:{}:{}", tool_request.id, tool_call.name, tool_call.arguments);
+                    num_tokens += self.count_tokens(&text, model_name);
+                } else if let Some(tool_response_text) = content.as_tool_response_text() {
+                    num_tokens += self.count_tokens(&tool_response_text, model_name);
+                } else {
+                    // unsupported content type such as image - pass
+                    continue;
+                }
             }
         }
 
