@@ -10,6 +10,7 @@ import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import MoreMenu from './components/MoreMenu';
 import {Bird} from './components/ui/icons';
+import BottomMenu from './components/BottomMenu';
 import LoadingGoose from './components/LoadingGoose';
 import {ApiKeyWarning} from './components/ApiKeyWarning';
 
@@ -85,13 +86,13 @@ function ChatContent({
   });
 
   // Update chat messages when they change
-  useEffect(() => {    
+  useEffect(() => {
       const sessionToSave = {
         messages: messages,
         directory: window.appConfig.get("GOOSE_WORKING_DIR")
       };
       saveSession(sessionToSave);
-  
+
   }, [messages]);
 
   // Function to save a session
@@ -180,9 +181,6 @@ function ChatContent({
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <div className="relative block h-[20px] w-screen">
-        <div className="text-center text-splash-pills-text">
-          {window.appConfig.get("GOOSE_WORKING_DIR")}
-        </div>
         <MoreMenu />
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
@@ -217,9 +215,25 @@ function ChatContent({
               </div>
             )}
             {error && (
-              <div className="flex items-center justify-center p-4">
-                <div className="text-red-500 bg-red-100 p-3 rounded-lg">
-                  {error.message || 'An error occurred while processing your request'}
+              <div className="flex flex-col items-center justify-center p-4">
+                <div className="text-red-700 bg-red-400/50 p-3 rounded-lg mb-2">
+                  {error.message || 'Honk! Goose experienced an error while responding'}
+                  {error.status && (
+                    <span className="ml-2">(Status: {error.status})</span>
+                  )}
+                </div>
+                <div
+                  className="p-4 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-prev-goose-gradient text-prev-goose-text rounded-[14px] inline-block hover:scale-[1.02] transition-all duration-150"
+                  onClick={async () => {
+                    const lastUserMessage = messages.reduceRight((found, m) => found || (m.role === 'user' ? m : null), null);
+                    if (lastUserMessage) {
+                      append({
+                        role: 'user',
+                        content: lastUserMessage.content
+                      });
+                    }
+                  }}>
+                  Retry Last Message
                 </div>
               </div>
             )}
@@ -233,6 +247,8 @@ function ChatContent({
           isLoading={isLoading}
           onStop={onStopGoose}
         />
+        <div className="self-stretch h-px bg-black/5 rounded-sm" />
+        <BottomMenu />
       </Card>
     </div>
   );
@@ -327,4 +343,3 @@ const getSession =  async (sessionId) => {
     console.error('Failed to load session:', error);
   }
 };
-
