@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('electron', {
   showNotification: (data) => ipcRenderer.send('notify', data),
   createWingToWingWindow: (query) => ipcRenderer.send('create-wing-to-wing-window', query),
   saveSession: (session) => ipcRenderer.send('save-session', session),
-  getSession: (sessionId) => ipcRenderer.send('get-session', sessionId),
+  getSession: (sessionId) => ipcRenderer.invoke('get-session', sessionId),
   openInChrome: (url) => ipcRenderer.send('open-in-chrome', url),
   fetchMetadata: (url) => ipcRenderer.invoke('fetch-metadata', url),
 })

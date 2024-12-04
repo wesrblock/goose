@@ -312,14 +312,6 @@ app.whenReady().then(async () => {
   }
 });
 
-  ipcMain.on('get-session',  (_, sessionId) => {
-    try {
-      return loadSessions().find(session => session.name === sessionId);
-    } catch (error) {
-      console.error('Failed to load sessions:', error);
-      throw error;
-    }
-  });
 
   ipcMain.on('create-chat-window', (_, query) => {
       createChat(app, query);
@@ -372,6 +364,17 @@ app.whenReady().then(async () => {
       throw error;
     }
   });
+
+  ipcMain.handle('get-session',  (_, sessionId) => {
+    try {
+      console.log("Loading session.....");
+      return loadSessions().find(session => session.name === sessionId);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      throw error;
+    }
+  });
+
 
   ipcMain.on('open-in-chrome', (_, url) => {
     // On macOS, use the 'open' command with Chrome
