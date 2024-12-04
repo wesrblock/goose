@@ -221,6 +221,7 @@ impl Agent {
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
+                // Get completion from provider
                 let (response, _) = self.provider.complete(
                     &system_prompt,
                     &messages,
