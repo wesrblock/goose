@@ -1,6 +1,6 @@
 # Installation
 
-To install Goose, use `pipx` - works on macOS, linux, and Windows. 
+To install Goose, use `pipx` on macOS, Linux, or Windows. 
 
 First, ensure [pipx][pipx] is installed:
 
@@ -30,7 +30,7 @@ Goose works with a set of [supported LLM providers][providers] that you can obta
 
 #### Profiles
 
-After installation, you can configure Goose anytime by editing your profile file located at `~/.config/goose/profiles.yaml`. You can set multiple profile configurations, use different LLM providers, or enable toolkits that customize Goose's functionality as well:
+After installation, you can configure Goose anytime by editing your profile file located at `~/.config/goose/profiles.yaml`. You can set multiple profile configurations, use different LLM providers, and enable toolkits that customize Goose's functionality as well:
 
 ```yaml
 default:
