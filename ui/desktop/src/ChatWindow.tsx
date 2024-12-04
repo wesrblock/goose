@@ -9,7 +9,6 @@ import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import MoreMenu from './components/MoreMenu';
-import {Bird} from './components/ui/icons';
 import BottomMenu from './components/BottomMenu';
 import LoadingGoose from './components/LoadingGoose';
 import {ApiKeyWarning} from './components/ApiKeyWarning';
