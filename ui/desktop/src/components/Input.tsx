@@ -23,6 +23,12 @@ export default function Input({
   const [value, setValue] = useState(input);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    if (textAreaRef.current && !disabled) {
+      textAreaRef.current.focus();
+    }
+  }, [disabled, value]);
+
   const useAutosizeTextArea = (textAreaRef: HTMLTextAreaElement | null, value: string) => {
     useEffect(() => {
       if (textAreaRef) {
