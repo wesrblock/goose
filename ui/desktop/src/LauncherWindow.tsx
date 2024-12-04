@@ -5,10 +5,11 @@ declare global {
     electron: {
       getConfig(): object;
       getSession(sessionId: string): object;
+      listSessions(dir: string): Array<object>;
       logInfo(info: string): object;
       saveSession(sessionData: { name: string; messages: Array<object>; directory: string }): object;
       hideWindow: () => void;
-      createChatWindow: (query: string) => void;
+      createChatWindow: (query?: string, dir?: string, sessionId?: string) => void;
     };
   }
 }
