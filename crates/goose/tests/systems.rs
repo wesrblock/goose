@@ -77,7 +77,7 @@ impl System for EchoSystem {
         }
     }
 
-    async fn read_resource(&self, uri: &str) -> AgentResult<String> {
+    async fn read_resource(&self, _uri: &str) -> AgentResult<String> {
         Ok("".to_string())
     }
 }

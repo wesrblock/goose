@@ -37,45 +37,64 @@ impl Default for DeveloperSystem {
 
 impl DeveloperSystem {
     // Reads a resource from a URI and returns its content.
-    // The resource is added to active_resources if successfully loaded.
+    // The resource must already exist in active_resources.
     pub async fn read_resource(&self, uri: &str) -> AgentResult<String> {
+        eprintln!("Reading resource: {}", uri);
         let url = Url::parse(uri)
             .map_err(|e| AgentError::InvalidParameters(format!("Invalid URI: {}", e)))?;
         
-        // get the resource from active_resources if it exists
+        // For all URIs, verify the resource exists in active_resources first
         let active_resources = self.active_resources.lock().unwrap();
-        let resource = active_resources.get(uri);
-
-        // Load the content based on URI scheme
+        let resource = active_resources.get(uri).ok_or_else(|| {
+            // For file URIs, we want to treat unregistered files as an execution error
+            if uri.starts_with("file://") {
+                AgentError::ExecutionError(format!("Resource {} must be registered before reading", uri))
+            } else {
+                AgentError::InvalidParameters(format!("Resource {} must be registered before reading", uri))
+            }
+        })?;
+        eprintln!("Found resource in active_resources with mime type: {}", resource.mime_type);
+        
+        // Load the content based on URI scheme and mime type
         let content = match url.scheme() {
             "file" => {
                 let path = url.to_file_path()
-                    .map_err(|_| AgentError::ExecutionError("Invalid file path in URI".into()))?;
+                    .map_err(|_| AgentError::InvalidParameters("Invalid file path in URI".into()))?;
+                eprintln!("Resolved file path: {}", path.display());
                 
-                match resource {
-                    Some(r) => match r.mime_type.as_str() {
-                        "text" => std::fs::read_to_string(&path)
-                            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?,
-                        "blob" => {
-                            let data = std::fs::read(&path)
-                                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
-                            base64::engine::general_purpose::STANDARD.encode(data)
+                if !path.exists() {
+                    eprintln!("File does not exist at path: {}", path.display());
+                    return Err(AgentError::ExecutionError(format!("File does not exist: {}", path.display())));
+                }
+                
+                match resource.mime_type.as_str() {
+                    "text" => {
+                        // For text mime type, read as string
+                        std::fs::read_to_string(&path)
+                            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?
                     },
-                    _ => return Err(AgentError::ExecutionError(format!("Unsupported MIME type: {}", r.mime_type))),
-                },
-                None => std::fs::read_to_string(&path)
-                        .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?,
-                }   
+                    "blob" => {
+                        // For blob mime type, read as bytes and base64 encode
+                        let bytes = std::fs::read(&path)
+                            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
+                        base64::prelude::BASE64_STANDARD.encode(bytes)
+                    },
+                    mime_type => return Err(AgentError::InvalidParameters(format!("Unsupported mime type: {}", mime_type))),
+                }
             },
             "str" => {
+                // For str:// URIs, only text mime type is supported
+                if resource.mime_type != "text" {
+                    return Err(AgentError::InvalidParameters(
+                        format!("str:// URI only supports text mime type, got {}", resource.mime_type)
+                    ));
+                }
+                
                 // Extract content after "str:///" prefix and URL decode it
                 let content = url.path().trim_start_matches('/');
                 urlencoding::decode(content)
                     .map_err(|e| AgentError::ExecutionError(format!("Failed to decode str:// content: {}", e)))?
                     .into_owned()
-            },
-            "http" | "https" => {
-                return Err(AgentError::ExecutionError("HTTP(S) URIs not yet supported".into()))
             },
             scheme => return Err(AgentError::InvalidParameters(format!("Unsupported URI scheme: {}", scheme))),
         };
@@ -354,10 +373,15 @@ impl DeveloperSystem {
             let uri = Url::from_file_path(path)
                 .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
                 .to_string();
+            
+            // Read the content first
+            let content = std::fs::read_to_string(path)
+                .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
+            
+            // Create and store the resource
             let resource = Resource::new(uri.clone(), Some("text".to_string()))
                 .map_err(|e| AgentError::ExecutionError(format!("Failed to create resource: {}", e)))?;
             
-            let content = self.read_resource(&uri).await?;
             self.active_resources
                 .lock()
                 .unwrap()
@@ -388,7 +412,7 @@ impl DeveloperSystem {
                     .with_priority(0.0),
             ])
         } else {
-            Err(AgentError::InvalidParameters(format!(
+            Err(AgentError::ExecutionError(format!(
                 "The path '{}' does not exist or is not a file.",
                 path.display()
             )))
@@ -910,30 +934,94 @@ mod tests {
             .unwrap()
             .to_string();
         
-        // Test reading content
+        // Test text mime type with file:// URI
+        {
+            let mut active_resources = system.active_resources.lock().unwrap();
+            let resource = Resource::new(uri.clone(), Some("text".to_string())).unwrap();
+            active_resources.insert(uri.clone(), resource);
+        }
         let content = system.read_resource(&uri).await.unwrap();
         assert_eq!(content, test_content);
 
-        // Verify the resource is stored in active_resources
-        let active_resources = system.active_resources.lock().unwrap();
-        assert!(active_resources.contains_key(&uri));
-        assert_eq!(active_resources[&uri].mime_type, "text");
+        // Test blob mime type with file:// URI
+        let blob_path = temp_dir.path().join("test.bin");
+        let blob_content = b"Binary content";
+        std::fs::write(&blob_path, blob_content).unwrap();
+        let blob_uri = Url::from_file_path(&blob_path).unwrap().to_string();
+        {
+            let mut active_resources = system.active_resources.lock().unwrap();
+            let resource = Resource::new(blob_uri.clone(), Some("blob".to_string())).unwrap();
+            active_resources.insert(blob_uri.clone(), resource);
+        }
+        let encoded_content = system.read_resource(&blob_uri).await.unwrap();
+        assert_eq!(
+            base64::prelude::BASE64_STANDARD.decode(encoded_content).unwrap(),
+            blob_content
+        );
 
-        // Test str:// URI
+        // Test str:// URI with text mime type
         let str_uri = format!("str:///{}", test_content);
+        {
+            let mut active_resources = system.active_resources.lock().unwrap();
+            let resource = Resource::new(str_uri.clone(), Some("text".to_string())).unwrap();
+            active_resources.insert(str_uri.clone(), resource);
+        }
         let str_content = system.read_resource(&str_uri).await.unwrap();
         assert_eq!(str_content, test_content);
+
+        // Test str:// URI with blob mime type (should fail)
+        let str_blob_uri = format!("str:///{}", test_content);
+        {
+            let mut active_resources = system.active_resources.lock().unwrap();
+            let resource = Resource::new(str_blob_uri.clone(), Some("blob".to_string())).unwrap();
+            active_resources.insert(str_blob_uri.clone(), resource);
+        }
+        let error = system.read_resource(&str_blob_uri).await.unwrap_err();
+        assert!(matches!(error, AgentError::InvalidParameters(_)));
+        assert!(error.to_string().contains("only supports text mime type"));
 
         // Test invalid URI
         let error = system.read_resource("invalid://uri").await.unwrap_err();
         assert!(matches!(error, AgentError::InvalidParameters(_)));
 
-        // Test file:// URI with non-existent file
+        // Test file:// URI without registration
+        let non_registered = Url::from_file_path(temp_dir.path().join("not_registered.txt"))
+            .unwrap()
+            .to_string();
+        let error = system.read_resource(&non_registered).await.unwrap_err();
+        assert!(matches!(error, AgentError::ExecutionError(_)));
+        assert!(error.to_string().contains("must be registered before reading"));
+
+        // Test file:// URI with non-existent file but registered
         let non_existent = Url::from_file_path(temp_dir.path().join("non_existent.txt"))
             .unwrap()
             .to_string();
-        let error = system.read_resource(&non_existent).await.unwrap_err();
+        eprintln!("Non-existent file path: {}", non_existent);
+        {
+            let mut active_resources = system.active_resources.lock().unwrap();
+            let resource = Resource::new(non_existent.clone(), Some("text".to_string())).unwrap();
+            active_resources.insert(non_existent.clone(), resource);
+            eprintln!("Resource registered with URI: {}", non_existent);
+        }
+        let result = system.read_resource(&non_existent).await;
+        eprintln!("Read result: {:?}", result);
+        let error = result.unwrap_err();
+        eprintln!("Error type: {:?}", error);
         assert!(matches!(error, AgentError::ExecutionError(_)));
+        assert!(error.to_string().contains("does not exist"));
+
+        // Test invalid mime type
+        let invalid_mime = Url::from_file_path(&file_path).unwrap().to_string();
+        {
+            let mut active_resources = system.active_resources.lock().unwrap();
+            // Create with text mime type but modify it to be invalid
+            let mut resource = Resource::new(invalid_mime.clone(), Some("text".to_string())).unwrap();
+            resource.mime_type = "invalid".to_string();
+            active_resources.insert(invalid_mime.clone(), resource);
+        }
+        let error = system.read_resource(&invalid_mime).await.unwrap_err();
+        assert!(matches!(error, AgentError::InvalidParameters(_)));
+        assert!(error.to_string().contains("Unsupported mime type"));
 
         temp_dir.close().unwrap();
     }
