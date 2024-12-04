@@ -13,6 +13,7 @@ use std::sync::Mutex;
 use tokio::process::Command;
 use xcap::Monitor;
 use crate::systems::Resource;
+use url::Url;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
@@ -23,7 +24,7 @@ use crate::systems::System;
 pub struct DeveloperSystem {
     tools: Vec<Tool>,
     cwd: Mutex<PathBuf>,
-    active_resources: Mutex<HashMap<PathBuf, Resource>>,
+    active_resources: Mutex<HashMap<String, Resource>>, // Use URI string as key instead of PathBuf
     file_history: Mutex<HashMap<PathBuf, Vec<String>>>,
     instructions: String,
 }
@@ -35,6 +36,59 @@ impl Default for DeveloperSystem {
 }
 
 impl DeveloperSystem {
+    /// Reads a resource from a URI and returns its content.
+    /// The resource is added to active_resources if successfully loaded.
+    pub async fn read_resource(&self, uri: &str) -> AgentResult<String> {
+        let url = Url::parse(uri)
+            .map_err(|e| AgentError::InvalidParameters(format!("Invalid URI: {}", e)))?;
+        
+        // Create a resource with the given URI
+        let resource = Resource::new(uri, Some("text".to_string()))
+            .map_err(|e| AgentError::InvalidParameters(format!("Failed to create resource: {}", e)))?;
+
+        // Load the content based on URI scheme
+        let content = match url.scheme() {
+            "file" => {
+                let path = url.to_file_path()
+                    .map_err(|_| AgentError::ExecutionError("Invalid file path in URI".into()))?;
+                
+                match resource.mime_type.as_str() {
+                    "text" => std::fs::read_to_string(&path)
+                        .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?,
+                    "blob" => {
+                        let data = std::fs::read(&path)
+                            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
+                        base64::engine::general_purpose::STANDARD.encode(data)
+                    },
+                    _ => return Err(AgentError::ExecutionError(format!("Unsupported MIME type: {}", resource.mime_type))),
+                }
+            },
+            "str" => {
+                // Extract content after "str:///" prefix and URL decode it
+                let content = url.path().trim_start_matches('/');
+                urlencoding::decode(content)
+                    .map_err(|e| AgentError::ExecutionError(format!("Failed to decode str:// content: {}", e)))?
+                    .into_owned()
+            },
+            "http" | "https" => {
+                return Err(AgentError::ExecutionError("HTTP(S) URIs not yet supported".into()))
+            },
+            scheme => return Err(AgentError::InvalidParameters(format!("Unsupported URI scheme: {}", scheme))),
+        };
+
+        // If this is a file resource, store it in active_resources using the path as the key
+        if url.scheme() == "file" {
+            if let Ok(_path) = url.to_file_path() {
+                self.active_resources
+                    .lock()
+                    .unwrap()
+                    .insert(uri.to_string(), resource);
+            }
+        }
+
+        Ok(content)
+    }
+
     pub fn new() -> Self {
         let bash_tool = Tool::new(
             "bash",
@@ -303,14 +357,17 @@ impl DeveloperSystem {
     async fn text_editor_view(&self, path: &PathBuf) -> AgentResult<Vec<Content>> {
         if path.is_file() {
             // Create a new resource and add it to active_resources
-            let resource = Resource::new(path)
+            let uri = Url::from_file_path(path)
+                .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
+                .to_string();
+            let resource = Resource::new(uri.clone(), Some("text".to_string()))
                 .map_err(|e| AgentError::ExecutionError(format!("Failed to create resource: {}", e)))?;
             
-            let content = resource.content.clone();
+            let content = self.read_resource(&uri).await?;
             self.active_resources
                 .lock()
                 .unwrap()
-                .insert(path.clone(), resource);
+                .insert(uri, resource);
 
             let language = lang::get_language_identifier(path);
             let formatted = formatdoc! {"
@@ -349,8 +406,13 @@ impl DeveloperSystem {
         path: &PathBuf,
         file_text: &str,
     ) -> AgentResult<Vec<Content>> {
+        // Get the URI for the file
+        let uri = Url::from_file_path(path)
+            .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
+            .to_string();
+
         // Check if file already exists and is active
-        if path.exists() && !self.active_resources.lock().unwrap().contains_key(path) {
+        if path.exists() && !self.active_resources.lock().unwrap().contains_key(&uri) {
             return Err(AgentError::InvalidParameters(format!(
                 "File '{}' exists but is not active. View it first before overwriting.",
                 path.display()
@@ -365,11 +427,12 @@ impl DeveloperSystem {
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         // Create and store resource
-        let resource = Resource::with_content(path, file_text, 0);
+        let resource = Resource::new(uri.clone(), Some("text".to_string()))
+            .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
         self.active_resources
             .lock()
             .unwrap()
-            .insert(path.clone(), resource);
+            .insert(uri, resource);
 
         // Try to detect the language from the file extension
         let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
@@ -398,6 +461,11 @@ impl DeveloperSystem {
         old_str: &str,
         new_str: &str,
     ) -> AgentResult<Vec<Content>> {
+        // Get the URI for the file
+        let uri = Url::from_file_path(path)
+            .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
+            .to_string();
+
         // Check if file exists and is active
         if !path.exists() {
             return Err(AgentError::InvalidParameters(format!(
@@ -405,7 +473,7 @@ impl DeveloperSystem {
                 path.display()
             )));
         }
-        if !self.active_resources.lock().unwrap().contains_key(path) {
+        if !self.active_resources.lock().unwrap().contains_key(&uri) {
             return Err(AgentError::InvalidParameters(format!(
                 "You must view '{}' before editing it",
                 path.display()
@@ -438,8 +506,8 @@ impl DeveloperSystem {
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         // Update resource
-        if let Some(resource) = self.active_resources.lock().unwrap().get_mut(path) {
-            resource.update_content(new_content);
+        if let Some(resource) = self.active_resources.lock().unwrap().get_mut(&uri) {
+            resource.update_timestamp();
         }
 
         // Try to detect the language from the file extension
@@ -476,6 +544,11 @@ impl DeveloperSystem {
         insert_line: usize,
         new_str: &str,
     ) -> AgentResult<Vec<Content>> {
+        // Get the URI for the file
+        let uri = Url::from_file_path(path)
+            .map_err(|_| AgentError::ExecutionError("Invalid file path".into()))?
+            .to_string();
+
         // Check if file exists and is active
         if !path.exists() {
             return Err(AgentError::InvalidParameters(format!(
@@ -483,7 +556,7 @@ impl DeveloperSystem {
                 path.display()
             )));
         }
-        if !self.active_resources.lock().unwrap().contains_key(path) {
+        if !self.active_resources.lock().unwrap().contains_key(&uri) {
             return Err(AgentError::InvalidParameters(format!(
                 "You must view '{}' before editing it",
                 path.display()
@@ -514,8 +587,8 @@ impl DeveloperSystem {
             .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
 
         // Update resource
-        if let Some(resource) = self.active_resources.lock().unwrap().get_mut(path) {
-            resource.update_content(new_content);
+        if let Some(resource) = self.active_resources.lock().unwrap().get_mut(&uri) {
+            resource.update_timestamp();
         }
 
         // Try to detect the language from the file extension
@@ -641,25 +714,28 @@ running commands on the shell."
     async fn status(&self) -> AnyhowResult<Vec<Resource>> {
         let mut active_resources = self.active_resources.lock().unwrap();
 
-        // Update resources and remove any that can't be read
-        active_resources.retain(|path, resource| {
-            if !path.exists() {
-                return false;
-            }
-
-            match std::fs::read_to_string(path) {
-                Ok(content) => {
-                    resource.update_content(content);
-                    true
+        // Update resources and remove any that are no longer valid
+        active_resources.retain(|uri, _| {
+            if let Ok(url) = Url::parse(uri) {
+                match url.scheme() {
+                    "file" => {
+                        // For file URIs, check if file exists
+                        url.to_file_path()
+                            .map(|path| path.exists())
+                            .unwrap_or(false)
+                    },
+                    "str" => true, // str:// URIs are always valid
+                    _ => false, // Other schemes not yet supported
                 }
-                Err(_) => false,
+            } else {
+                false
             }
         });
 
         // Convert active resources to a Vec<Resource>
         let resources: Vec<Resource> = active_resources
-            .iter()
-            .map(|(_, resource)| resource.clone())
+            .values()
+            .cloned()
             .collect();
 
         Ok(resources)
@@ -818,6 +894,47 @@ mod tests {
             .as_text()
             .unwrap()
             .contains("The file content for"));
+
+        temp_dir.close().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_read_resource() {
+        let system = get_system().await;
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        let test_content = "Hello, world!";
+        std::fs::write(&file_path, test_content).unwrap();
+
+        let uri = Url::from_file_path(&file_path)
+            .unwrap()
+            .to_string();
+        
+        // Test reading content
+        let content = system.read_resource(&uri).await.unwrap();
+        assert_eq!(content, test_content);
+
+        // Verify the resource is stored in active_resources
+        let active_resources = system.active_resources.lock().unwrap();
+        assert!(active_resources.contains_key(&uri));
+        assert_eq!(active_resources[&uri].mime_type, "text");
+
+        // Test str:// URI
+        let str_uri = format!("str:///{}", test_content);
+        let str_content = system.read_resource(&str_uri).await.unwrap();
+        assert_eq!(str_content, test_content);
+
+        // Test invalid URI
+        let error = system.read_resource("invalid://uri").await.unwrap_err();
+        assert!(matches!(error, AgentError::InvalidParameters(_)));
+
+        // Test file:// URI with non-existent file
+        let non_existent = Url::from_file_path(temp_dir.path().join("non_existent.txt"))
+            .unwrap()
+            .to_string();
+        let error = system.read_resource(&non_existent).await.unwrap_err();
+        assert!(matches!(error, AgentError::ExecutionError(_)));
 
         temp_dir.close().unwrap();
     }

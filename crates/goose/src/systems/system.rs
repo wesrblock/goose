@@ -1,6 +1,6 @@
 use anyhow::Result as AnyhowResult;
 use async_trait::async_trait;
-use serde_json::Value;
+
 use crate::errors::AgentResult;
 use crate::models::content::Content;
 use crate::models::tool::{Tool, ToolCall};
