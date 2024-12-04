@@ -5,9 +5,9 @@ use goose::providers::configs::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs;
 use std::path::PathBuf;
+use anyhow::Result;
 
 // Profile types and structures
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -29,7 +29,7 @@ pub struct AdditionalSystem {
     pub location: String,
 }
 
-pub fn profile_path() -> Result<PathBuf, Box<dyn Error>> {
+pub fn profile_path() -> Result<PathBuf> {
     let home_dir = dirs::home_dir().ok_or(anyhow::anyhow!("Could not determine home directory"))?;
     let config_dir = home_dir.join(".config").join("goose");
     if !config_dir.exists() {
@@ -38,7 +38,7 @@ pub fn profile_path() -> Result<PathBuf, Box<dyn Error>> {
     Ok(config_dir.join("profiles.json"))
 }
 
-pub fn load_profiles() -> Result<HashMap<String, Profile>, Box<dyn Error>> {
+pub fn load_profiles() -> Result<HashMap<String, Profile>> {
     let path = profile_path()?;
     if !path.exists() {
         return Ok(HashMap::new());
@@ -48,7 +48,7 @@ pub fn load_profiles() -> Result<HashMap<String, Profile>, Box<dyn Error>> {
     Ok(profiles.profile_items)
 }
 
-pub fn save_profile(name: &str, profile: Profile) -> Result<(), Box<dyn Error>> {
+pub fn save_profile(name: &str, profile: Profile) -> Result<()> {
     let path = profile_path()?;
     let mut profiles = load_profiles()?;
     profiles.insert(name.to_string(), profile);
@@ -65,6 +65,10 @@ pub fn find_existing_profile(name: &str) -> Option<Profile> {
         Ok(profiles) => profiles.get(name).cloned(),
         Err(_) => None,
     }
+}
+
+pub fn has_no_profiles() -> Result<bool> {
+    load_profiles().map(|profiles| Ok(profiles.is_empty()))?
 }
 
 pub fn get_provider_config(provider_name: &str, model: String) -> ProviderConfig {
