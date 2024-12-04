@@ -16,38 +16,45 @@ const useCombinedSessions = (workingDir: string) => {
 
   const getCombinedSessions = () => {
     if (sessions.length === 0 && latestSessions.length === 0) {
-      return [];
+      return { currentDirSessions: [], otherLocationSessions: [] };
     }
 
-    const combinedSessions = [];
+    const currentDirSessions = [];
+    const otherLocationSessions = [];
     const seenNames = new Set();
 
-    // Add at least one latest session if available
-    if (latestSessions.length > 0) {
-      const latest = latestSessions[0];
-      combinedSessions.push({ ...latest, isLatest: true });
-      seenNames.add(latest.name);
-    }
-
-    // Add remaining latest sessions (up to 5 total)
-    for (let i = 1; i < latestSessions.length && combinedSessions.length < 5; i++) {
-      const session = latestSessions[i];
+    // Process latest sessions first
+    for (const session of latestSessions) {
       if (!seenNames.has(session.name)) {
-        combinedSessions.push({ ...session, isLatest: true });
+        if (session.directory === workingDir) {
+          currentDirSessions.push({ ...session, isLatest: true });
+        } else {
+          otherLocationSessions.push({ ...session, isLatest: true });
+        }
         seenNames.add(session.name);
       }
     }
 
-    // Fill remaining slots with regular sessions (up to 5 total)
+    // Process regular sessions
     for (const session of sessions) {
-      if (combinedSessions.length >= 5) break;
       if (!seenNames.has(session.name)) {
-        combinedSessions.push({ ...session, isLatest: false });
+        if (session.directory === workingDir) {
+          currentDirSessions.push({ ...session, isLatest: false });
+        } else {
+          otherLocationSessions.push({ ...session, isLatest: false });
+        }
         seenNames.add(session.name);
       }
     }
 
-    return combinedSessions;
+    // Sort sessions by name
+    currentDirSessions.sort((a, b) => a.name.localeCompare(b.name));
+    otherLocationSessions.sort((a, b) => a.name.localeCompare(b.name));
+
+    return {
+      currentDirSessions: currentDirSessions.slice(0, 5),
+      otherLocationSessions: otherLocationSessions.slice(0, 5)
+    };
   };
 
   return getCombinedSessions();
@@ -55,31 +62,52 @@ const useCombinedSessions = (workingDir: string) => {
 
 export default function SessionPills() {
   const workingDir = window.appConfig.get("GOOSE_WORKING_DIR");
-  const combinedSessions = useCombinedSessions(workingDir);
+  const { currentDirSessions, otherLocationSessions } = useCombinedSessions(workingDir);
 
-  if (combinedSessions.length === 0) {
+  if (currentDirSessions.length === 0 && otherLocationSessions.length === 0) {
     return null;
   }
 
-  return (
-  <div className="grid grid-cols-1 gap-4">
-    <div className="grid grid-cols-1 gap-4 mb-[8px]">
-      {combinedSessions.map((session) => (
-        <div
-          key={session.directory + session.name}
-          className="w-[312px] px-16 py-4 text-14 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-prev-goose-gradient text-prev-goose-text rounded-[14px] inline-block hover:scale-[1.02] transition-all duration-150"
-          onClick={async () => {
-            window.electron.createChatWindow(undefined, session.directory, session.name);
-          }}
-          title={session.directory}
-        >
-          {`${session.name.slice(0, 50)}`}
-          {session.isLatest && !(session.directory === workingDir) && (
-            <span className="ml-2 text-10 opacity-70">(recent)</span>
-          )}
-        </div>          
-      ))}
+  const SessionPill = ({ session }) => (
+    <div
+      key={session.directory + session.name}
+      className="w-[312px] px-16 py-4 mb-2 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-prev-goose-gradient text-prev-goose-text rounded-[14px] inline-block hover:scale-[1.02] transition-all duration-150"
+      onClick={async () => {
+        window.electron.createChatWindow(undefined, session.directory, session.name);
+      }}
+      title={session.directory}
+    >
+      <div className="text-14">{`${session.name.slice(0, 50)}`}</div>
+      {session.directory !== workingDir && (
+        <div className="text-xs opacity-70 mt-1">{session.directory}</div>
+      )}
     </div>
-  </div>
-  )
+  );
+
+  return (
+      <div className="grid grid-cols-1  ">
+          {currentDirSessions.length > 0 && (
+              <div>
+                  <h3 className="text-11 text-splash-pills-text mb-2 text-center">Recent sessions in
+                      this directory</h3>
+                  <div className="grid grid-cols-1 gap-4 mb-[16px]">
+                      {currentDirSessions.map((session) => (
+                          <SessionPill key={session.directory + session.name} session={session}/>
+                      ))}
+                  </div>
+              </div>
+          )}
+          {otherLocationSessions.length > 0 && (
+              <div>
+                  <h3 className="text-11 text-splash-pills-text mb-2 text-center">Recent sessions in other
+                      locations</h3>
+                  <div className="grid grid-cols-1">
+                      {otherLocationSessions.map((session) => (
+                          <SessionPill key={session.directory + session.name} session={session}/>
+                      ))}
+                  </div>
+              </div>
+          )}
+      </div>
+  );
 }
