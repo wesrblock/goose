@@ -158,29 +158,11 @@ function ChatContent({
 
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
-      
-
       <div className="relative block h-[20px] w-screen">
-      <div className="text-center text-splash-pills-text">{window.appConfig.get("GOOSE_WORKING_DIR")}</div>
-        <MoreMenu
-          onStopGoose={() => {
-            stop();
-          }}
-          onClearContext={() => {
-            append({
-              id: Date.now().toString(),
-              role: 'system',
-              content: 'Context cleared',
-            });
-          }}
-          onRestartGoose={() => {
-            append({
-              id: Date.now().toString(),
-              role: 'system',
-              content: 'Goose restarted',
-            });
-          }}
-        />
+        <div className="text-center text-splash-pills-text">
+          {window.appConfig.get("GOOSE_WORKING_DIR")}
+        </div>
+        <MoreMenu />
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
         {messages.length === 0 ? (
