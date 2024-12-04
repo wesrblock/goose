@@ -247,10 +247,12 @@ export default function ChatWindow() {
   };
 
   // Function to get a session by ID
-  const getSession =  (sessionId) => {
+  const getSession =  async (sessionId) => {
+
     try {
-      const session = window.electron.getSession(sessionId);
-      console.log('Session loaded:', session);
+      const session = await window.electron.getSession(sessionId);
+      window.electron.logInfo('GUI Session loading '); // + JSON.stringify(session, null,2));
+      console.log('XSession loaded:', session);
       return  session
     } catch (error) {
       console.error('Failed to load session:', error);
