@@ -73,13 +73,15 @@ impl MessageContent {
         }
     }
 
-    pub fn as_tool_response_text(&self) -> Option<&str> {
+    pub fn as_tool_response_text(&self) -> Option<String> {
         if let Some(tool_response) = self.as_tool_response() {
             if let Ok(contents) = &tool_response.tool_result {
-                for content in contents {
-                    if let Some(text) = content.as_text() {
-                        return Some(text);
-                    }
+                let texts: Vec<String> = contents
+                    .iter()
+                    .filter_map(|content| content.as_text().map(String::from))
+                    .collect();
+                if !texts.is_empty() {
+                    return Some(texts.join("\n"));
                 }
             }
         }
