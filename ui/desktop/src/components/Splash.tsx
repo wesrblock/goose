@@ -1,7 +1,7 @@
 import React from 'react';
 import GooseSplashLogo from './GooseSplashLogo';
 import SplashPills from './SplashPills';
-import SessionPills from './SessionPIlls';
+import SessionPills from './SessionPills';
 
 export default function Splash({ append }) {
 
