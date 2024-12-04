@@ -278,6 +278,10 @@ app.whenReady().then(async () => {
     createChat(app, query);
   });
 
+  ipcMain.on('directory-chooser', (_) => {
+    openDirectoryDialog();
+  });
+
   ipcMain.on('notify', (event, data) => {
     console.log("NOTIFY", data);
     new Notification({ title: data.title, body: data.body }).show();
