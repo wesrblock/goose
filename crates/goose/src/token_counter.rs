@@ -70,7 +70,7 @@ impl TokenCounter {
 
     pub fn count_tokens(&self, text: &str, model_name: Option<&str>) -> usize {
         let tokenizer_key = Self::model_to_tokenizer_key(model_name);
-        dbg!(&model_name, &tokenizer_key);
+        // dbg!(&model_name, &tokenizer_key);
         let tokenizer = self
             .tokenizers
             .get(tokenizer_key)
@@ -78,6 +78,14 @@ impl TokenCounter {
         let encoding = tokenizer.encode(text, false).unwrap();
         encoding.len()
     }
+
+    // pub fn count_tokens_for_messages(&self, system_prompt: &str, messages: &[Message], tools: &[Tool]) -> usize {
+    //     let tokenizer_key = Self::model_to_tokenizer_key(model_name);
+    //     let tokenizer = self
+    //         .tokenizers
+    //         .get(tokenizer_key)
+    //         .expect("Tokenizer not found");
+    // }
 }
 
 #[cfg(test)]
