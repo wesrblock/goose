@@ -1,3 +1,4 @@
+use anyhow::Result;
 use goose::key_manager::{get_keyring_secret, KeyRetrievalStrategy};
 use goose::providers::configs::{
     DatabricksAuth, DatabricksProviderConfig, OllamaProviderConfig, OpenAiProviderConfig,
@@ -7,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use anyhow::Result;
 
 // Profile types and structures
 #[derive(Serialize, Deserialize, Clone, Debug)]
