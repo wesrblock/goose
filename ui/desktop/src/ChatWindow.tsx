@@ -111,7 +111,7 @@ function ChatContent({
   const onStopGoose = () => {
     stop();
 
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage: Message = messages[messages.length - 1];
     if (lastMessage.role === 'user' && lastMessage.toolInvocations === undefined) {
       // TODO: Using setInput seems to change the ongoing request message and prevents stop from stopping.
       // It would be nice to find a way to populate the input field with the last message when interrupted.
@@ -125,7 +125,7 @@ function ChatContent({
       }
     } else if (lastMessage.role === 'assistant' && lastMessage.toolInvocations !== undefined) {
       // Add messaging about interrupted ongoing tool invocations.
-      const newLastMessage = {
+      const newLastMessage: Message = {
           ...lastMessage,
           toolInvocations: lastMessage.toolInvocations.map((invocation) => {
             if (invocation.state !== 'result') {
@@ -155,7 +155,7 @@ function ChatContent({
         }),
       };
         
-      const updatedMessages = [...messages.slice(0, -1), newLastMessage as Message];
+      const updatedMessages = [...messages.slice(0, -1), newLastMessage];
       setMessages(updatedMessages);
     }
     
