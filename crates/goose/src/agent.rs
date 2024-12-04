@@ -6,11 +6,11 @@ use std::collections::HashMap;
 
 use crate::errors::{AgentError, AgentResult};
 use crate::models::content::Content;
-use crate::models::message::{Message, ToolRequest};
+use crate::models::message::{Message, ToolRequest, MessageContent};
 use crate::models::tool::{Tool, ToolCall};
 use crate::prompt_template::load_prompt_file;
 use crate::providers::base::Provider;
-use crate::systems::System;
+use crate::systems::{System, Resource};
 use crate::token_counter::TokenCounter;
 use serde::Serialize;
 
@@ -216,15 +216,23 @@ impl Agent {
         });
 
         // Keep resources until we hit the context limit
-        let mut current_tokens = 0;
+        let mut current_tokens = approx_count as u32;
         let mut kept_resources = Vec::new();
+        let target_limit = (context_limit as f32 * 0.9) as u32;
         
-        for (system_name, uri, resource, token_count, content) in all_resources {
-            if current_tokens + token_count > context_limit as u32 {
+        // Start with all resources and remove until we're under target
+        let mut remaining_resources: Vec<_> = all_resources.into_iter().collect();
+        while current_tokens > target_limit {
+            if let Some((_, _, _, token_count, _)) = remaining_resources.pop() {
+                current_tokens -= token_count;
+            } else {
                 break;
             }
+        }
+
+        // Keep the remaining resources that fit under limit
+        for (system_name, _, resource, _, content) in remaining_resources {
             kept_resources.push((system_name, resource, content));
-            current_tokens += token_count;
         }
 
         // Group resources by system
@@ -317,7 +325,26 @@ impl Agent {
         Ok(Box::pin(async_stream::try_stream! {
             loop {
                 
-                let approx_count = TokenCount::from_messages(&system_prompt, &messages, &tools);
+                let token_counter = TokenCounter::new();
+                // let approx_count = token_counter.count_chat_tokens(
+                //     system_prompt,
+                //     &messages,
+                //     &tools,
+                //     Some("gpt-4o"),
+                // );
+                // Count tokens for system prompt and messages
+                let mut approx_count = token_counter.count_tokens(&system_prompt, Some("gpt-4"));
+                for msg in &messages {
+                    for content in &msg.content {
+                        if let MessageContent::Text(text) = content {
+                            approx_count += token_counter.count_tokens(&text.text, Some("gpt-4"));
+                        }
+                    }
+                }
+                // Add estimated tokens for tools
+                for tool in &tools {
+                    approx_count += token_counter.count_tokens(&tool.description, Some("gpt-4"));
+                }
 
                 if approx_count > CONTEXT_LIMIT {
                     let status_counts = self.get_system_status_counts().await?;
@@ -393,6 +420,7 @@ mod tests {
     use async_trait::async_trait;
     use futures::TryStreamExt;
     use serde_json::json;
+    use chrono::{Utc, Duration};
 
     // Mock system for testing
     struct MockSystem {
@@ -565,6 +593,143 @@ mod tests {
             .iter()
             .any(|c| matches!(c, MessageContent::ToolRequest(_))));
         assert_eq!(messages[2].content[0], MessageContent::text("All done!"));
+        Ok(())
+    }
+
+    // Helper function to create test resources with different priorities and timestamps
+    fn create_test_resource(name: &str, priority: i32, seconds_ago: i64) -> Resource {
+        use chrono::{Utc, Duration};
+        let now = Utc::now();
+        let timestamp = now - Duration::seconds(seconds_ago);
+        Resource {
+            name: name.to_string(),
+            uri: format!("test://{}", name),
+            priority,
+            timestamp,
+            description: None,
+            mime_type: "text".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_trim_system_status_empty() -> Result<()> {
+        let agent = Agent::new(Box::new(MockProvider::new(vec![])));
+        let status_counts = HashMap::new();
+        let result = agent.trim_system_status(status_counts, 1000, 2000)?;
+        assert!(!result.is_empty()); // Should return template with no systems
+        Ok(())
+    }
+
+    #[test]
+    fn test_trim_system_status_single_system() -> Result<()> {
+        let agent = Agent::new(Box::new(MockProvider::new(vec![])));
+        
+        let mut system_counts = HashMap::new();
+        let mut resource_counts = HashMap::new();
+        
+        let resource = create_test_resource("test1", 1, 0);
+        resource_counts.insert(
+            "test://test1".to_string(), 
+            (resource, 100, "test content".to_string())
+        );
+        
+        system_counts.insert("system1".to_string(), resource_counts);
+        
+        let result = agent.trim_system_status(system_counts, 1000, 2000)?;
+        assert!(result.contains("system1"));
+        assert!(result.contains("test1"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_trim_system_status_prioritization() -> Result<()> {
+        let agent = Agent::new(Box::new(MockProvider::new(vec![])));
+        
+        let mut system_counts = HashMap::new();
+        let mut resource_counts = HashMap::new();
+        
+        // Add resources with different priorities
+        let high_priority = create_test_resource("high", 2, 10);
+        let low_priority = create_test_resource("low", 1, 10);
+        
+        resource_counts.insert(
+            "test://high".to_string(), 
+            (high_priority, 500, "high priority content".to_string())
+        );
+        resource_counts.insert(
+            "test://low".to_string(), 
+            (low_priority, 500, "low priority content".to_string())
+        );
+        
+        system_counts.insert("system1".to_string(), resource_counts);
+        
+        // Set a tight token limit that should only allow one resource
+        let result = agent.trim_system_status(system_counts, 1100, 1000)?;
+        
+        // Should contain high priority but not low priority
+        assert!(result.contains("high priority content"));
+        assert!(!result.contains("low priority content"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_system_status_counts_empty() -> Result<()> {
+        let agent = Agent::new(Box::new(MockProvider::new(vec![])));
+        let counts = tokio_test::block_on(agent.get_system_status_counts())?;
+        assert!(counts.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_system_status_counts_with_system() -> Result<()> {
+        let mut agent = Agent::new(Box::new(MockProvider::new(vec![])));
+        
+        // Add a mock system that returns some resources
+        struct TestSystem {
+            resources: Vec<Resource>,
+        }
+        
+        #[async_trait]
+        impl System for TestSystem {
+            fn name(&self) -> &str { "test_system" }
+            fn description(&self) -> &str { "Test system" }
+            fn instructions(&self) -> &str { "Test instructions" }
+            fn tools(&self) -> &[Tool] { &[] }
+            
+            async fn status(&self) -> anyhow::Result<Vec<Resource>> {
+                Ok(self.resources.clone())
+            }
+            
+            async fn call(&self, _: ToolCall) -> AgentResult<Vec<Content>> {
+                Ok(vec![])
+            }
+            
+            async fn read_resource(&self, _: &str) -> AgentResult<String> {
+                Ok("test content".to_string())
+            }
+        }
+        
+        let test_resource = create_test_resource("test1", 1, 0);
+        let test_system = TestSystem {
+            resources: vec![test_resource.clone()],
+        };
+        
+        agent.add_system(Box::new(test_system));
+        
+        let counts = tokio_test::block_on(agent.get_system_status_counts())?;
+        
+        assert_eq!(counts.len(), 1);
+        assert!(counts.contains_key("test_system"));
+        
+        let system_counts = counts.get("test_system").unwrap();
+        assert_eq!(system_counts.len(), 1);
+        assert!(system_counts.contains_key(&test_resource.uri));
+        
+        let (resource, count, content) = &system_counts[&test_resource.uri];
+        assert_eq!(resource.name, "test1");
+        assert!(*count > 0);
+        assert_eq!(content, "test content");
+        
         Ok(())
     }
 }
