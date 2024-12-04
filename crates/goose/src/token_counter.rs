@@ -140,8 +140,7 @@ impl TokenCounter {
         tools: &[Tool],
         model_name: Option<&str>,
     ) -> usize {
-        // <|im_start|>ROLE<|im_sep|>You are a helpful assistant that can answer questions about the weather.<|im_end|>
-        // 3 for the role, 1 for message end
+        // <|im_start|>ROLE<|im_sep|>MESSAGE<|im_end|>
         let tokens_per_message = 4;
 
         // Count tokens in the system prompt
