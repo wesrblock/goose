@@ -1,16 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Message, useChat } from './ai-sdk-fork/useChat';
-import { Route, Routes, Navigate } from 'react-router-dom';
-import { getApiUrl } from './config';
-import { Card } from './components/ui/card';
-import { ScrollArea } from './components/ui/scroll-area';
+import React, {useEffect, useRef, useState} from 'react';
+import {Message,useChat} from './ai-sdk-fork/useChat';
+import {Navigate, Route, Routes} from 'react-router-dom';
+import {getApiUrl} from './config';
+import {Card} from './components/ui/card';
+import {ScrollArea} from './components/ui/scroll-area';
 import Splash from './components/Splash';
 import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import MoreMenu from './components/MoreMenu';
+import {Bird} from './components/ui/icons';
 import LoadingGoose from './components/LoadingGoose';
-import { ApiKeyWarning } from './components/ApiKeyWarning';
+import {ApiKeyWarning} from './components/ApiKeyWarning';
+
 import { askAi, getPromptTemplates } from './utils/askAI';
 import WingToWing, { Working } from './components/WingToWing';
 
@@ -89,7 +91,22 @@ function ChatContent({
       c.id === selectedChatId ? { ...c, messages } : c
     );
     setChats(updatedChats);
+    const currentChat = chats.find(chat => chat.id === selectedChatId);
+    if (currentChat) {
+      const sessionToSave = {
+        messages: currentChat.messages,
+        directory: window.appConfig.get("GOOSE_WORKING_DIR")
+      };
+      saveSession(sessionToSave);
+    }
   }, [messages, selectedChatId]);
+
+  // Function to save a session
+  const saveSession = (session) => {
+    if(session.messages === undefined || session.messages.length === 0) return
+    window.electron.saveSession(session);
+  };
+
 
   const initialQueryAppended = useRef(false);
   useEffect(() => {
@@ -149,11 +166,11 @@ function ChatContent({
           }
         }),
       };
-        
+
       const updatedMessages = [...messages.slice(0, -1), newLastMessage];
       setMessages(updatedMessages);
     }
-    
+
   };
 
   return (
@@ -225,6 +242,26 @@ export default function ChatWindow() {
     window.electron.createChatWindow();
   };
 
+  // Function to get a session by ID
+  const getSession =  (sessionId) => {
+    try {
+      const session = window.electron.getSession(sessionId);
+      console.log('Session loaded:', session);
+      return  session
+    } catch (error) {
+      console.error('Failed to load session:', error);
+    }
+  };
+
+  const convertSessionToChat = (session) => {
+    const chat = {
+      id: 1,
+      title: session.name,
+      messages: session.messages,
+    };
+    return chat;
+  }
+
   // Add keyboard shortcut handler
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -259,6 +296,11 @@ export default function ChatWindow() {
       title: initialQuery || 'Chat 1',
       messages: initialHistory.length > 0 ? initialHistory : [],
     };
+    const sessionId = window.appConfig.get("GOOSE_SESSION_ID");
+    const session = getSession(sessionId);
+      if (session) {
+        return[convertSessionToChat(session)];
+      }
     return [firstChat];
   });
 
@@ -308,9 +350,9 @@ export default function ChatWindow() {
               <Route path="*" element={<Navigate to="/chat/1" replace />} />
             </Routes>
           </div>
-                    
+
           <WingToWing onExpand={toggleMode} progressMessage={progressMessage} working={working} />
-          
+
         </>
       )}
     </div>

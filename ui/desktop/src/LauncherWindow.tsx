@@ -3,6 +3,10 @@ import React, { useState, useRef } from 'react';
 declare global {
   interface Window {
     electron: {
+      getConfig(): object;
+      getSession(arg0: string): object;
+      logInfo(arg0: string): object;
+      saveSession(arg0: { name: string; messages: Array<object>; directory: string }): object;
       hideWindow: () => void;
       createChatWindow: (query: string) => void;
     };
