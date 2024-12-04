@@ -52,7 +52,12 @@ wiremock = "0.6.0"
 mockito = "1.2"
 tempfile = "3.8"
 mockall = "0.11"
+criterion = "0.5"
 
 [[example]]
 name = "databricks_oauth"
 path = "examples/databricks_oauth.rs"
+
+[[bench]]
+name = "tokenization_benchmark"
+harness = false
