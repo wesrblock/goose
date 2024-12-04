@@ -245,7 +245,7 @@ fn is_valid_function_name(name: &str) -> bool {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Input message too long. Message: {0}")]
+#[error("Context length exceeded. Message: {0}")]
 pub struct ContextLengthExceededError(String);
 
 pub fn check_openai_context_length_error(error: &Value) -> Option<ContextLengthExceededError> {
@@ -537,7 +537,7 @@ mod tests {
         assert!(result.is_some());
         assert_eq!(
             result.unwrap().to_string(),
-            "Input message too long. Message: This message is too long"
+            "Context length exceeded. Message: This message is too long"
         );
 
         let error = json!({
@@ -562,7 +562,7 @@ mod tests {
         assert!(result.is_some());
         assert_eq!(
             result.unwrap().to_string(),
-            "Input message too long. Message: Input is too long for requested model."
+            "Context length exceeded. Message: Input is too long for requested model."
         );
 
         let error = json!({
