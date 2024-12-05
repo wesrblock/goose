@@ -14,7 +14,7 @@ use crate::systems::{System, Resource};
 use crate::token_counter::TokenCounter;
 use serde::Serialize;
 
-const CONTEXT_LIMIT: usize = 1_900; // TODO: update back to 200_000; // model's context limit
+const CONTEXT_LIMIT: usize = 200_000; // TODO: update back to 200_000; // model's context limit
 const ESTIMATE_FACTOR: f32 = 0.8;
 const ESTIMATED_TOKEN_LIMIT: usize = (CONTEXT_LIMIT as f32 * ESTIMATE_FACTOR) as usize;
 
@@ -251,7 +251,6 @@ impl Agent {
                         system_counts.remove(&uri);
                         current_tokens -= token_count as usize;
                     }
-                    println!("Trimmed a resource: {uri}.\nCurrent tokens: {current_tokens}");
                 }
             }
             // Create status messages only from resources that remain after token trimming
@@ -265,7 +264,6 @@ impl Agent {
         }
         else {
             // Create status messages from all resources when no trimming needed
-            let mut status_content = Vec::new();
             for (_system_name, resources) in &resource_content {
                 for (resource, content) in resources.values() {
                     status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
@@ -320,11 +318,7 @@ impl Agent {
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
-                // TODO: remove. DEBUG - Print the messages before completion
-                println!("Messages before completion:");
-                for (i, msg) in messages.iter().enumerate() {
-                    println!("Message {}: {:?}\n", i, msg);
-                }
+
                 // Get completion from provider
                 let (response, _) = self.provider.complete(
                     &system_prompt,
