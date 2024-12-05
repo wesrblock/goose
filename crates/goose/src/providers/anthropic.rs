@@ -31,47 +31,41 @@ impl AnthropicProvider {
         Ok(Usage::new(None, None, None))
     }
 
-    fn messages_to_anthropic_spec(messages: &[Message], system: &str) -> String {
-        let mut conversation = String::new();
+    fn messages_to_anthropic_spec(messages: &[Message], system: &str) -> Vec<Value> {
+        let mut anthropic_messages = Vec::new();
         
         // Add system message if present
         if !system.is_empty() {
-            conversation.push_str(system);
-            conversation.push('\n');
+            anthropic_messages.push(json!({
+                "role": "assistant",
+                "content": system
+            }));
         }
 
         // Convert messages to Anthropic format
         for message in messages {
-            match message.role {
-                Role::User => {
-                    conversation.push_str("\n\nHuman: ");
-                    for content in &message.content {
-                        // Handle different content types
-                        match content {
-                            crate::models::message::MessageContent::Text(text) => {
-                                conversation.push_str(&text.text);
-                            }
-                            // Add other content type handling as needed
-                            _ => {} // Skip other content types for now
-                        }
+            let role = match message.role {
+                Role::User => "user",
+                Role::Assistant => "assistant",
+            };
+
+            let mut content = String::new();
+            for msg_content in &message.content {
+                match msg_content {
+                    crate::models::message::MessageContent::Text(text) => {
+                        content.push_str(&text.text);
                     }
-                }
-                Role::Assistant => {
-                    conversation.push_str("\n\nAssistant: ");
-                    for content in &message.content {
-                        match content {
-                            crate::models::message::MessageContent::Text(text) => {
-                                conversation.push_str(&text.text);
-                            }
-                            // Add other content type handling as needed
-                            _ => {} // Skip other content types for now
-                        }
-                    }
+                    _ => {} // Skip other content types for now
                 }
             }
+
+            anthropic_messages.push(json!({
+                "role": role,
+                "content": content
+            }));
         }
 
-        conversation
+        anthropic_messages
     }
 
     async fn post(&self, payload: Value) -> Result<Value> {
@@ -84,7 +78,8 @@ impl AnthropicProvider {
             .client
             .post(&url)
             .header("x-api-key", &self.config.api_key)
-            .header("anthropic-version", "2023-06-01")
+            .header("anthropic-version", "2024-02-01")
+            .header("anthropic-beta", "messages-2024-02-01-preview")
             .json(&payload)
             .send()
             .await?;
@@ -94,11 +89,14 @@ impl AnthropicProvider {
             status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
                 Err(anyhow!("Server error: {}", status))
             }
-            _ => Err(anyhow!(
-                "Request failed: {}\nPayload: {}",
-                response.status(),
-                payload
-            )),
+            _ => {
+                let error_text = response.text().await?;
+                Err(anyhow!(
+                    "Request failed: {} - {}",
+                    response.status(),
+                    error_text
+                ))
+            }
         }
     }
 }
@@ -111,14 +109,11 @@ impl Provider for AnthropicProvider {
         messages: &[Message],
         _tools: &[Tool],
     ) -> Result<(Message, Usage)> {
-        let conversation = Self::messages_to_anthropic_spec(messages, system);
+        let anthropic_messages = Self::messages_to_anthropic_spec(messages, system);
 
         let mut payload = json!({
             "model": self.config.model,
-            "messages": [{
-                "role": "user",
-                "content": conversation
-            }],
+            "messages": anthropic_messages,
             "max_tokens": self.config.max_tokens.unwrap_or(1000)
         });
 
@@ -162,7 +157,8 @@ mod tests {
         Mock::given(method("POST"))
             .and(path("/v1/messages"))
             .and(header("x-api-key", "test_api_key"))
-            .and(header("anthropic-version", "2023-06-01"))
+            .and(header("anthropic-version", "2024-02-01"))
+            .and(header("anthropic-beta", "messages-2024-02-01-preview"))
             .respond_with(ResponseTemplate::new(200).set_body_json(response_body))
             .mount(&mock_server)
             .await;
@@ -170,7 +166,7 @@ mod tests {
         let config = AnthropicProviderConfig {
             host: mock_server.uri(),
             api_key: "test_api_key".to_string(),
-            model: "claude-3-opus-20240229".to_string(),
+            model: "claude-3-sonnet-20240229".to_string(),
             temperature: Some(0.7),
             max_tokens: None,
         };
@@ -189,7 +185,7 @@ mod tests {
                 "type": "text",
                 "text": "Hello! How can I assist you today?"
             }],
-            "model": "claude-3-opus-20240229",
+            "model": "claude-3-sonnet-20240229",
             "stop_reason": "end_turn",
             "stop_sequence": null,
             "usage": {
