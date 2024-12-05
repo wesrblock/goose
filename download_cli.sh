@@ -63,6 +63,6 @@ if [ -n "${GOOSE_MODEL:-}" ]; then
     CONFIG_ARGS="$CONFIG_ARGS -m $GOOSE_MODEL"
 fi
 
-$LOCAL_BIN/$OUT_FILE config $CONFIG_ARGS
+$LOCAL_BIN/$OUT_FILE configure $CONFIG_ARGS
 
 echo "You can now run Goose using: $OUT_FILE session\n"
