@@ -177,6 +177,7 @@ impl Agent {
             for resource in system_status {
                 if let Ok(content) = system.read_resource(&resource.uri).await {
                     let token_count = token_counter.count_tokens(&content, None) as u32;
+                    println!("[DEBUG] Resource {} has {} tokens", resource.name, token_count);
                     resource_counts.insert(resource.uri.clone(), (resource, token_count, content));
                 }
             }
@@ -191,6 +192,8 @@ impl Agent {
     /// Trims the system status to reduce size while preserving critical information by sorting resources
     /// by priority and timestamp, removing older and lower priority resources to meet token limits
     fn trim_system_status(&self, status_counts: HashMap<String, HashMap<String, (Resource, u32, String)>>, approx_count: usize, context_limit: usize) -> AgentResult<String> {
+        println!("[DEBUG] Starting trim with approx_count: {}, context_limit: {}", approx_count, context_limit);
+        
         // Flatten all resources into a single vector for sorting
         let mut all_resources: Vec<(String, String, Resource, u32, String)> = Vec::new();
         for (system_name, resources) in status_counts.iter() {
@@ -204,6 +207,8 @@ impl Agent {
                 ));
             }
         }
+
+        println!("[DEBUG] Total resources before trimming: {}", all_resources.len());
 
         // Sort by priority (high to low) and timestamp (newest to oldest)
         all_resources.sort_by(|a, b| {
@@ -220,15 +225,21 @@ impl Agent {
         let mut kept_resources = Vec::new();
         let target_limit = (context_limit as f32 * 0.9) as u32;
         
+        println!("[DEBUG] Current tokens: {}, Target limit: {}", current_tokens, target_limit);
+        
         // Start with all resources and remove until we're under target
         let mut remaining_resources: Vec<_> = all_resources.into_iter().collect();
         while current_tokens > target_limit {
-            if let Some((_, _, _, token_count, _)) = remaining_resources.pop() {
+            if let Some((system_name, uri, resource, token_count, _)) = remaining_resources.pop() {
                 current_tokens -= token_count;
+                println!("[DEBUG] Removed resource {} ({} tokens) from system {}, new total: {}", 
+                    resource.name, token_count, system_name, current_tokens);
             } else {
                 break;
             }
         }
+
+        println!("[DEBUG] Resources remaining after trimming: {}", remaining_resources.len());
 
         // Keep the remaining resources that fit under limit
         for (system_name, _, resource, _, content) in remaining_resources {
@@ -263,57 +274,32 @@ impl Agent {
             .map_err(|e| AgentError::Internal(e.to_string()))
     }
 
-    // Initialize a new reply round, which may call multiple tools
-    async fn rewrite_messages_on_reply(
+    /// Setup the next inference by budgeting the context window as well as we can
+    fn prepare_inference(
         &self,
-        messages: &mut Vec<Message>,
-        status: String,
-    ) -> AgentResult<()> {
-        // Create tool use message for status check
-        let message_use =
-            Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
+        system_prompt: &str,
+        tools: &Vec<Tool>,
+        messages: &Vec<Message>,
+        resources: &Vec<Resource>,
+    ) -> AgentResult<Vec<Message>> {
+        let token_counter = TokenCounter::new("gpt-4");
+        let approx_count = token_counter.count_everything(
+            &system_prompt,
+            &messages,
+            &tools,
+            &resources,
+        );
 
-        // Create tool result message with status
-        let message_result =
-            Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
-
-        messages.push(message_use);
-        messages.push(message_result);
-        Ok(())
-    }
-
-    // Rewrite the exchange as needed after each tool call
-    async fn rewrite_messages_on_tool_response(
-        &self,
-        messages: &mut Vec<Message>,
-        pending: Vec<Message>,
-        status: String,
-    ) -> AgentResult<()> {
-        // Remove the last two messages (status and tool response)
-        messages.pop();
-        messages.pop();
-
-        // Append the pending messages
-        messages.extend(pending);
-
-        // Add back a fresh status and tool response
-        let message_use =
-            Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
-
-        let message_result =
-            Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
-
-        messages.push(message_use);
-        messages.push(message_result);
-
-        Ok(())
+        // Start dropping stuff! In theory we'd even way old messages against resources in some way
+        // it all eats the same budget. For now we drop old resources...
+        // TODO this is hard to implement
     }
 
     /// Create a stream that yields each message as it's generated by the agent.
     /// This includes both the assistant's responses and any tool responses.
     pub async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
         const CONTEXT_LIMIT: usize = 3000;
-        let mut messages = messages.to_vec();
+        let messages = messages.to_vec();
         let tools = self.get_prefixed_tools();
         let system_prompt = self.get_system_prompt()?;
         let token_counter = TokenCounter::new();
@@ -327,15 +313,10 @@ impl Agent {
             Some("gpt-4"),
         );
 
-        // Update conversation history for the start of the reply
-        if approx_count > CONTEXT_LIMIT {
-            let status_counts = self.get_system_status_counts().await?;
-            status = self.trim_system_status(status_counts, approx_count, CONTEXT_LIMIT)?;
-        } else {
-            status = self.get_system_status().await?;
-        }
-        self.rewrite_messages_on_reply(&mut messages, status.clone())
-            .await?;
+        println!("[DEBUG] Initial token count: {}", approx_count);
+
+        let resources = self.get_resources();
+        messages = self.prepare_inference(&system_prompt, &tools, &messages, &resources)?;
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
@@ -387,28 +368,15 @@ impl Agent {
 
                 yield message_tool_response.clone();
 
-                // Update conversation history after the tool call round
-                let token_counter = TokenCounter::new();
-                let approx_count = token_counter.count_chat_tokens(
-                    &system_prompt,
-                    &messages,
-                    &tools,
-                    Some("gpt-4"),
-                );
+                // Now we have to remove the previous system tool_call from the messages
+                messages.pop();
+                messages.pop();
 
-                let new_status;
-                if approx_count > CONTEXT_LIMIT {
-                    let status_counts = self.get_system_status_counts().await?;
-                    new_status = self.trim_system_status(status_counts, approx_count, CONTEXT_LIMIT)?;
-                } else {
-                    new_status = self.get_system_status().await?;
-                }
+                // And add the last two calls
+                messages.push(response);
+                messages.push(message_tool_response);
 
-                self.rewrite_messages_on_tool_response(
-                    &mut messages,
-                    vec![response.clone(), message_tool_response],
-                    new_status.clone(),
-                ).await?;
+                messages = self.prepare_inference(&system_prompt, &tools, &messages, &resources)?;
             }
         }))
     }
