@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useChat } from './ai-sdk-fork/useChat';
+import { Message, useChat } from './ai-sdk-fork/useChat';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { getApiUrl } from './config';
 import { Card } from './components/ui/card';
@@ -9,11 +9,21 @@ import GooseMessage from './components/GooseMessage';
 import UserMessage from './components/UserMessage';
 import Input from './components/Input';
 import MoreMenu from './components/MoreMenu';
-import { Bird } from './components/ui/icons';
 import { getPromptTemplates } from './notificationPrompts';
+import BottomMenu from './components/BottomMenu';
 import LoadingGoose from './components/LoadingGoose';
 import { ApiKeyWarning } from './components/ApiKeyWarning';
-// import fakeToolInvocations from './fixtures/tool-calls-and-results.json';
+import { askAi, getPromptTemplates } from './utils/askAI';
+import WingToWing, { Working } from './components/WingToWing';
+import { WelcomeScreen } from './components/WelcomeScreen';
+
+// Current version of the app - update this when you want to show the welcome screen again
+const CURRENT_VERSION = '1.0.0';
+
+// Get the last version from localStorage
+const getLastSeenVersion = () => localStorage.getItem('lastSeenVersion');
+const setLastSeenVersion = (version: string) => localStorage.setItem('lastSeenVersion', version);
+
 
 export interface Chat {
   id: number;
@@ -24,34 +34,6 @@ export interface Chat {
     content: string;
   }>;
 }
-
-enum Working {
-  Idle = 'Idle',
-  Working = 'Working',
-}
-
-const WingView: React.FC<{
-  onExpand: () => void;
-  progressMessage: string;
-  working: Working;
-}> = ({ onExpand, progressMessage, working }) => {
-  return (
-    <div
-      onClick={onExpand}
-      className="flex items-center w-full h-28 bg-gradient-to-r from-gray-100 via-gray-200 to-gray-300 shadow-md rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200">
-      {working === Working.Working && (      
-        <div className="w-10 h-10 mr-4 flex-shrink-0">
-          <Bird />
-        </div>
-      )}
-
-      {/* Status Text */}
-      <div className="flex flex-col text-left">
-        <span className="text-sm text-gray-600 font-medium">{progressMessage}</span>
-      </div>
-    </div>
-  );
-};
 
 function ChatContent({
   chats,
@@ -71,18 +53,15 @@ function ChatContent({
   setWorking: React.Dispatch<React.SetStateAction<Working>>;
 }) {
   const chat = chats.find((c: Chat) => c.id === selectedChatId);
-
   const [messageMetadata, setMessageMetadata] = useState<Record<string, string[]>>({});
 
   const {
     messages,
-    input,
-    handleInputChange,
-    handleSubmit,
     append,
     stop,
     isLoading,
     error,
+    setMessages,
   } = useChat({
     api: getApiUrl('/reply'),
     initialMessages: chat?.messages || [],
@@ -104,14 +83,10 @@ function ChatContent({
       setWorking(Working.Idle);
 
       const promptTemplates = getPromptTemplates(message.content);
-
       const fetchResponses = await askAi(promptTemplates);
-
       setMessageMetadata((prev) => ({ ...prev, [message.id]: fetchResponses }));
     },
   });
-
-  // const messages = fakeToolInvocations;
 
   // Update chat messages when they change
   useEffect(() => {
@@ -129,32 +104,78 @@ function ChatContent({
     }
   }, [initialQuery]);
 
+  const handleSubmit = (e: React.FormEvent) => {
+    const customEvent = e as CustomEvent;
+    const content = customEvent.detail?.value || '';
+    if (content.trim()) {
+      append({
+        role: 'user',
+        content: content,
+      });
+    }
+  };
+
   if (error) {
     console.log('Error:', error);
   }
 
+  const onStopGoose = () => {
+    stop();
+
+    const lastMessage: Message = messages[messages.length - 1];
+    if (lastMessage.role === 'user' && lastMessage.toolInvocations === undefined) {
+      // TODO: Using setInput seems to change the ongoing request message and prevents stop from stopping.
+      // It would be nice to find a way to populate the input field with the last message when interrupted.
+      // setInput("stop");
+
+      // Remove the last user message.
+      if (messages.length > 1) {
+        setMessages(messages.slice(0, -1));
+      } else {
+        setMessages([]);
+      }
+    } else if (lastMessage.role === 'assistant' && lastMessage.toolInvocations !== undefined) {
+      // Add messaging about interrupted ongoing tool invocations.
+      const newLastMessage: Message = {
+          ...lastMessage,
+          toolInvocations: lastMessage.toolInvocations.map((invocation) => {
+            if (invocation.state !== 'result') {
+              return {
+                ...invocation,
+                result: [
+                  {
+                    "audience": [
+                      "user"
+                    ],
+                    "text": "Interrupted.\n",
+                    "type": "text"
+                  },
+                  {
+                    "audience": [
+                      "assistant"
+                    ],
+                    "text": "Interrupted by the user to make a correction.\n",
+                    "type": "text"
+                  }
+                ],
+                state: 'result',
+              };
+          } else {
+            return invocation;
+          }
+        }),
+      };
+        
+      const updatedMessages = [...messages.slice(0, -1), newLastMessage];
+      setMessages(updatedMessages);
+    }
+    
+  };
+
   return (
     <div className="chat-content flex flex-col w-screen h-screen bg-window-gradient items-center justify-center p-[10px]">
       <div className="relative block h-[20px] w-screen">
-        <MoreMenu
-          onStopGoose={() => {
-            stop();
-          }}
-          onClearContext={() => {
-            append({
-              id: Date.now().toString(),
-              role: 'system',
-              content: 'Context cleared',
-            });
-          }}
-          onRestartGoose={() => {
-            append({
-              id: Date.now().toString(),
-              role: 'system',
-              content: 'Goose restarted',
-            });
-          }}
-        />
+        <MoreMenu />
       </div>
       <Card className="flex flex-col flex-1 h-[calc(100vh-95px)] w-full bg-card-gradient mt-0 border-none shadow-xl rounded-2xl relative">
         {messages.length === 0 ? (
@@ -188,9 +209,25 @@ function ChatContent({
               </div>
             )}
             {error && (
-              <div className="flex items-center justify-center p-4">
-                <div className="text-red-500 bg-red-100 p-3 rounded-lg">
-                  {error.message || 'An error occurred while processing your request'}
+              <div className="flex flex-col items-center justify-center p-4">
+                <div className="text-red-700 bg-red-400/50 p-3 rounded-lg mb-2">
+                  {error.message || 'Honk! Goose experienced an error while responding'}
+                  {error.status && (
+                    <span className="ml-2">(Status: {error.status})</span>
+                  )}
+                </div>
+                <div
+                  className="p-4 text-center text-splash-pills-text whitespace-nowrap cursor-pointer bg-prev-goose-gradient text-prev-goose-text rounded-[14px] inline-block hover:scale-[1.02] transition-all duration-150"
+                  onClick={async () => {
+                    const lastUserMessage = messages.reduceRight((found, m) => found || (m.role === 'user' ? m : null), null);
+                    if (lastUserMessage) {
+                      append({
+                        role: 'user',
+                        content: lastUserMessage.content
+                      });
+                    }
+                  }}>
+                  Retry Last Message
                 </div>
               </div>
             )}
@@ -200,12 +237,12 @@ function ChatContent({
 
         <Input
           handleSubmit={handleSubmit}
-          handleInputChange={handleInputChange}
-          input={input}
           disabled={isLoading}
           isLoading={isLoading}
-          onStop={stop}
+          onStop={onStopGoose}
         />
+        <div className="self-stretch h-px bg-black/5 rounded-sm" />
+        <BottomMenu />
       </Card>
     </div>
   );
@@ -255,13 +292,22 @@ export default function ChatWindow() {
   });
 
   const [selectedChatId, setSelectedChatId] = useState(1);
-
   const [mode, setMode] = useState<'expanded' | 'compact'>(
     initialQuery ? 'compact' : 'expanded'
   );
-
   const [working, setWorking] = useState<Working>(Working.Idle);
   const [progressMessage, setProgressMessage] = useState<string>('');
+
+  // Welcome screen state
+  const [showWelcome, setShowWelcome] = useState(() => {
+    const lastVersion = getLastSeenVersion();
+    return !lastVersion || lastVersion !== CURRENT_VERSION;
+  });
+
+  const handleWelcomeDismiss = () => {
+    setShowWelcome(false);
+    setLastSeenVersion(CURRENT_VERSION);
+  };
 
   const toggleMode = () => {
     const newMode = mode === 'expanded' ? 'compact' : 'expanded';
@@ -277,6 +323,10 @@ export default function ChatWindow() {
       {apiCredsMissing ? (
         <div className="w-full h-full">
           <ApiKeyWarning className="w-full h-full" />
+        </div>
+      ) : showWelcome ? (
+        <div className="w-full h-full">
+          <WelcomeScreen className="w-full h-full" onDismiss={handleWelcomeDismiss} />
         </div>
       ) : (
         <>
@@ -300,38 +350,11 @@ export default function ChatWindow() {
               <Route path="*" element={<Navigate to="/chat/1" replace />} />
             </Routes>
           </div>
-
-          {/* Always render WingView but control its visibility */}
-          <WingView onExpand={toggleMode} progressMessage={progressMessage} working={working} />
+                    
+          <WingToWing onExpand={toggleMode} progressMessage={progressMessage} working={working} />
+          
         </>
       )}
     </div>
   );
-}
-
-/**
- * Utility to ask the LLM any question to clarify without wider context.
- */
-async function askAi(promptTemplates: string[]) {
-  const responses = await Promise.all(
-    promptTemplates.map(async (template) => {
-      const response = await fetch(getApiUrl('/ask'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt: template }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response');
-      }
-
-      const data = await response.json();
-
-      return data.response;
-    })
-  );
-
-  return responses;
 }

@@ -3,6 +3,7 @@ use goose::{
     agent::Agent,
     developer::DeveloperSystem,
     providers::{configs::ProviderConfig, factory},
+    systems::goose_hints::GooseHintsSystem,
 };
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -18,6 +19,8 @@ impl AppState {
         let provider = factory::get_provider(provider_config.clone())?;
         let mut agent = Agent::new(provider);
         agent.add_system(Box::new(DeveloperSystem::new()));
+        let goosehints_system = Box::new(GooseHintsSystem::new());
+        agent.add_system(goosehints_system);
 
         Ok(Self {
             provider_config,

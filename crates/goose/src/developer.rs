@@ -8,6 +8,7 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::Mutex;
 use tokio::process::Command;
 use xcap::Monitor;
@@ -97,29 +98,24 @@ impl DeveloperSystem {
                         "description": "Path to the file. Can be absolute or relative to the system CWD"
                     },
                     "command": {
-                        "enum": ["view", "write", "replace", "insert", "undo"],
+                        "enum": ["view", "write", "replace", "undo"],
                         "description": "The commands to run."
                     },
                     "new_str": {
                         "type": "string",
                         "default": null,
-                        "description": "Required for `replace` and `insert` commands."
+                        "description": "Required for the `replace` command."
                     },
                     "old_str": {
                         "type": "string",
                         "default": null,
-                        "description": "Required for `str_replace` command."
+                        "description": "Required for the `replace` command."
                     },
                     "file_text": {
                         "type": "string",
                         "default": null,
                         "description": "Required for `create` command."
                     },
-                    "insert_line": {
-                        "type": "integer",
-                        "default": null,
-                        "description": "Required for `insert` command."
-                    }
                 }
             }),
         );
@@ -132,7 +128,7 @@ impl DeveloperSystem {
 
             bash
               - Prefer ripgrep - `rg` - when you need to locate content, it will respected ignored files for
-            efficiency.
+            efficiency. **Avoid find and ls -r**
                 - to locate files by name: `rg --files | rg example.py`
                 - to locate consent inside files: `rg 'class Example'`
               - The operating system for these commands is {os}
@@ -158,7 +154,8 @@ impl DeveloperSystem {
     // Helper method to resolve a path relative to cwd
     fn resolve_path(&self, path_str: &str) -> AgentResult<PathBuf> {
         let cwd = self.cwd.lock().unwrap();
-        let path = Path::new(path_str);
+        let expanded = shellexpand::tilde(path_str);
+        let path = Path::new(expanded.as_ref());
         let resolved_path = if path.is_absolute() {
             path.to_path_buf()
         } else {
@@ -191,13 +188,31 @@ impl DeveloperSystem {
         let cmd_with_redirect = format!("{} 2>&1", command);
 
         // Execute the command
-        let output = Command::new("bash")
+        let child = Command::new("bash")
+            .stdout(Stdio::piped()) // These two pipes required to capture output later.
+            .stderr(Stdio::piped())
             .kill_on_drop(true) // Critical so that the command is killed when the agent.reply stream is interrupted.
             .arg("-c")
             .arg(cmd_with_redirect)
-            .output()
+            .spawn()
+            .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+
+        // Store the process ID with the command as the key
+        let pid: Option<u32> = child.id();
+        if let Some(pid) = pid {
+            crate::process_store::store_process(pid);
+        }
+
+        // Wait for the command to complete and get output
+        let output = child
+            .wait_with_output()
             .await
             .map_err(|e| AgentError::ExecutionError(e.to_string()))?;
+
+        // Remove the process ID from the store
+        if let Some(pid) = pid {
+            crate::process_store::remove_process(pid);
+        }
 
         let output_str = format!(
             "Finished with Status Code: {}\nOutput:\n{}",
@@ -236,7 +251,7 @@ impl DeveloperSystem {
                         AgentError::InvalidParameters("Missing 'file_text' parameter".into())
                     })?;
 
-                self.text_editor_create(&path, file_text).await
+                self.text_editor_write(&path, file_text).await
             }
             "replace" => {
                 let old_str = params
@@ -253,23 +268,6 @@ impl DeveloperSystem {
                     })?;
 
                 self.text_editor_replace(&path, old_str, new_str).await
-            }
-            "insert" => {
-                let insert_line = params
-                    .get("insert_line")
-                    .and_then(|v| v.as_u64())
-                    .ok_or_else(|| {
-                        AgentError::InvalidParameters("Missing 'insert_line' parameter".into())
-                    })?;
-                let new_str = params
-                    .get("new_str")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        AgentError::InvalidParameters("Missing 'new_str' parameter".into())
-                    })?;
-
-                self.text_editor_insert(&path, insert_line as usize, new_str)
-                    .await
             }
             "undo" => self.text_editor_undo(&path).await,
             _ => Err(AgentError::InvalidParameters(format!(
@@ -319,7 +317,7 @@ impl DeveloperSystem {
         }
     }
 
-    async fn text_editor_create(
+    async fn text_editor_write(
         &self,
         path: &PathBuf,
         file_text: &str,
@@ -433,70 +431,6 @@ impl DeveloperSystem {
             })
             .with_audience(vec![Role::User])
             .with_priority(0.2),
-        ])
-    }
-
-    async fn text_editor_insert(
-        &self,
-        path: &PathBuf,
-        insert_line: usize,
-        new_str: &str,
-    ) -> AgentResult<Vec<Content>> {
-        // Check if file exists and is active
-        if !path.exists() {
-            return Err(AgentError::InvalidParameters(format!(
-                "File '{}' does not exist",
-                path.display()
-            )));
-        }
-        if !self.active_files.lock().unwrap().contains(path) {
-            return Err(AgentError::InvalidParameters(format!(
-                "You must view '{}' before editing it",
-                path.display()
-            )));
-        }
-
-        // Read lines
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| AgentError::ExecutionError(format!("Failed to read file: {}", e)))?;
-        let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-
-        if insert_line > lines.len() {
-            return Err(AgentError::InvalidParameters(format!(
-                "The insert line is greater than the length of the file ({} lines)",
-                lines.len()
-            )));
-        }
-
-        // Save history for undo
-        self.save_file_history(path)?;
-
-        // Insert new string after the specified line
-        lines.insert(insert_line, new_str.to_string());
-
-        // Write back to file
-        std::fs::write(path, lines.join("\n"))
-            .map_err(|e| AgentError::ExecutionError(format!("Failed to write file: {}", e)))?;
-
-        // Try to detect the language from the file extension
-        let language = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-
-        Ok(vec![
-            Content::text("Successfully inserted text").with_audience(vec![Role::Assistant]),
-            Content::text(formatdoc! {r#"
-                ### {path}
-                @{line}
-                ```{language}
-                {new_str}
-                ```
-                "#,
-                path=path.display(),
-                line=insert_line,
-                language=language,
-                new_str=new_str,
-            })
-            .with_audience(vec![Role::User])
-            .with_priority(0.0),
         ])
     }
 
@@ -812,13 +746,13 @@ mod tests {
         );
         system.call(view_call).await.unwrap();
 
-        // Insert a new line
+        // replace an entry
         let insert_call = ToolCall::new(
             "text_editor",
             json!({
-                "command": "insert",
+                "command": "replace",
                 "path": file_path_str,
-                "insert_line": 1,
+                "old_str": "First line",
                 "new_str": "Second line"
             }),
         );
