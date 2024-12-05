@@ -290,7 +290,7 @@ impl Agent {
             &resources,
         );
 
-        // Start dropping stuff! In theory we'd even way old messages against resources in some way
+        // Start dropping stuff! In theory we'd even way old messages against resources in some weight
         // it all eats the same budget. For now we drop old resources...
         // TODO this is hard to implement
     }
@@ -315,12 +315,10 @@ impl Agent {
                     &tools,
                 ).await?;
 
-                // The assistant's response is added in rewrite_messages_on_tool_response
                 // Yield the assistant's response
                 yield response.clone();
 
-                // Not sure why this is needed, but this ensures that the above message is yielded
-                // before the following potentially long-running commands start processing
+                // Allow other async processes to progress so they can handle the above response message
                 tokio::task::yield_now().await;
 
                 // First collect any tool requests
