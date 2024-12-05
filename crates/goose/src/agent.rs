@@ -203,9 +203,9 @@ impl Agent {
         let mut status_content: Vec<String> = Vec::new();
 
         if approx_count > ESTIMATED_TOKEN_LIMIT {
-            println!("Token budget exceeded. Current count: {}", approx_count);
-            println!("Difference: {} tokens over budget", approx_count - ESTIMATED_TOKEN_LIMIT);
-            // Get token counts for each resource
+            println!("[WARNING]Token budget exceeded. Current count: {} \n Difference: {} tokens over buget. Removing context", approx_count, approx_count - ESTIMATED_TOKEN_LIMIT);
+
+            // Get token counts for each resourcee
             let mut system_token_counts = HashMap::new();
 
             // Iterate through each system and its resources
@@ -311,7 +311,6 @@ impl Agent {
         let tools = self.get_prefixed_tools();
         let system_prompt = self.get_system_prompt()?;
 
-        println!("Estimated token limit: {} tokens", ESTIMATED_TOKEN_LIMIT);
 
         // Update conversation history for the start of the reply
         messages =self.prepare_inference(&system_prompt, &tools, &messages, &Vec::new()).await?;
@@ -373,19 +372,6 @@ impl Agent {
 
                 let pending = vec![response, message_tool_response];
                 messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending).await?;
-
-                // TODO: remove. DEBUG - Print the last message (status tool response) for debugging
-                if let Some(last_message) = messages.last() {
-                    // Get all tool response content concatenated with newlines
-                    let status_text: String = last_message.content.iter()
-                        .filter_map(|content| content.as_tool_response_text())
-                        .collect::<Vec<&str>>()
-                        .join("\n");
-
-                    if !status_text.is_empty() {
-                        println!("Status tool response:\n{}", status_text);
-                    }
-                }
             }
         }))
     }
