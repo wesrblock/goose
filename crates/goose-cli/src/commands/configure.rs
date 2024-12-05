@@ -16,7 +16,7 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
         name
     } else {
         cliclack::input("Which profile should we configure?")
-            .placeholder("default")
+            .default_input("default")
             .interact()?
     };
 
@@ -78,7 +78,7 @@ pub async fn handle_configure(provided_profile_name: Option<String>) -> Result<(
     let default_model_value =
         existing_profile.map_or(recommended_model, |profile| profile.model.as_str());
     let model: String = cliclack::input("Enter a model from that provider:")
-        .placeholder(default_model_value)
+        .default_input(default_model_value)
         .interact()?;
 
     // Forward any existing systems from the profile if present
