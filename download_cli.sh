@@ -11,7 +11,8 @@ function gh_curl() {
 }
 
 # Find the goose binary asset id without using jq
-echo "Looking up the most recent goose binary release...\n"
+echo "Looking up the most recent goose binary release..."
+echo ""
 RELEASES=$(gh_curl https://$GITHUB_API_ENDPOINT/repos/$REPO/releases)
 
 # Use awk to find the asset ID
@@ -37,7 +38,8 @@ if [ -z "$ASSET_ID" ]; then
 fi
 
 # Download the goose binary
-echo "Downloading goose...\n"
+echo "Downloading goose..."
+echo ""
 curl -sL --header 'Accept: application/octet-stream' https://$GITHUB_API_ENDPOINT/repos/$REPO/releases/assets/$ASSET_ID > $OUT_FILE
 chmod +x $OUT_FILE
 
@@ -45,10 +47,12 @@ LOCAL_BIN="$HOME/.local/bin"
 if [ ! -d "$LOCAL_BIN" ]; then
   echo "Directory $LOCAL_BIN does not exist. Creating it now..."
   mkdir -p "$LOCAL_BIN"
-  echo "Directory $LOCAL_BIN created successfully.\n"
+  echo "Directory $LOCAL_BIN created successfully."
+  echo ""
 fi
 
-echo "Sending goose to $LOCAL_BIN/$OUT_FILE\n"
+echo "Sending goose to $LOCAL_BIN/$OUT_FILE"
+echo ""
 chmod +x $OUT_FILE
 mv $OUT_FILE $LOCAL_BIN/$OUT_FILE
 
@@ -79,4 +83,5 @@ fi
 
 $LOCAL_BIN/$OUT_FILE configure $CONFIG_ARGS
 
-echo "You can now run Goose using: $OUT_FILE session\n"
+echo ""
+echo "You can now run Goose using: $OUT_FILE session"
