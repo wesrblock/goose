@@ -7,6 +7,8 @@ if (!fs.existsSync(SESSIONS_PATH)) {
   fs.mkdirSync(SESSIONS_PATH);
 }
 
+let cache: { [key: string]: Session } = {};
+
 interface Session {
   name: string; // Derived from a synopsis of the conversation
   messages: Array<{
@@ -50,6 +52,10 @@ export function saveSession(session: Session): string {
 
 export function loadSession(sessionId: string): Session | undefined {
   try {
+    if (cache[sessionId]) {
+      console.log('Session loaded from cache:', sessionId);
+      return cache[sessionId];
+    }
     const safeFileName = createSafeFilename(sessionId);
     const filePath = path.join(SESSIONS_PATH, `${safeFileName}.json`);
     if (!fs.existsSync(filePath)) {
@@ -68,6 +74,16 @@ export function loadSession(sessionId: string): Session | undefined {
 // load sessions that are relevant to the directory supplied (not where they are stored, but where user is operating)
 export function loadSessions(dir?: string): Session[] {
   try {
+    if (cache && Object.keys(cache).length > 0) {
+      console.log('Sessions loaded from cache');
+      if (dir) {
+        // Filter sessions based on the directory
+        return Object.values(cache).filter(session => session.directory === dir).splice(0, 4);
+      } else {
+        // just recent sessions
+        return Object.values(cache).splice(0, 20);
+      }
+    }
     console.log('Attempting to load sessions from:', SESSIONS_PATH);
     const MAX_AGE_DAYS = 10;
     // Get the current date
@@ -101,6 +117,10 @@ export function loadSessions(dir?: string): Session[] {
     const sessions = filteredFiles.map(({ file }) => {
       const data = fs.readFileSync(path.join(SESSIONS_PATH, file), 'utf8');
       return JSON.parse(data) as Session;
+    });
+    //save sessions in cache
+    sessions.forEach(session => {
+      cache[session.name] = session;
     });
     if (dir) {
       // Filter sessions based on the directory
