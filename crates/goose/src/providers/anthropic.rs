@@ -89,11 +89,11 @@ impl AnthropicProvider {
             status if status == StatusCode::TOO_MANY_REQUESTS || status.as_u16() >= 500 => {
                 Err(anyhow!("Server error: {}", status))
             }
-            _ => {
+            status => {
                 let error_text = response.text().await?;
                 Err(anyhow!(
                     "Request failed: {} - {}",
-                    response.status(),
+                    status,
                     error_text
                 ))
             }
