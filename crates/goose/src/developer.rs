@@ -45,6 +45,7 @@ impl DeveloperSystem {
         
         // For all URIs, verify the resource exists in active_resources first
         let active_resources = self.active_resources.lock().unwrap();
+        eprintln!("Active resources: {:?}", active_resources);
         let resource = active_resources.get(uri).ok_or_else(|| {
             // For file URIs, we want to treat unregistered files as an execution error
             if uri.starts_with("file://") {
@@ -224,7 +225,9 @@ impl DeveloperSystem {
                 let uri: Option<String> = Some(format!("str:///{}", cwd.display()));
                 resources.insert(
                     uri.clone().unwrap(),
-                    Resource::new(uri.unwrap(), Some("text".to_string()), Some("cwd".to_string())).unwrap()
+                    Resource::new(uri.unwrap(), Some("text".to_string()), Some("cwd".to_string()))
+                        .unwrap()
+                        .with_priority(1000) // Set highest priority
                 );
                 Mutex::new(resources)
             },
