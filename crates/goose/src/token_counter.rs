@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tokenizers::tokenizer::Tokenizer;
 use crate::models::message::Message;
 use crate::models::tool::Tool;
-use crate::systems::Resource;
+
 
 // Embed the tokenizer files directory
 static TOKENIZER_FILES: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../tokenizer_files");
@@ -182,7 +182,7 @@ impl TokenCounter {
         num_tokens
     }
 
-    pub fn count_pre_inference_tokens(
+    pub fn count_everything(
         &self,
         system_prompt: &str,
         messages: &[Message],

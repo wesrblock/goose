@@ -14,6 +14,8 @@ use crate::systems::{System, Resource};
 use crate::token_counter::TokenCounter;
 use serde::Serialize;
 
+const CONTEXT_LIMIT: usize = 3000;
+
 #[derive(Clone, Debug, Serialize)]
 struct SystemInfo {
     name: String,
@@ -52,6 +54,7 @@ pub struct Agent {
     provider: Box<dyn Provider>,
 }
 
+#[allow(dead_code)]
 impl Agent {
     /// Create a new Agent with the specified provider
     pub fn new(provider: Box<dyn Provider>) -> Self {
@@ -310,15 +313,14 @@ impl Agent {
     }
 
     async fn get_systems_resources(&self) -> AgentResult<HashMap<String, HashMap<String, (Resource,String)>>> {
-        let mut system_resource_content = HashMap::new();
+        let mut system_resource_content: HashMap<String, HashMap<String, (Resource, String)>> = HashMap::new();
         for system in &self.systems {
             let system_status = system
                 .status()
                 .await
                 .map_err(|e| AgentError::Internal(e.to_string()))?;
-        }
 
-            let mut resource_content: HashMap<String, String> = HashMap::new();
+            let mut resource_content: HashMap<String, (Resource, String)> = HashMap::new();
             for resource in system_status {
                 if let Ok(content) = system.read_resource(&resource.uri).await {
                     resource_content.insert(resource.uri.to_string(), (resource, content));
@@ -326,7 +328,7 @@ impl Agent {
             }
             system_resource_content.insert(system.name().to_string(), resource_content);
         }
-
+        Ok(system_resource_content)
     }
 
 
@@ -344,9 +346,9 @@ impl Agent {
 
         // Flatten all resource content into a vector of strings
         let mut resources = Vec::new();
-        for (_, system_resources) in resource_content {
+        for (_, system_resources) in &resource_content {
             for (_, (_, content)) in system_resources {
-                resources.push(content);
+                resources.push(content.clone());
             }
         }
 
@@ -355,47 +357,44 @@ impl Agent {
             &messages,
             &tools,
             &resources,
+            Some("gpt-4"),
         );
 
-        let mut status_content: Vec<_> = Vec::new();
+        let mut status_content: Vec<String> = Vec::new();
 
         if approx_count > CONTEXT_LIMIT {
             // Get token counts for each resource
             let mut system_token_counts = HashMap::new();
 
             // Iterate through each system and its resources
-            for (system_name, resources) in resource_content {
+            for (system_name, resources) in &resource_content {
                 let mut resource_counts = HashMap::new();
-                for (uri, (resource, content)) in resources {
+                for (uri, (_resource, content)) in resources {
                     let token_count = token_counter.count_tokens(&content, Some("gpt-4")) as u32;
-                    resource_counts.insert(uri, token_count);
+                    resource_counts.insert(uri.clone(), token_count);
                 }
-                system_token_counts.insert(system_name, resource_counts);
-
+                system_token_counts.insert(system_name.clone(), resource_counts);
+            }
             // Sort resources by priority and timestamp and trim to fit context limit
-            let mut all_resources: Vec<(String, String, u32)> = Vec::new();
-            for (system_name, resources) in &system_token_counts {
-                for (uri, token_count) in resources {
-                    // Get the resource details from the original content
-                    if let Some(resource_content) = resource_content.get(system_name) {
-                        if let Some((resource, _)) = resource_content.get(uri) {
-                            all_resources.push((
-                                system_name.clone(),
-                                uri.clone(), 
-                                *token_count
-                            ));
-                        }
+            let mut all_resources: Vec<(String, String, Resource, u32)> = Vec::new();
+            for (system_name, resources) in &resource_content {
+                for (uri, (resource, _)) in resources {
+                    if let Some(token_count) = system_token_counts.get(system_name).and_then(|counts| counts.get(uri)) {
+                        all_resources.push((
+                            system_name.clone(),
+                            uri.clone(),
+                            resource.clone(),
+                            *token_count
+                        ));
                     }
                 }
             }
 
             // Sort by priority (high to low) and timestamp (newest to oldest)
             all_resources.sort_by(|a, b| {
-                let a_resource = resource_content[&a.0][&a.1].0;
-                let b_resource = resource_content[&b.0][&b.1].0;
-                let priority_cmp = b_resource.priority.cmp(&a_resource.priority);
+                let priority_cmp = b.2.priority.cmp(&a.2.priority);
                 if priority_cmp == std::cmp::Ordering::Equal {
-                    b_resource.timestamp.cmp(&a_resource.timestamp)
+                    b.2.timestamp.cmp(&a.2.timestamp)
                 } else {
                     priority_cmp
                 }
@@ -406,7 +405,7 @@ impl Agent {
             let mut current_tokens = approx_count;
             
             while current_tokens > target_limit && !all_resources.is_empty() {
-                if let Some((system_name, uri, token_count)) = all_resources.pop() {
+                if let Some((system_name, uri, _, token_count)) = all_resources.pop() {
                     if let Some(system_counts) = system_token_counts.get_mut(&system_name) {
                         system_counts.remove(&uri);
                         current_tokens -= token_count as usize;
@@ -414,8 +413,7 @@ impl Agent {
                 }
             }
             // Create status messages only from resources that remain after token trimming
-            let mut status_content = Vec::new();
-            for (system_name, uri, _) in &all_resources {
+            for (system_name, uri, _, _) in &all_resources {
                 if let Some(system_resources) = resource_content.get(system_name) {
                     if let Some((resource, content)) = system_resources.get(uri) {
                         status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
@@ -426,7 +424,7 @@ impl Agent {
         else {
             // Create status messages from all resources when no trimming needed
             let mut status_content = Vec::new();
-            for (system_name, resources) in &resource_content {
+            for (_system_name, resources) in &resource_content {
                 for (resource, content) in resources.values() {
                     status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
                 }
@@ -435,7 +433,7 @@ impl Agent {
 
         
         // Create status messages only from resources that remain after token trimming
-        let mut status_content: Vec<_> = Vec::new();
+        let status_content: Vec<String> = Vec::new();
 
         // Join remaining status content and create status message
         let status_str = status_content.join("\n");
@@ -454,10 +452,12 @@ impl Agent {
         let message_result =
             Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
 
-        messages.push(message_use);
-        messages.push(message_result);
+        // Create a new messages vector with our changes
+        let mut new_messages = messages.to_vec();
+        new_messages.push(message_use);
+        new_messages.push(message_result);
 
-        Ok(messages)
+        Ok(new_messages)
 
         
         // Start dropping stuff! In theory we'd even weigh old messages against resources in some way
@@ -468,12 +468,9 @@ impl Agent {
     /// Create a stream that yields each message as it's generated by the agent.
     /// This includes both the assistant's responses and any tool responses.
     pub async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
-        const CONTEXT_LIMIT: usize = 3000;
         let mut messages = messages.to_vec();
         let tools = self.get_prefixed_tools();
         let system_prompt = self.get_system_prompt()?;
-        let token_counter = TokenCounter::new();
-        let status;
 
         // Update conversation history for the start of the reply
         messages =self.prepare_inference(&system_prompt, &tools, &messages).await?;
@@ -532,7 +529,7 @@ impl Agent {
                 messages.pop();
                 messages.pop();
 
-                messages = self.prepare_inference(&system_prompt, &tools, &messages, &resources)?;
+                messages = self.prepare_inference(&system_prompt, &tools, &messages).await?;
 
                 // And add the last two calls
                 messages.push(response);
