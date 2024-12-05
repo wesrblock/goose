@@ -6,19 +6,33 @@ FILE="goose"
 OUT_FILE="rgoose"
 GITHUB_API_ENDPOINT="api.github.com"
 
-alias errcho='>&2 echo'
-
 function gh_curl() {
   curl -sL -H "Accept: application/vnd.github.v3.raw" $@
 }
 
-PARSER="map(select(.prerelease == true and has(\"assets\") and (.assets | length > 0))) | sort_by(.published_at) | reverse | .[0].assets | map(select(.name == \"$FILE\"))[0].id"
-
-# Find the goose binary asset id
+# Find the goose binary asset id without using jq
 echo "Looking up the most recent goose binary release...\n"
-ASSET_ID=`gh_curl https://$GITHUB_API_ENDPOINT/repos/$REPO/releases | jq "$PARSER"`
-if [ "$ASSET_ID" = "null" ]; then
-  errcho "ERROR: $FILE asset not found"
+RELEASES=$(gh_curl https://$GITHUB_API_ENDPOINT/repos/$REPO/releases)
+
+# Use awk to find the asset ID
+# This script looks for the first prerelease and within it finds the asset with matching name
+ASSET_ID=$(echo "$RELEASES" | awk -v file="$FILE" '
+  BEGIN { found_prerelease = 0; found_asset = 0; }
+  /"prerelease"/ && /true/ { found_prerelease = 1; next }
+  found_prerelease && /"assets"/ { in_assets = 1; next }
+  in_assets && /"id":/ {
+    match($0, /[0-9]+/);
+    current_id = substr($0, RSTART, RLENGTH);
+    next
+  }
+  in_assets && /"name":/ && $0 ~ file {
+    print current_id;
+    exit;
+  }
+')
+
+if [ -z "$ASSET_ID" ]; then
+  echo "ERROR: $FILE asset not found"
   exit 1
 fi
 
