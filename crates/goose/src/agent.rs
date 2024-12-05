@@ -14,7 +14,7 @@ use crate::systems::{System, Resource};
 use crate::token_counter::TokenCounter;
 use serde::Serialize;
 
-const CONTEXT_LIMIT: usize = 3000;
+const CONTEXT_LIMIT: usize = 200000;
 
 #[derive(Clone, Debug, Serialize)]
 struct SystemInfo {

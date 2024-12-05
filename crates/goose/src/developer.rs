@@ -39,13 +39,11 @@ impl DeveloperSystem {
     // Reads a resource from a URI and returns its content.
     // The resource must already exist in active_resources.
     pub async fn read_resource(&self, uri: &str) -> AgentResult<String> {
-        eprintln!("Reading resource: {}", uri);
         let url = Url::parse(uri)
             .map_err(|e| AgentError::InvalidParameters(format!("Invalid URI: {}", e)))?;
         
         // For all URIs, verify the resource exists in active_resources first
         let active_resources = self.active_resources.lock().unwrap();
-        eprintln!("Active resources: {:?}", active_resources);
         let resource = active_resources.get(uri).ok_or_else(|| {
             // For file URIs, we want to treat unregistered files as an execution error
             if uri.starts_with("file://") {
@@ -54,17 +52,14 @@ impl DeveloperSystem {
                 AgentError::InvalidParameters(format!("Resource {} must be registered before reading", uri))
             }
         })?;
-        eprintln!("Found resource in active_resources with mime type: {}", resource.mime_type);
         
         // Load the content based on URI scheme and mime type
         let content = match url.scheme() {
             "file" => {
                 let path = url.to_file_path()
                     .map_err(|_| AgentError::InvalidParameters("Invalid file path in URI".into()))?;
-                eprintln!("Resolved file path: {}", path.display());
                 
                 if !path.exists() {
-                    eprintln!("File does not exist at path: {}", path.display());
                     return Err(AgentError::ExecutionError(format!("File does not exist: {}", path.display())));
                 }
                 
@@ -1009,17 +1004,13 @@ mod tests {
         let non_existent = Url::from_file_path(temp_dir.path().join("non_existent.txt"))
             .unwrap()
             .to_string();
-        eprintln!("Non-existent file path: {}", non_existent);
         {
             let mut active_resources = system.active_resources.lock().unwrap();
             let resource = Resource::new(non_existent.clone(), Some("text".to_string()), None).unwrap();
             active_resources.insert(non_existent.clone(), resource);
-            eprintln!("Resource registered with URI: {}", non_existent);
         }
         let result = system.read_resource(&non_existent).await;
-        eprintln!("Read result: {:?}", result);
         let error = result.unwrap_err();
-        eprintln!("Error type: {:?}", error);
         assert!(matches!(error, AgentError::ExecutionError(_)));
         assert!(error.to_string().contains("does not exist"));
 
