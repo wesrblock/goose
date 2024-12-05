@@ -218,7 +218,7 @@ impl Agent {
         // Keep resources until we hit the context limit
         let mut current_tokens = approx_count as u32;
         let mut kept_resources = Vec::new();
-        let target_limit = (context_limit as f32 * 0.9) as u32;
+        let target_limit = (context_limit as f32 * 0.8) as u32;
         
         // Start with all resources and remove until we're under target
         let mut remaining_resources: Vec<_> = all_resources.into_iter().collect();
@@ -309,6 +309,162 @@ impl Agent {
         Ok(())
     }
 
+    async fn get_systems_resources(&self) -> AgentResult<HashMap<String, HashMap<String, (Resource,String)>>> {
+        let mut system_resource_content = HashMap::new();
+        for system in &self.systems {
+            let system_status = system
+                .status()
+                .await
+                .map_err(|e| AgentError::Internal(e.to_string()))?;
+        }
+
+            let mut resource_content: HashMap<String, String> = HashMap::new();
+            for resource in system_status {
+                if let Ok(content) = system.read_resource(&resource.uri).await {
+                    resource_content.insert(resource.uri.to_string(), (resource, content));
+                }
+            }
+            system_resource_content.insert(system.name().to_string(), resource_content);
+        }
+
+    }
+
+
+    /// Setup the next inference by budgeting the context window as well as we can
+    async fn prepare_inference(
+            &self,
+            system_prompt: &str,
+            tools: &Vec<Tool>,
+            messages: &Vec<Message>,
+        ) -> AgentResult<Vec<Message>> {
+
+        let token_counter = TokenCounter::new();
+    
+        let resource_content = self.get_systems_resources().await?;
+
+        // Flatten all resource content into a vector of strings
+        let mut resources = Vec::new();
+        for (_, system_resources) in resource_content {
+            for (_, (_, content)) in system_resources {
+                resources.push(content);
+            }
+        }
+
+        let approx_count = token_counter.count_everything(
+            &system_prompt,
+            &messages,
+            &tools,
+            &resources,
+        );
+
+        let mut status_content: Vec<_> = Vec::new();
+
+        if approx_count > CONTEXT_LIMIT {
+            // Get token counts for each resource
+            let mut system_token_counts = HashMap::new();
+
+            // Iterate through each system and its resources
+            for (system_name, resources) in resource_content {
+                let mut resource_counts = HashMap::new();
+                for (uri, (resource, content)) in resources {
+                    let token_count = token_counter.count_tokens(&content, Some("gpt-4")) as u32;
+                    resource_counts.insert(uri, token_count);
+                }
+                system_token_counts.insert(system_name, resource_counts);
+
+            // Sort resources by priority and timestamp and trim to fit context limit
+            let mut all_resources: Vec<(String, String, u32)> = Vec::new();
+            for (system_name, resources) in &system_token_counts {
+                for (uri, token_count) in resources {
+                    // Get the resource details from the original content
+                    if let Some(resource_content) = resource_content.get(system_name) {
+                        if let Some((resource, _)) = resource_content.get(uri) {
+                            all_resources.push((
+                                system_name.clone(),
+                                uri.clone(), 
+                                *token_count
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // Sort by priority (high to low) and timestamp (newest to oldest)
+            all_resources.sort_by(|a, b| {
+                let a_resource = resource_content[&a.0][&a.1].0;
+                let b_resource = resource_content[&b.0][&b.1].0;
+                let priority_cmp = b_resource.priority.cmp(&a_resource.priority);
+                if priority_cmp == std::cmp::Ordering::Equal {
+                    b_resource.timestamp.cmp(&a_resource.timestamp)
+                } else {
+                    priority_cmp
+                }
+            });
+
+            // Remove resources until we're under target limit HARDCODEDE
+            let target_limit = (CONTEXT_LIMIT as f32 * 0.8) as usize;
+            let mut current_tokens = approx_count;
+            
+            while current_tokens > target_limit && !all_resources.is_empty() {
+                if let Some((system_name, uri, token_count)) = all_resources.pop() {
+                    if let Some(system_counts) = system_token_counts.get_mut(&system_name) {
+                        system_counts.remove(&uri);
+                        current_tokens -= token_count as usize;
+                    }
+                }
+            }
+            // Create status messages only from resources that remain after token trimming
+            let mut status_content = Vec::new();
+            for (system_name, uri, _) in &all_resources {
+                if let Some(system_resources) = resource_content.get(system_name) {
+                    if let Some((resource, content)) = system_resources.get(uri) {
+                        status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
+                    }
+            }
+        }
+        } 
+        else {
+            // Create status messages from all resources when no trimming needed
+            let mut status_content = Vec::new();
+            for (system_name, resources) in &resource_content {
+                for (resource, content) in resources.values() {
+                    status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
+                }
+            }
+        }  
+
+        
+        // Create status messages only from resources that remain after token trimming
+        let mut status_content: Vec<_> = Vec::new();
+
+        // Join remaining status content and create status message
+        let status_str = status_content.join("\n");
+        let mut context = HashMap::new();
+        let systems_status = vec![SystemStatus::new("system", status_str)];
+        context.insert("systems", &systems_status);
+
+        // Load and format the status template with only remaining resources
+        let status = load_prompt_file("status.md", &context)
+            .map_err(|e| AgentError::Internal(e.to_string()))?;
+
+
+        let message_use =
+            Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
+
+        let message_result =
+            Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
+
+        messages.push(message_use);
+        messages.push(message_result);
+
+        Ok(messages)
+
+        
+        // Start dropping stuff! In theory we'd even weigh old messages against resources in some way
+        // it all eats the same budget. For now we drop old resources...
+        // TODO this is hard to implement
+    }
+
     /// Create a stream that yields each message as it's generated by the agent.
     /// This includes both the assistant's responses and any tool responses.
     pub async fn reply(&self, messages: &[Message]) -> Result<BoxStream<'_, Result<Message>>> {
@@ -317,25 +473,10 @@ impl Agent {
         let tools = self.get_prefixed_tools();
         let system_prompt = self.get_system_prompt()?;
         let token_counter = TokenCounter::new();
-        let mut status;
-
-
-        let approx_count = token_counter.count_chat_tokens(
-            &system_prompt,
-            &messages,
-            &tools,
-            Some("gpt-4"),
-        );
+        let status;
 
         // Update conversation history for the start of the reply
-        if approx_count > CONTEXT_LIMIT {
-            let status_counts = self.get_system_status_counts().await?;
-            status = self.trim_system_status(status_counts, approx_count, CONTEXT_LIMIT)?;
-        } else {
-            status = self.get_system_status().await?;
-        }
-        self.rewrite_messages_on_reply(&mut messages, status.clone())
-            .await?;
+        messages =self.prepare_inference(&system_prompt, &tools, &messages).await?;
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
@@ -387,28 +528,16 @@ impl Agent {
 
                 yield message_tool_response.clone();
 
-                // Update conversation history after the tool call round
-                let token_counter = TokenCounter::new();
-                let approx_count = token_counter.count_chat_tokens(
-                    &system_prompt,
-                    &messages,
-                    &tools,
-                    Some("gpt-4"),
-                );
+                // Now we have to remove the previous system tool_call from the messages
+                messages.pop();
+                messages.pop();
 
-                let new_status;
-                if approx_count > CONTEXT_LIMIT {
-                    let status_counts = self.get_system_status_counts().await?;
-                    new_status = self.trim_system_status(status_counts, approx_count, CONTEXT_LIMIT)?;
-                } else {
-                    new_status = self.get_system_status().await?;
-                }
+                messages = self.prepare_inference(&system_prompt, &tools, &messages, &resources)?;
 
-                self.rewrite_messages_on_tool_response(
-                    &mut messages,
-                    vec![response.clone(), message_tool_response],
-                    new_status.clone(),
-                ).await?;
+                // And add the last two calls
+                messages.push(response);
+                messages.push(message_tool_response);
+
             }
         }))
     }
