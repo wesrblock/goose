@@ -15,7 +15,7 @@ function gh_curl() {
 PARSER="map(select(.prerelease == true and has(\"assets\") and (.assets | length > 0))) | sort_by(.published_at) | reverse | .[0].assets | map(select(.name == \"$FILE\"))[0].id"
 
 # Find the goose binary asset id
-echo "Flocking to the nearest goose binary location...\n"
+echo "Looking up the most recent goose binary release...\n"
 ASSET_ID=`gh_curl https://$GITHUB_API_ENDPOINT/repos/$REPO/releases | jq "$PARSER"`
 if [ "$ASSET_ID" = "null" ]; then
   errcho "ERROR: $FILE asset not found"
@@ -50,5 +50,19 @@ if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
   echo "    source ~/.bashrc    # or source ~/.zshrc\n"
 fi
 
-echo "Setup Goose by running: $OUT_FILE configure"
-echo "Then run Goose using: $OUT_FILE session\n"
+# Initialize config args with the default name
+CONFIG_ARGS="-n default"
+
+# Check for GOOSE_PROVIDER environment variable
+if [ -n "${GOOSE_PROVIDER:-}" ]; then
+    CONFIG_ARGS="$CONFIG_ARGS -p $GOOSE_PROVIDER"
+fi
+
+# Check for GOOSE_MODEL environment variable
+if [ -n "${GOOSE_MODEL:-}" ]; then
+    CONFIG_ARGS="$CONFIG_ARGS -m $GOOSE_MODEL"
+fi
+
+$LOCAL_BIN/$OUT_FILE config $CONFIG_ARGS
+
+echo "You can now run Goose using: $OUT_FILE session\n"
