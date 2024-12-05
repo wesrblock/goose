@@ -14,7 +14,9 @@ use crate::systems::{System, Resource};
 use crate::token_counter::TokenCounter;
 use serde::Serialize;
 
-const CONTEXT_LIMIT: usize = 200000;
+const CONTEXT_LIMIT: usize = 1_900; // TODO: update back to 200_000; // model's context limit
+const ESTIMATE_FACTOR: f32 = 0.8;
+const ESTIMATED_TOKEN_LIMIT: usize = (CONTEXT_LIMIT as f32 * ESTIMATE_FACTOR) as usize;
 
 #[derive(Clone, Debug, Serialize)]
 struct SystemInfo {
@@ -157,10 +159,29 @@ impl Agent {
             system_prompt: &str,
             tools: &Vec<Tool>,
             messages: &Vec<Message>,
+            pending: &Vec<Message>,
         ) -> AgentResult<Vec<Message>> {
+        // Prepares the inference by managing context window and token budget.
+        // This function:
+        // 1. Retrieves and formats system resources and status
+        // 2. Trims content if total tokens exceed the model's context limit
+        // 3. Adds pending messages if any. Pending messages are messages that have been added
+        //    to the conversation but not yet responded to.
+        // 4. Adds two messages to the conversation:
+        //    - A tool request message for status
+        //    - A tool response message containing the (potentially trimmed) status
+        //
+        // Returns the updated message history with status information appended.
+        //
+        // Arguments:
+        // * `system_prompt` - The system prompt to include
+        // * `tools` - Available tools for the agent
+        // * `messages` - Current conversation history
+        //
+        // Returns:
+        // * `AgentResult<Vec<Message>>` - Updated message history with status appended
 
         let token_counter = TokenCounter::new();
-    
         let resource_content = self.get_systems_resources().await?;
 
         // Flatten all resource content into a vector of strings
@@ -181,7 +202,9 @@ impl Agent {
 
         let mut status_content: Vec<String> = Vec::new();
 
-        if approx_count > CONTEXT_LIMIT {
+        if approx_count > ESTIMATED_TOKEN_LIMIT {
+            println!("Token budget exceeded. Current count: {}", approx_count);
+            println!("Difference: {} tokens over budget", approx_count - ESTIMATED_TOKEN_LIMIT);
             // Get token counts for each resource
             let mut system_token_counts = HashMap::new();
 
@@ -219,16 +242,16 @@ impl Agent {
                 }
             });
 
-            // Remove resources until we're under target limit HARDCODEDE
-            let target_limit = (CONTEXT_LIMIT as f32 * 0.8) as usize;
+            // Remove resources until we're under target limit
             let mut current_tokens = approx_count;
-            
-            while current_tokens > target_limit && !all_resources.is_empty() {
+
+            while current_tokens > ESTIMATED_TOKEN_LIMIT && !all_resources.is_empty() {
                 if let Some((system_name, uri, _, token_count)) = all_resources.pop() {
                     if let Some(system_counts) = system_token_counts.get_mut(&system_name) {
                         system_counts.remove(&uri);
                         current_tokens -= token_count as usize;
                     }
+                    println!("Trimmed a resource: {uri}.\nCurrent tokens: {current_tokens}");
                 }
             }
             // Create status messages only from resources that remain after token trimming
@@ -239,7 +262,7 @@ impl Agent {
                     }
             }
         }
-        } 
+        }
         else {
             // Create status messages from all resources when no trimming needed
             let mut status_content = Vec::new();
@@ -248,11 +271,7 @@ impl Agent {
                     status_content.push(format!("{}\n```\n{}\n```\n", resource.name, content));
                 }
             }
-        }  
-
-        
-        // Create status messages only from resources that remain after token trimming
-        let status_content: Vec<String> = Vec::new();
+        }
 
         // Join remaining status content and create status message
         let status_str = status_content.join("\n");
@@ -265,23 +284,26 @@ impl Agent {
             .map_err(|e| AgentError::Internal(e.to_string()))?;
 
 
+        // Create a new messages vector with our changes
+        let mut new_messages = messages.to_vec();
+
+        // Add pending messages
+        for msg in pending {
+            new_messages.push(msg.clone());
+        }
+
+        // Finally add the status messages
         let message_use =
             Message::assistant().with_tool_request("000", Ok(ToolCall::new("status", json!({}))));
 
         let message_result =
             Message::user().with_tool_response("000", Ok(vec![Content::text(status)]));
 
-        // Create a new messages vector with our changes
-        let mut new_messages = messages.to_vec();
+
         new_messages.push(message_use);
         new_messages.push(message_result);
 
         Ok(new_messages)
-
-        
-        // Start dropping stuff! In theory we'd even weigh old messages against resources in some way
-        // it all eats the same budget. For now we drop old resources...
-        // TODO this is hard to implement
     }
 
     /// Create a stream that yields each message as it's generated by the agent.
@@ -291,12 +313,18 @@ impl Agent {
         let tools = self.get_prefixed_tools();
         let system_prompt = self.get_system_prompt()?;
 
+        println!("Estimated token limit: {} tokens", ESTIMATED_TOKEN_LIMIT);
+
         // Update conversation history for the start of the reply
-        messages =self.prepare_inference(&system_prompt, &tools, &messages).await?;
+        messages =self.prepare_inference(&system_prompt, &tools, &messages, &Vec::new()).await?;
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
-
+                // TODO: remove. DEBUG - Print the messages before completion
+                println!("Messages before completion:");
+                for (i, msg) in messages.iter().enumerate() {
+                    println!("Message {}: {:?}\n", i, msg);
+                }
                 // Get completion from provider
                 let (response, _) = self.provider.complete(
                     &system_prompt,
@@ -344,16 +372,26 @@ impl Agent {
 
                 yield message_tool_response.clone();
 
-                // Now we have to remove the previous system tool_call from the messages
+                // Now we have to remove the previous status tooluse and toolresponse
+                // before we add pending messages, then the status msgs back again
                 messages.pop();
                 messages.pop();
 
-                messages = self.prepare_inference(&system_prompt, &tools, &messages).await?;
+                let pending = vec![response, message_tool_response];
+                messages = self.prepare_inference(&system_prompt, &tools, &messages, &pending).await?;
 
-                // And add the last two calls
-                messages.push(response);
-                messages.push(message_tool_response);
+                // TODO: remove. DEBUG - Print the last message (status tool response) for debugging
+                if let Some(last_message) = messages.last() {
+                    // Get all tool response content concatenated with newlines
+                    let status_text: String = last_message.content.iter()
+                        .filter_map(|content| content.as_tool_response_text())
+                        .collect::<Vec<&str>>()
+                        .join("\n");
 
+                    if !status_text.is_empty() {
+                        println!("Status tool response:\n{}", status_text);
+                    }
+                }
             }
         }))
     }
