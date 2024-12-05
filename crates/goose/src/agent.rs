@@ -316,35 +316,29 @@ impl Agent {
         let mut messages = messages.to_vec();
         let tools = self.get_prefixed_tools();
         let system_prompt = self.get_system_prompt()?;
+        let token_counter = TokenCounter::new();
+        let mut status;
+
+
+        let approx_count = token_counter.count_chat_tokens(
+            &system_prompt,
+            &messages,
+            &tools,
+            Some("gpt-4"),
+        );
 
         // Update conversation history for the start of the reply
-        let status = self.get_system_status().await?;
-        self.rewrite_messages_on_reply(&mut messages, status)
+        if approx_count > CONTEXT_LIMIT {
+            let status_counts = self.get_system_status_counts().await?;
+            status = self.trim_system_status(status_counts, approx_count, CONTEXT_LIMIT)?;
+        } else {
+            status = self.get_system_status().await?;
+        }
+        self.rewrite_messages_on_reply(&mut messages, status.clone())
             .await?;
 
         Ok(Box::pin(async_stream::try_stream! {
             loop {
-                
-                let token_counter = TokenCounter::new();
-                let approx_count = token_counter.count_chat_tokens(
-                    &system_prompt,
-                    &messages,
-                    &tools,
-                    Some("gpt-4"),
-                );
-
-                if approx_count > CONTEXT_LIMIT {
-                    eprintln!("Trimming system status due to token count: {}", approx_count);
-                    let status_counts = self.get_system_status_counts().await?;
-                    eprintln!("Status counts: {:?}", status_counts);
-                    let trimmed_status = self.trim_system_status(status_counts, approx_count, CONTEXT_LIMIT)?;
-                    eprintln!("Trimmed status: {:?}", trimmed_status);
-                    self.rewrite_messages_on_reply(&mut messages, trimmed_status).await?;
-                    eprintln!("Messages after trimming:");
-                    for (i, msg) in messages.iter().enumerate() {
-                        eprintln!("[{}] {:?}", i, msg);
-                    }
-                }
 
                 // Get completion from provider
                 let (response, _) = self.provider.complete(
@@ -394,11 +388,26 @@ impl Agent {
                 yield message_tool_response.clone();
 
                 // Update conversation history after the tool call round
-                let status = self.get_system_status().await?;
+                let token_counter = TokenCounter::new();
+                let approx_count = token_counter.count_chat_tokens(
+                    &system_prompt,
+                    &messages,
+                    &tools,
+                    Some("gpt-4"),
+                );
+
+                let new_status;
+                if approx_count > CONTEXT_LIMIT {
+                    let status_counts = self.get_system_status_counts().await?;
+                    new_status = self.trim_system_status(status_counts, approx_count, CONTEXT_LIMIT)?;
+                } else {
+                    new_status = self.get_system_status().await?;
+                }
+
                 self.rewrite_messages_on_tool_response(
                     &mut messages,
                     vec![response.clone(), message_tool_response],
-                    status,
+                    new_status.clone(),
                 ).await?;
             }
         }))
