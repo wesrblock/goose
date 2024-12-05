@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO="block/goose"
 FILE="goose"
-OUT_FILE="rgoose"
+OUT_FILE="goose"
 GITHUB_API_ENDPOINT="api.github.com"
 
 function gh_curl() {
